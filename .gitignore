@@ -1,0 +1,4 @@
+# default exclusions
+temp/
+Au3ChangelogUpdater.exe
+package.json
