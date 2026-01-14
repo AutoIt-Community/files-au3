@@ -21,9 +21,10 @@
 ; argumentum    Dark Mode functions
 ; NoNameCode    Dark Mode functions
 ; Melba23       GUIFrame UDF
+; ahmet         Non-client painting of white line in dark mode
 ; UEZ           Lots and lots and lots
 
-Global $sVersion = "2026-01-12"
+Global $sVersion = "2026-01-14"
 
 ; set base DPI scale value and apply DPI
 Global $DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = -2
@@ -33,17 +34,21 @@ $iDPI = ApplyDPI()
 ; DPI must be set before ownerdrawn menu
 #include "../lib/ModernMenuRaw.au3"
 
-Global $hTLESystem, $iFrame_A, $hSecondFrame, $g_bHeaderEndDrag, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus
+Opt("GUIOnEventMode", 1)
+
+Global $hTLESystem, $iFrame_A, $hSecondFrame, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus
 Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hChildLV, $hParentFrame, $g_iIconWidth, $g_hTreeView
 Global $g_hSizebox, $g_hOldProc, $g_iHeight, $g_aTextStatus, $g_aRatioW, $g_hDots
 Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
 Global $sBack, $sForward, $sUpLevel, $sRefresh
+Global $idExitItem, $idAboutItem
 Global $hCursor, $hProc, $g_hBrush
 Global $iTimeCalled, $iTimeDiff
-Global $bPathSelectAll, $bPathInputChanged, $sSelectedItems, $g_aText
-Global $idSeparator, $idThemeItem, $hToolTip2, $hToolTip1
+Global $sSelectedItems, $g_aText
+Global $idSeparator, $idThemeItem, $hToolTip2, $hToolTip1, $bTooltipActive
 Global $isDarkMode = _WinAPI_ShouldAppsUseDarkMode()
 Global $hFolderHistory=__History_Create("_doUnReDo", 100, "_historyChange"), $bFolderHistoryChanging = False
+Global $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, 0x000000)
 Global Const $SBS_SIZEBOX = 0x08, $SBS_SIZEGRIP = 0x10
 Global Const $CLR_TEXT = 0xFFFFFF ; The text color
 Global Const $SB_LEFT = 6
@@ -54,15 +59,13 @@ Global $aPosTip, $iOldaPos0, $iOldaPos1
 ; force light mode
 ;$isDarkMode = False
 
-Global $tInfo, $gText
+Global $gText
 
 Global $hKernel32 = DllOpen('kernel32.dll')
 Global $hGdi32 = DllOpen('gdi32.dll')
 Global $hUser32 = DllOpen('user32.dll')
 Global $hShlwapi = DllOpen('shlwapi.dll')
 Global $hShell32 = DllOpen('shell32.dll')
-
-Global $global_StatusBar_Text = "  Part 1"
 
 ; get Windows build
 Global $iOSBuild = @OSBuild
@@ -88,10 +91,6 @@ Else
     Global $iTextColorDef = _WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOWTEXT))
     Global $iTextColorDis = _WinAPI_ColorAdjustLuma(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOWTEXT)), 70)
 EndIf
-
-; menu line color
-Global $iColorNew = $iBackColorDef
-Global $iColorOld = _WinAPI_GetSysColor($COLOR_MENU)
 
 ; Structure Definitions (using $tagNMHDR and $tagRECT which are defined in includes)
 Global Const $tagNMCUSTOMDRAW = $tagNMHDR & ";dword DrawStage;handle hdc;" & $tagRECT & ";dword_ptr ItemSpec;uint ItemState;lparam lItemParam;"
@@ -147,6 +146,10 @@ Func _FilesAu3()
 
     ;Create GUI
     $g_hGUI = GUICreate("Files Au3", @DesktopWidth - 600, @DesktopHeight - 400, -1, -1, $WS_OVERLAPPEDWINDOW)
+    GUISetOnEvent($GUI_EVENT_CLOSE, "_EventsGUI")
+    GUISetOnEvent($GUI_EVENT_MAXIMIZE, "_EventsGUI")
+    GUISetOnEvent($GUI_EVENT_RESIZED, "_EventsGUI")
+
     $FrameWidth1 = @DesktopWidth / 4
 
     _InitDarkSizebox()
@@ -165,6 +168,7 @@ Func _FilesAu3()
     GUISetFont(10, $FW_NORMAL, $GUI_FONTNORMAL, $sButtonFont)
 
     $sBack = GUICtrlCreateButton(ChrW(0xE64E), $sButtonSpacing, 10, -1, -1)
+    GUICtrlSetOnEvent(-1, "_ButtonFunctions")
     GUICtrlSetResizing(-1, $GUI_DOCKMENUBAR + $GUI_DOCKLEFT + $GUI_DOCKWIDTH)
     $aPos = ControlGetPos($g_hGUI, "", $sBack)
     $sBackPosV = $aPos[1] + $aPos[3]
@@ -174,6 +178,7 @@ Func _FilesAu3()
     _GUIToolTip_AddTool($hToolTip2, $g_hGUI, "Back", GUICtrlGetHandle($sBack))
 
     $sForward = GUICtrlCreateButton(ChrW(0xE64D), $sBackPosH + $sButtonSpacing, 10, -1, -1)
+    GUICtrlSetOnEvent(-1, "_ButtonFunctions")
     GUICtrlSetResizing(-1, $GUI_DOCKMENUBAR + $GUI_DOCKLEFT + $GUI_DOCKWIDTH)
     $aPos = ControlGetPos($g_hGUI, "", $sForward)
     $sForwardPosV = $aPos[1] + $aPos[3]
@@ -182,6 +187,7 @@ Func _FilesAu3()
     _GUIToolTip_AddTool($hToolTip2, $g_hGUI, "Forward", GUICtrlGetHandle($sForward))
 
     $sUpLevel = GUICtrlCreateButton(ChrW(0xE64C), $sForwardPosH + $sButtonSpacing, 10, -1, -1)
+    GUICtrlSetOnEvent(-1, "_ButtonFunctions")
     GUICtrlSetResizing(-1, $GUI_DOCKMENUBAR + $GUI_DOCKLEFT + $GUI_DOCKWIDTH)
     $aPos = ControlGetPos($g_hGUI, "", $sUpLevel)
     $sUpLevelPosV = $aPos[1] + $aPos[3]
@@ -189,6 +195,7 @@ Func _FilesAu3()
     _GUIToolTip_AddTool($hToolTip2, $g_hGUI, "Up", GUICtrlGetHandle($sUpLevel))
 
     $sRefresh = GUICtrlCreateButton(ChrW(0xE72C), $sUpLevelPosH + $sButtonSpacing, 10, -1, -1)
+    GUICtrlSetOnEvent(-1, "_ButtonFunctions")
     GUICtrlSetResizing(-1, $GUI_DOCKMENUBAR + $GUI_DOCKLEFT + $GUI_DOCKWIDTH)
     $aPos = ControlGetPos($g_hGUI, "", $sRefresh)
     $sRefreshPosV = $aPos[1] + $aPos[3]
@@ -210,11 +217,15 @@ Func _FilesAu3()
     EndIf
 
     $idPropertiesItem = GUICtrlCreateMenuItem("&Properties", $idFileMenu)
+    GUICtrlSetOnEvent(-1, "_MenuFunctions")
     GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
     GUICtrlCreateMenuItem("", $idFileMenu)
-    Local $idExitItem = GUICtrlCreateMenuItem("&Exit", $idFileMenu)
+    $idExitItem = GUICtrlCreateMenuItem("&Exit", $idFileMenu)
+    GUICtrlSetOnEvent(-1, "_MenuFunctions")
     $idThemeItem = GUICtrlCreateMenuItem("&Dark Mode", $idViewMenu)
-    Local $idAboutItem = GUICtrlCreateMenuItem("&About", $idHelpMenu)
+    GUICtrlSetOnEvent(-1, "_MenuFunctions")
+    $idAboutItem = GUICtrlCreateMenuItem("&About", $idHelpMenu)
+    GUICtrlSetOnEvent(-1, "_MenuFunctions")
 
     If $isDarkMode Then GUICtrlSetState($idThemeItem, $GUI_CHECKED)
 
@@ -260,7 +271,7 @@ Func _FilesAu3()
     $g_hTreeView = GUICtrlGetHandle($idTreeView)
 
     ; Create TLE system
-    Local $hTLESystem = __TreeListExplorer_CreateSystem($g_hGUI, "", "_folderCallback")
+    $hTLESystem = __TreeListExplorer_CreateSystem($g_hGUI, "", "_folderCallback")
     If @error Then ConsoleWrite("__TreeListExplorer_CreateSystem left failed: "&@error&":"&@extended&@crlf)
     ; Add Views to TLE system
     __TreeListExplorer_AddView($hTLESystem, $idInputPath)
@@ -306,7 +317,8 @@ Func _FilesAu3()
 
     ; listview context menu
     Local $idContextLV = GUICtrlCreateContextMenu($idListview)
-    Local $idPropertiesLV = GUICtrlCreateMenuItem("Properties", $idContextLV)
+    $idPropertiesLV = GUICtrlCreateMenuItem("Properties", $idContextLV)
+    GUICtrlSetOnEvent(-1, "_MenuFunctions")
 
     __TreeListExplorer_AddView($hTLESystem, $idListview, True, True, True, False, False)
     If @error Then ConsoleWrite("__TreeListExplorer_AddView $idListview failed: "&@error&":"&@extended&@crlf)
@@ -347,14 +359,11 @@ Func _FilesAu3()
 
     _setThemeColors()
 
-    If $isDarkMode Then
-        ; set COLOR_MENU system color
-        _WinAPI_SetSysColors($COLOR_MENU, $iColorNew)
-    EndIf
-
     GUIRegisterMsg($WM_MOVE, "WM_MOVE")
     GUIRegisterMsg($WM_SIZE, "WM_SIZE")
     GUIRegisterMsg($WM_DRAWITEM, "WM_DRAWITEM2")
+    GUIRegisterMsg($WM_ACTIVATE, "WM_ACTIVATE_Handler")
+    GUIRegisterMsg($WM_WINDOWPOSCHANGED, "WM_WINDOWPOSCHANGED_Handler")
 
     _GUICtrl_SetFont($g_hHeader, 16 * $iDPI, 400, 0, "Segoe UI")
 
@@ -367,6 +376,7 @@ Func _FilesAu3()
     EndIf
 
     GUISetState(@SW_SHOW, $g_hGUI)
+    _drawUAHMenuNCBottomLine($g_hGUI)
 
     ; get parent frame handle
     Local $aData = _WinAPI_EnumChildWindows(_GetHwndFromPID(@AutoItPID))
@@ -412,69 +422,20 @@ Func _FilesAu3()
     _WinAPI_SetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 1), $GWL_EXSTYLE, BitOR($i_ExStyle_Old, $WS_EX_COMPOSITED))
 
     While True
-        Local $iMsg = GUIGetMsg()
-        Switch $iMsg
-            Case $idThemeItem
-                _switchTheme()
-			Case $sBack
-				__History_Undo($hFolderHistory)
-            Case $sForward
-				__History_Redo($hFolderHistory)
-            Case $sUpLevel
-				__TreeListExplorer_OpenPath($hTLESystem, __TreeListExplorer__GetPathAndLast(__TreeListExplorer_GetPath($hTLESystem))[0])
-            Case $sRefresh
-				__TreeListExplorer_Reload($hTLESystem)
-            Case $GUI_EVENT_CLOSE
-                ExitLoop
-            Case $GUI_EVENT_RESIZED, $GUI_EVENT_MAXIMIZE
-                _resizeLVCols2()
-            Case $idExitItem
-                ExitLoop
-            Case $idPropertiesItem, $idPropertiesLV
-                _Properties()
-            Case $idAboutItem
-                _About()
-        EndSwitch
-
-        If $g_bHeaderEndDrag Then
-            $g_bHeaderEndDrag = False
-            _reorderLVCols()
+        If $bTooltipActive Then
+            ; check if cursor is still over listview
+            Local $aCursor = GUIGetCursorInfo($g_hGUI)
+            If $aCursor[4] <> $idListview Then
+                ; cancel tooltip when not over listview
+                _GUIToolTip_TrackActivate($hToolTip1, False, $g_hGUI, $g_hListview)
+                ; reset the value stored in the tooltip
+                $gText = ""
+                _GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
+                $bTooltipActive = False
+            EndIf
         EndIf
 
-        If $bPathSelectAll Then
-            ; select all text in path input box
-            ControlFocus($g_hGUI, "", $idInputPath)
-            _GUICtrlEdit_SetSel($g_hInputPath, 0, -1)
-            ; reset variable
-            $bPathSelectAll = False
-        EndIf
-
-        If $bPathInputChanged Then
-            ; reset position of header and listview
-            GUICtrlSendMsg($idListview, $WM_HSCROLL, $SB_LEFT, 0)
-            WinMove($g_hHeader, "", 0, 0, WinGetPos($g_hChild)[2], Default)
-
-            ; update number of items (files and folders) in statusbar
-            $g_aText[0] = "  " & _GUICtrlListView_GetItemCount($idListview) & " items"
-            ; update drive space information
-            Local $iDriveFree = Round(DriveSpaceFree(GUICtrlRead($idInputPath)) / 1024, 1)
-            Local $iDriveTotal = Round(DriveSpaceTotal(GUICtrlRead($idInputPath)) / 1024, 1)
-            Local $iPercentFree = Round(($iDriveFree / $iDriveTotal) * 100)
-            $g_aText[3] = $iDriveFree & " GB free" & " (" & $iPercentFree & "%)"
-            _WinAPI_RedrawWindow($g_hStatus)
-            ; reset variable
-            $bPathInputChanged = False
-        EndIf
-
-        Local $aCursor = GUIGetCursorInfo($g_hGUI)
-        If $aCursor[4] <> $idListview Then
-            ; cancel tooltip when not over listview
-            _GUIToolTip_TrackActivate($hToolTip1, False, $g_hGUI, $g_hListview)
-            ; reset the value stored in the tooltip
-            $gText = ""
-            _GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
-        EndIf
-        Sleep(10)
+        Sleep(200)
     WEnd
 EndFunc
 
@@ -524,8 +485,6 @@ Func _switchTheme()
 
         GUICtrlSetState($idThemeItem, $GUI_UNCHECKED)
         _themeTooltips()
-        $iColorNew = $iBackColorDef
-        _WinAPI_SetSysColors($COLOR_MENU, $iColorNew)
         _setThemeColors()
         _WinAPI_RedrawWindow($g_hStatus)
     Else
@@ -569,8 +528,6 @@ Func _switchTheme()
 
         GUICtrlSetState($idThemeItem, $GUI_CHECKED)
         _themeTooltips()
-        $iColorNew = $iBackColorDef
-        _WinAPI_SetSysColors($COLOR_MENU, $iColorNew)
         _setThemeColors()
         _WinAPI_RedrawWindow($g_hStatus)
     EndIf
@@ -771,8 +728,6 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
     Local Static $iItemPrev
     Local $iItemRow
 
-    ;Local $tInfo, $gText
-
     ; header and listview combined functionality
     ;Local $tNMHDR = DllStructCreate($tagNMHDR, $lParam)
     Local $hWndFrom = HWnd(DllStructGetData($tNMHDR, "hWndFrom"))
@@ -814,7 +769,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                     Return False ; to continue tracking the divider
 
                 Case $HDN_ENDDRAG
-                    $g_bHeaderEndDrag = True
+                    AdlibRegister("_EndDrag", 10)
                     Return False ; to allow the control to automatically place and reorder the item
 
                 Case $HDN_DIVIDERDBLCLICK, $HDN_DIVIDERDBLCLICKW
@@ -872,16 +827,19 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                     ; item selection(s) have changed
                     _selectionChangedLV()
                 Case $LVN_HOTTRACK; Sent by a list-view control When the user moves the mouse over an item
-                    $tInfo = DllStructCreate($tagNMLISTVIEW, $lParam)
-                    $gText = _GUICtrlListView_GetItemText($hWndFrom, DllStructGetData($tInfo, "Item"), 0)
-                    $iItemRow = DllStructGetData($tInfo, "Item")
+                    Local $tInfo2 = DllStructCreate($tagNMLISTVIEW, $lParam)
+                    $gText = _GUICtrlListView_GetItemText($hWndFrom, DllStructGetData($tInfo2, "Item"), 0)
+                    $iItemRow = DllStructGetData($tInfo2, "Item")
                     ; clear tooltip if cursor not over column 0 or different item
-                    If DllStructGetData($tInfo, "SubItem") <> 0 Or $iItemRow <> $iItemPrev Then
+                    If DllStructGetData($tInfo2, "SubItem") <> 0 Or $iItemRow <> $iItemPrev Then
                         ; ensure that tooltip only shows when over column 0
                         _GUIToolTip_TrackActivate($hToolTip1, False, $g_hGUI, $g_hListview)
                         ; reset the value stored in the tooltip
                         $gText = ""
                         _GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
+                    Else
+                        ; check if cursor is over listview (if not, clear tooltip)
+                        ;AdlibRegister("_IsCursorOverLV", 200)
                     EndIf
                     $iItemPrev = $iItemRow
                     Return 0; Allow the ListView to perform its normal track select processing.
@@ -919,6 +877,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                         _GUIToolTip_TrackActivate($hToolTip1, False, $g_hGUI, $g_hListview)
                     Else
                         _GUIToolTip_TrackActivate($hToolTip1, True, $g_hGUI, $g_hListview)
+                        ; check if cursor is over listview (if not, clear tooltip)
+                        $bTooltipActive = True
                     EndIf
                     Return 1 ; prevent the hover from being processed
             EndSwitch
@@ -1108,9 +1068,9 @@ Func WM_COMMAND2($hWnd, $iMsg, $wParam, $lParam)
             Switch $iCode
                 Case $EN_SETFOCUS
                     ; select all text in path input box
-                    $bPathSelectAll = True
+                    AdlibRegister("_PathSelectAll", 10)
                 Case $EN_CHANGE
-                    $bPathInputChanged = True
+                    AdlibRegister("_PathInputChanged", 10)
             EndSwitch
     EndSwitch
     Return $GUI_RUNDEFMSG
@@ -1129,9 +1089,6 @@ Func _CleanExit()
     _GUICtrlHeader_Destroy($g_hHeader)
     GUIDelete($g_hGUI)
     _ClearDarkSizebox()
-
-    ; reset COLOR_MENU system color
-    _WinAPI_SetSysColors($COLOR_MENU, $iColorOld)
 
     DllClose($hKernel32)
     DllClose($hGdi32)
@@ -1510,7 +1467,7 @@ Func _GUICtrl_SetFont($hWnd, $iHeight = 15, $iWeight = 400, $iFontAtrributes = 0
         $hFont = _WinAPI_CreateFont($iHeight, 0, 0, 0, $iWeight, BitAND($iFontAtrributes, 2), BitAND($iFontAtrributes, 4), _
                                     BitAND($iFontAtrributes, 8), $DEFAULT_CHARSET, $OUT_DEFAULT_PRECIS, $CLIP_DEFAULT_PRECIS, _
                                     $DEFAULT_QUALITY, 0, $sFontName)
-
+    
         _SendMessage($hWnd, $WM_SETFONT, $hFont, 1)
 EndFunc ;==>_GUICtrl_SetFont
 
@@ -1703,6 +1660,8 @@ Func _setThemeColors()
         EndIf
         GUICtrlSetColor($idInputPath, $iTextColorDef)
         GUICtrlSetBkColor($idSeparator, 0x505050)
+        $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, $iBackColorDef)
+        _drawUAHMenuNCBottomLine($g_hGUI)
     Else
         _GUISetDarkTheme($g_hGUI, False)
         _GUISetDarkTheme(_GUIFrame_GetHandle($iFrame_A, 1), False)
@@ -1719,6 +1678,8 @@ Func _setThemeColors()
         GUICtrlSetBkColor($idInputPath, 0xFFFFFF)
         GUICtrlSetColor($idInputPath, $iTextColorDef)
         GUICtrlSetBkColor($idSeparator, 0x909090)
+        $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, $iBackColorDef)
+        _drawUAHMenuNCBottomLine($g_hGUI)
     EndIf
 EndFunc
 
@@ -1872,3 +1833,124 @@ Func _WinAPI_FlushMenuThemes()
 	If @error Or Not IsArray($aResult) Then Return SetError(@error, @extended, False)
 	Return True
 EndFunc   ;==>_WinAPI_FlushMenuThemes
+
+Func _EventsGUI()
+    Switch @GUI_CtrlId
+        Case $GUI_EVENT_CLOSE
+            Exit
+        Case $GUI_EVENT_MAXIMIZE
+            _resizeLVCols2()
+        Case $GUI_EVENT_RESIZED
+            _resizeLVCols2()
+    EndSwitch
+EndFunc   ;==>_EventsGUI
+
+Func _ButtonFunctions()
+    Switch @GUI_CtrlId
+        Case $sBack
+            __History_Undo($hFolderHistory)
+        Case $sForward
+            __History_Redo($hFolderHistory)
+        Case $sUpLevel
+            __TreeListExplorer_OpenPath($hTLESystem, __TreeListExplorer__GetPathAndLast(__TreeListExplorer_GetPath($hTLESystem))[0])
+        Case $sRefresh
+            __TreeListExplorer_Reload($hTLESystem)
+    EndSwitch
+EndFunc
+
+Func _MenuFunctions()
+    Switch @GUI_CtrlId
+        Case $idThemeItem
+            _switchTheme()
+        Case $idExitItem
+            Exit
+        Case $idPropertiesItem
+            _Properties()
+        Case $idPropertiesLV
+            _Properties()
+        Case $idAboutItem
+            _About()
+    EndSwitch
+EndFunc
+
+Func _IsCursorOverLV()
+    ; check if cursor is over listview
+    Local $aCInfo = GUIGetCursorInfo($g_hGUI)
+    If $aCInfo[4] <> $idListview Or $aCInfo[4] = 0 Then
+        ; clear tooltip if not over listview
+        _GUIToolTip_TrackActivate($hToolTip1, False, $g_hGUI, $g_hListview)
+        ; reset the value stored in the tooltip
+        $gText = ""
+        _GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
+    EndIf
+    AdlibUnRegister("_IsCursorOverLV")
+EndFunc
+
+Func _EndDrag()
+    ; reorder columns after header drag and drop
+    _reorderLVCols()
+    AdlibUnRegister("_EndDrag")
+EndFunc
+
+Func _PathSelectAll()
+    ; select all text in path input box
+    ControlFocus($g_hGUI, "", $idInputPath)
+    _GUICtrlEdit_SetSel($g_hInputPath, 0, -1)
+    AdlibUnRegister("_PathSelectAll")
+EndFunc
+
+Func _PathInputChanged()
+    ; reset position of header and listview
+    GUICtrlSendMsg($idListview, $WM_HSCROLL, $SB_LEFT, 0)
+    WinMove($g_hHeader, "", 0, 0, WinGetPos($g_hChild)[2], Default)
+
+    ; update number of items (files and folders) in statusbar
+    $g_aText[0] = "  " & _GUICtrlListView_GetItemCount($idListview) & " items"
+    ; update drive space information
+    Local $iDriveFree = Round(DriveSpaceFree(GUICtrlRead($idInputPath)) / 1024, 1)
+    Local $iDriveTotal = Round(DriveSpaceTotal(GUICtrlRead($idInputPath)) / 1024, 1)
+    Local $iPercentFree = Round(($iDriveFree / $iDriveTotal) * 100)
+    $g_aText[3] = $iDriveFree & " GB free" & " (" & $iPercentFree & "%)"
+    _WinAPI_RedrawWindow($g_hStatus)
+    AdlibUnRegister("_PathInputChanged")
+EndFunc
+
+Func _drawUAHMenuNCBottomLine($hWnd) ; ahmet
+    $rcClient = _WinAPI_GetClientRect($hWnd)
+
+    Local $aCall = DllCall('user32.dll', "int", "MapWindowPoints", _
+        "hwnd", $hWnd, _ ; hWndFrom
+        "hwnd", 0, _     ; hWndTo
+        "ptr", DllStructGetPtr($rcClient), _
+        "uint", 2)       ;number of points - 2 for RECT structure
+
+    $rcWindow = _WinAPI_GetWindowRect($hWnd)
+
+    _WinAPI_OffsetRect($rcClient, -$rcWindow.left, -$rcWindow.top)
+
+    $rcAnnoyingLine = DllStructCreate($tagRECT)
+    $rcAnnoyingLine.left = $rcClient.left
+    $rcAnnoyingLine.top = $rcClient.top
+    $rcAnnoyingLine.right = $rcClient.right
+    $rcAnnoyingLine.bottom = $rcClient.bottom
+
+    $rcAnnoyingLine.bottom = $rcAnnoyingLine.top
+    $rcAnnoyingLine.top = $rcAnnoyingLine.top - 1
+
+    $hRgn=_WinAPI_CreateRectRgn(0,0,8000,8000)
+
+    $hDC=_WinAPI_GetDCEx($hWnd,$hRgn, BitOR($DCX_WINDOW,$DCX_INTERSECTRGN))
+    _WinAPI_FillRect($hDC, $rcAnnoyingLine, $hSolidBrush)
+    _WinAPI_ReleaseDC($hWnd, $hDC)
+EndFunc   ;==>_drawUAHMenuNCBottomLine
+
+Func WM_ACTIVATE_Handler($hWnd, $MsgID, $wParam, $lParam) ; ioa747
+    _drawUAHMenuNCBottomLine($g_hGUI)
+    Return $GUI_RUNDEFMSG
+EndFunc
+
+Func WM_WINDOWPOSCHANGED_Handler($hWnd, $iMsg, $wParam, $lParam)
+    If $hWnd <> $g_hGUI Then Return $GUI_RUNDEFMSG
+    _drawUAHMenuNCBottomLine($hWnd)
+    Return $GUI_RUNDEFMSG
+EndFunc   ;==>_WM_WINDOWPOSCHANGED
