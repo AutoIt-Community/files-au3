@@ -544,7 +544,7 @@ Func _RefreshButtons()
 EndFunc
 
 Func _selectionChangedLV()
-    Local $sSelectedLV, $sSelectedInfo, $iDirCount = 0, $iFileCount = 0, $iFileSizes = 0
+    Local $sSelectedLV, $iDirCount = 0, $iFileCount = 0, $iFileSizes = 0
     ; get selections from listview
     Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
     Local $sSelectedItem = ""
@@ -566,18 +566,6 @@ Func _selectionChangedLV()
             $iFileSizes += FileGetSize($sSelectedLV)
         EndIf
     Next
-
-    If $iDirCount <> 0 Or $iDirCount = 0 Then
-        $sSelectedInfo = "(" & $iDirCount & " folders selected" & ")"
-    ElseIf $iDirCount = 1 Then
-        $sSelectedInfo &= "(" & $iDirCount & " folder selected" & ")"
-    EndIf
-
-    If $iFileCount <> 0 Or $iFileCount = 0 Then
-        $sSelectedInfo &= @TAB & "(" & $iFileCount & " files selected" & ")"
-    ElseIf $iFileCount = 1 Then
-        $sSelectedInfo &= @TAB & "(" & $iFileCount & " file selected" & ")"
-    EndIf
 
     Local $iItemCount = $iFileCount + $iDirCount
 

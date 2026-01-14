@@ -28,6 +28,7 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 ### Removed
 
 - Removed usage of SetSysColors
+- Removed unused code with logic error (close issue #2)
 
 ## [0.1.0] - 2026-01-13
 
