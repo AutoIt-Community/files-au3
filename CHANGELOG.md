@@ -35,8 +35,9 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 ### Contributor Acknowledgment
 
-- @DonChunior
-- @WildByDesign
+Thanks to:
+- [@DonChunior](https://github.com/DonChunior)
+- [@WildByDesign](https://github.com/WildByDesign)
 
 ## [0.1.0] - 2026-01-13
 
