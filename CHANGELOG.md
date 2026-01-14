@@ -11,11 +11,23 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 ## [Unreleased]
 
+### Added
+
+- Added painting over white menubar line in dark mode
+
+### Changed
+
+- Changed to OnEvent mode for lower idle CPU usage and faster GUI responsiveness
+
 ### Refactored
 
 - Missing variable declaration added.
 - Removed duplicate variable declarations.
 - Removed duplicate code for button refresh when changing themes.
+
+### Removed
+
+- Removed usage of SetSysColors
 
 ## [0.1.0] - 2026-01-13
 
