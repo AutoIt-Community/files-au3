@@ -512,14 +512,7 @@ Func _switchTheme()
         GUISetBkColor($iBackColorDef, $hSeparatorFrame)
         GUISetBkColor($iBackColorDef, $hParentFrame)
 
-        GUICtrlSetState($sBack, $GUI_HIDE)
-        GUICtrlSetState($sBack, $GUI_SHOW)
-        GUICtrlSetState($sForward, $GUI_HIDE)
-        GUICtrlSetState($sForward, $GUI_SHOW)
-        GUICtrlSetState($sUpLevel, $GUI_HIDE)
-        GUICtrlSetState($sUpLevel, $GUI_SHOW)
-        GUICtrlSetState($sRefresh, $GUI_HIDE)
-        GUICtrlSetState($sRefresh, $GUI_SHOW)
+        _RefreshButtons()
 
         _SetMenuBkColor(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOW)))
         _SetMenuSelectBkColor(_WinAPI_ColorAdjustLuma(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOW)), -6))
@@ -564,14 +557,7 @@ Func _switchTheme()
             GUISetBkColor($iBackColorDef, $hParentFrame)
         EndIf
 
-        GUICtrlSetState($sBack, $GUI_HIDE)
-        GUICtrlSetState($sBack, $GUI_SHOW)
-        GUICtrlSetState($sForward, $GUI_HIDE)
-        GUICtrlSetState($sForward, $GUI_SHOW)
-        GUICtrlSetState($sUpLevel, $GUI_HIDE)
-        GUICtrlSetState($sUpLevel, $GUI_SHOW)
-        GUICtrlSetState($sRefresh, $GUI_HIDE)
-        GUICtrlSetState($sRefresh, $GUI_SHOW)
+        _RefreshButtons()
 
         _SetMenuBkColor($iBackColorDef)
         _SetMenuSelectBkColor(_WinAPI_ColorAdjustLuma($iBackColorDef, 30))
@@ -588,6 +574,16 @@ Func _switchTheme()
         _setThemeColors()
         _WinAPI_RedrawWindow($g_hStatus)
     EndIf
+EndFunc
+
+Func _RefreshButtons()
+    ; Refresh navigation buttons to apply theme changes
+    ; This forces a redraw by hiding and showing the controls
+    Local $aButtons = [$sBack, $sForward, $sUpLevel, $sRefresh]
+    For $i = 0 To UBound($aButtons) - 1
+        GUICtrlSetState($aButtons[$i], $GUI_HIDE)
+        GUICtrlSetState($aButtons[$i], $GUI_SHOW)
+    Next
 EndFunc
 
 Func _selectionChangedLV()

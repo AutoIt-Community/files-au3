@@ -15,6 +15,7 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 - Missing variable declaration added.
 - Removed duplicate variable declarations.
+- Removed duplicate code for button refresh when changing themes.
 
 ## [0.1.0] - 2026-01-13
 
