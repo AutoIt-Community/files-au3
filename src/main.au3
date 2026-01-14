@@ -846,7 +846,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						If $i=$iCol Then ContinueLoop
 						_GUICtrlHeader_SetItemFormat($hHeader, $i, BitAND(_GUICtrlHeader_GetItemFormat($hHeader, $i), BitNOT(BitOR($HDF_SORTDOWN, $HDF_SORTUP))))
 					Next
-					$iFormat = _GUICtrlHeader_GetItemFormat($hHeader, $iCol)
+					Local $iFormat = _GUICtrlHeader_GetItemFormat($hHeader, $iCol)
 					$__TreeListExplorer__Data["mViews"][$hView]["mSorting"]["iCol"] = $iCol
 					If BitAND($iFormat, $HDF_SORTUP) Then ; ascending
 						_GUICtrlHeader_SetItemFormat($hHeader, $iCol, BitOR(BitXOR($iFormat, $HDF_SORTUP), $HDF_SORTDOWN))
