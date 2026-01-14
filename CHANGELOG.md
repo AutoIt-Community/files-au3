@@ -11,6 +11,10 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 ## [Unreleased]
 
+### Refactored
+
+- Removed duplicate variable declarations.
+
 ## [0.1.0] - 2026-01-13
 
 ### Added
