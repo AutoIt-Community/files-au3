@@ -14,6 +14,7 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 ### Refactored
 
 - Missing variable declaration added.
+- Removed duplicate variable declarations.
 
 ## [0.1.0] - 2026-01-13
 

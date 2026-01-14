@@ -44,7 +44,6 @@ Global $bPathSelectAll, $bPathInputChanged, $sSelectedItems, $g_aText
 Global $idSeparator, $idThemeItem, $hToolTip2, $hToolTip1
 Global $isDarkMode = _WinAPI_ShouldAppsUseDarkMode()
 Global $hFolderHistory=__History_Create("_doUnReDo", 100, "_historyChange"), $bFolderHistoryChanging = False
-Global $sBack, $sForward, $sUpLevel
 Global Const $SBS_SIZEBOX = 0x08, $SBS_SIZEGRIP = 0x10
 Global Const $CLR_TEXT = 0xFFFFFF ; The text color
 Global Const $SB_LEFT = 6
