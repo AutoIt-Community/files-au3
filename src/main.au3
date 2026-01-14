@@ -23,6 +23,7 @@
 ; Melba23       GUIFrame UDF
 ; ahmet         Non-client painting of white line in dark mode
 ; UEZ           Lots and lots and lots
+; DonChunior    Code review, bug fixes and refactoring
 
 Global $sVersion = "2026-01-14"
 
@@ -1596,14 +1597,14 @@ EndFunc   ;==>WM_MOVE
 
 Func ApplyDPI()
     ; apply System DPI awareness and calculate factor
+    ; Returns DPI scaling factor (1.0 = 100%), defaults to 1.0 on error
     _WinAPI_SetThreadDpiAwarenessContext($DPI_AWARENESS_CONTEXT_SYSTEM_AWARE)
-    If Not @error Then
-        $iDPI2 = Round(_WinAPI_GetDpiForSystem() / 96, 2)
-        Return $iDPI2
-        If @error Then Return $iDPI2 = 1
-    Else
-        Return $iDPI2 = 1
-    EndIf
+    If @error Then Return 1
+    
+    Local $iDPI2 = Round(_WinAPI_GetDpiForSystem() / 96, 2)
+    If @error Then Return 1
+    
+    Return $iDPI2
 EndFunc
 
 Func _WinAPI_SetThreadDpiAwarenessContext($DPI_AWARENESS_CONTEXT_value) ; UEZ

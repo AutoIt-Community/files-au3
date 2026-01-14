@@ -19,6 +19,10 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 - Changed to OnEvent mode for lower idle CPU usage and faster GUI responsiveness
 
+### Fixed
+
+- Fixed unreachable code in ApplyDPI function (thanks to @DonChunior)
+
 ### Refactored
 
 - Missing variable declaration added.
