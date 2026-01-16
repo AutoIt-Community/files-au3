@@ -27,25 +27,32 @@ A lightweight AutoIt-based file system viewer using TreeListExplorer, focused on
 
 ## Features
 
-#### *Light mode*
+#### *Light and dark mode*
 
 <img src="./assets/images/light-mode.png" width="500" />
 
-#### *Dark mode*
-
 <img src="./assets/images/dark-mode.png" width="500" />
+
+#### *Feature B*
+
+To be defined.
 
 #### *Feature C*
 
 To be defined.
 
-#### *Feature D*
+<br>
 
-To be defined.
+## Roadmap
 
-#### *Feature E*
+> ![NOTE]
+> The roadmap shows upcoming features and their current status.
 
-To be defined.
+| Feature | Status | Description |
+| ---     | ---    | ---         |
+| ...     |        |             |
+| ...     |        |             |
+| ...     |        |             |
 
 <br>
 
