@@ -110,10 +110,10 @@ Repository maintainer [@WildByDesign](https://github.com/WildByDesign).
 #### *Thanks to the contributors*
 
 <a href="https://github.com/AutoIt-Community/files-au3/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=AutoIt-Community/files-au3" />
+  <img src="https://stg.contrib.rocks/image?repo=AutoIt-Community/files-au3" />
 </a>
 
-###### Made with [contrib.rocks](https://contrib.rocks/preview?repo=AutoIt-Community%2Ffiles-au3).
+###### Made with [contrib.rocks](https://stg.contrib.rocks/preview?repo=AutoIt-Community%2Ffiles-au3).
 
 ##
 
