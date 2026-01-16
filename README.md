@@ -29,9 +29,7 @@ A lightweight AutoIt-based file system viewer using TreeListExplorer, focused on
 
 #### *Light and dark mode*
 
-<img src="./assets/images/light-mode.png" width="500" />
-
-<img src="./assets/images/dark-mode.png" width="500" />
+<img src="./assets/images/light-mode.png" width="400" /> <img src="./assets/images/dark-mode.png" width="400" />
 
 #### *Feature B*
 
