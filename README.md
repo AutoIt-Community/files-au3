@@ -43,7 +43,7 @@ To be defined.
 
 ## Roadmap
 
-> ![NOTE]
+> [!NOTE]
 > The roadmap shows upcoming features and their current status.
 
 | Feature | Status | Description |
@@ -84,11 +84,13 @@ To be defined (by Sven).
 
 ## License
 
-Distributed under the ABC License. See [LICENSE](./LICENSE.md) for more information.
+
+Distributed under the ABC License.<br>
+See license details [here](./LICENSE.md) for more information.
 
 Copyright (c) 2026 AutoIt-Community.<br>
-Contact person Sven Seyfert (@sven-seyfert).<br>
-Repository maintainer @WildByDesign.
+Contact person Sven Seyfert ([@sven-seyfert](https://github.com/sven-seyfert)).<br>
+Repository maintainer [@WildByDesign](https://github.com/WildByDesign).
 
 <br>
 
