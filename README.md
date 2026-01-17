@@ -78,7 +78,8 @@ To be defined.
 
 ## Contributing
 
-To be defined (by Sven).
+Any kind of contribution is very welcome and highly appreciated 💛 .<br>
+Please see the [CONTRIBUTING.md](./.github/CONTRIBUTING.md) file for detailed information.
 
 <br>
 
