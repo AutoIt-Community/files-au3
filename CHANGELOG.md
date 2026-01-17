@@ -45,6 +45,12 @@ Thanks to:
 
 - Initial commit (code base, assets, GitHub files). [17aab44](https://github.com/AutoIt-Community/files-au3/commit/17aab4409ea283ad181aed28984cb42c2cb8591f)
 
+### Contributor Acknowledgment
+
+Thanks to:
+- [@sven-seyfert](https://github.com/sven-seyfert)
+- [@WildByDesign](https://github.com/WildByDesign)
+
 [Unreleased]: https://github.com/AutoIt-Community/files-au3/compare/v0.2.0...HEAD
 [0.2.0]: https://github.com/AutoIt-Community/files-au3/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/AutoIt-Community/files-au3/releases/tag/v0.1.0
