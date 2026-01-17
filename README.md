@@ -104,22 +104,22 @@ Repository maintainer [@WildByDesign](https://github.com/WildByDesign).
 
 #### *Thanks to the third-party authors*
 
-| Author                                           | Field                                          |
-| ---                                              | ---                                            |
-| @ahmet                                           | Non-client painting of white line in dark mode |
-| [@argumentum](https://github.com/abrupto)        | Dark Mode functions                            |
-| @DK12000                                         | Dark Mode functions                            |
-| [@DonChunior](https://github.com/DonChunior)     | Code review, bug fixes and refactoring         |
-| [@ioa747](https://github.com/ioa747)             | Detached Header subclassing for dark mode      |
-| [@Kanashius](https://github.com/kanashius)       | TreeListExplorer UDF                           |
-| @Kip                                             | GUIFrame UDF                                   |
-| @line333                                         | WinAPI functions                               |
-| @Melba23                                         | GUIFrame UDF                                   |
-| @Nine                                            | Custom Draw for Buttons                        |
-| @NoNameCode                                      | Dark Mode functions                            |
-| @pixelsearch                                     | Detached Header and ListView synchronization   |
-| @Rasim                                           | GUI Control function                           |
-| @UEZ                                             | Lots and lots and lots                         |
+| Author                                       | Field                                          |
+| ---                                          | ---                                            |
+| @ahmet                                       | Non-client painting of white line in dark mode |
+| [@argumentum](https://github.com/abrupto)    | Dark Mode functions                            |
+| @DK12000                                     | Dark Mode functions                            |
+| [@DonChunior](https://github.com/DonChunior) | Code review, bug fixes and refactoring         |
+| [@ioa747](https://github.com/ioa747)         | Detached Header subclassing for dark mode      |
+| [@Kanashius](https://github.com/kanashius)   | TreeListExplorer UDF                           |
+| @Kip                                         | GUIFrame UDF                                   |
+| @line333                                     | WinAPI functions                               |
+| @Melba23                                     | GUIFrame UDF                                   |
+| @Nine                                        | Custom Draw for Buttons                        |
+| @NoNameCode                                  | Dark Mode functions                            |
+| @pixelsearch                                 | Detached Header and ListView synchronization   |
+| @Rasim                                       | GUI Control function                           |
+| @UEZ                                         | Lots and lots and lots                         |
 
 #### *Thanks to the contributors*
 
