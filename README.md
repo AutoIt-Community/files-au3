@@ -5,7 +5,7 @@
     <h2 align="center">Welcome to <code>Files Au3 - AutoIt File Manager</code></h2>
 </p>
 
-[![license](https://img.shields.io/badge/license-ABC-indianred.svg?style=flat-square&logo=spdx&logoColor=white)](./LICENSE.md)
+[![license](https://img.shields.io/badge/license-MIT-indianred.svg?style=flat-square&logo=spdx&logoColor=white)](./LICENSE.md)
 [![release](https://img.shields.io/github/release/AutoIt-Community/files-au3.svg?color=slateblue&style=flat-square&logo=github)](https://github.com/AutoIt-Community/files-au3/releases/latest)
 [![last commit](https://img.shields.io/github/last-commit/AutoIt-Community/files-au3.svg?color=darkgoldenrod&style=flat-square&logo=github)](https://github.com/AutoIt-Community/files-au3/commits/main)
 [![contributors](https://img.shields.io/github/contributors/AutoIt-Community/files-au3.svg?color=darkolivegreen&style=flat-square&logo=github)](https://github.com/AutoIt-Community/files-au3/graphs/contributors)
@@ -21,7 +21,7 @@ A lightweight AutoIt-based file system viewer using TreeListExplorer, focused on
 
 > [!WARNING]
 > 1. This repository is in a construction phase and will be enhanced very soon.
-> 2. License is not settled yet; currently using ABC License as a placeholder.
+> 2. License is not finally settled yet; but almost clarified MIT license is sufficient.
 
 <br>
 
@@ -85,8 +85,7 @@ Please see the [CONTRIBUTING.md](./.github/CONTRIBUTING.md) file for detailed in
 
 ## License
 
-
-Distributed under the ABC License.<br>
+Distributed under the MIT License.<br>
 See license details [here](./LICENSE.md) for more information.
 
 Copyright (c) 2026 AutoIt-Community.<br>
@@ -105,8 +104,22 @@ Repository maintainer [@WildByDesign](https://github.com/WildByDesign).
 
 #### *Thanks to the third-party authors*
 
-- ...
-- ...
+| Author                                           | Field                                          |
+| ---                                              | ---                                            |
+| @ahmet                                           | Non-client painting of white line in dark mode |
+| [@argumentum](https://github.com/abrupto)        | Dark Mode functions                            |
+| @DK12000                                         | Dark Mode functions                            |
+| [@DonChunior](https://github.com/DonChunior)     | Code review, bug fixes and refactoring         |
+| [@ioa747](https://github.com/ioa747)             | Detached Header subclassing for dark mode      |
+| [@Kanashius](https://github.com/kanashius)       | TreeListExplorer UDF                           |
+| @Kip                                             | GUIFrame UDF                                   |
+| @line333                                         | WinAPI functions                               |
+| @Melba23                                         | GUIFrame UDF                                   |
+| @Nine                                            | Custom Draw for Buttons                        |
+| @NoNameCode                                      | Dark Mode functions                            |
+| @pixelsearch                                     | Detached Header and ListView synchronization   |
+| @Rasim                                           | GUI Control function                           |
+| @UEZ                                             | Lots and lots and lots                         |
 
 #### *Thanks to the contributors*
 
