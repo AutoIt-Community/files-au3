@@ -41,7 +41,7 @@ Don't hesitate to open an issue, ask questions, and start a discussion.
 > If you have already made some commits without following the conventions, it's not a problem.<br>
 > Just try to follow the conventions for future commits.
 
-Please try to follow the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions for your commit messages.
+Please try to follow the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) conventions for your commit messages. The summarized version is as follows:
 
 #### *Usage*
 
