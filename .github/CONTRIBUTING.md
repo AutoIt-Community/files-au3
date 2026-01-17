@@ -59,7 +59,7 @@ Keywords and their purposes are:
 - `Security` in case of vulnerabilities.
 - `Styled` for changes like whitespaces, formatting, missing semicolons etc.
 
-#### **Examples**
+#### *Examples*
 
 ``` bash
 git commit -m "Added: Three-part statusbar to the main GUI."
@@ -68,7 +68,7 @@ git commit -m "Fixed: Broken label by set correct attribute."
 git commit -m "Refactored: Usage of map data type instead of array."
 ```
 
-#### **Why**
+#### *Why*
 
 Why is this important? Consistent commit messages allow the [CHANGELOG.md](../CHANGELOG.md) file to be generated automatically when creating a new release. This helps maintainers and users to keep track of changes in each version.
 
@@ -80,5 +80,8 @@ Why is this important? Consistent commit messages allow the [CHANGELOG.md](../CH
 - Please remember to update the [README.md](../README.md) file if necessary.
 
 <br>
+<br>
+
+---
 
 **Thank you very much for your contribution 🤝 .**
