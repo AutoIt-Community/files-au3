@@ -127,7 +127,7 @@ Repository maintainer [@WildByDesign](https://github.com/WildByDesign).
   <img src="https://stg.contrib.rocks/image?repo=AutoIt-Community/files-au3" />
 </a>
 
-###### Made with [contrib.rocks](https://stg.contrib.rocks/preview?repo=AutoIt-Community%2Ffiles-au3).
+<sub><sub>Made with [contrib.rocks](https://stg.contrib.rocks/preview?repo=AutoIt-Community%2Ffiles-au3).</sub></sub>
 
 ##
 
