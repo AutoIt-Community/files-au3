@@ -11,6 +11,10 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 ## [Unreleased]
 
+### Added
+
+- Added initial drag and drop structure (no file movement yet)
+
 ## [0.2.0] - 2026-01-14
 
 ### Added
