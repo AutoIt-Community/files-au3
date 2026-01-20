@@ -18,6 +18,7 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 ### Fixed
 
 - Fixed resizing issue with child GUI frames and controls from GUIFrame UDF
+- Fixed issue in dark mode where separator frame flickered during initial GUI startup
 
 ## [0.2.0] - 2026-01-14
 
