@@ -11,14 +11,33 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-01-20
+
 ### Added
 
-- Added initial drag and drop support (no file movement yet)
+- Community standard 'Code of conduct' document. [7e39247](https://github.com/AutoIt-Community/files-au3/commit/7e39247a9183df7921d9e60d66117ae45d8eacf1)
+- Community standard 'SECURITY.md' file. [f706504](https://github.com/AutoIt-Community/files-au3/commit/f706504ddaf480f73c7ce89633b377d620c1a421)
+- Initial drag and drop support (no file movement yet). [c6aa277](https://github.com/AutoIt-Community/files-au3/commit/c6aa277cf1032c9edd9e4e11792782cdb4894993)
+
+### Documented
+
+- Update README.md file. [0c2ded0](https://github.com/AutoIt-Community/files-au3/commit/0c2ded05f10b873f3539e37e079591b367d12e09)
+- Update README to display contributors. [c7755a4](https://github.com/AutoIt-Community/files-au3/commit/c7755a40988cd7b1fcfaa81aaaf894ecc02f56bf)
+- Add contribution instructions via CONTRIBUTING.md file. [8273d4a](https://github.com/AutoIt-Community/files-au3/commit/8273d4ab2d63a365db8a88f41f1b11e3c3ca0659)
+- Add link to contribution section in README.md file. [d7a1532](https://github.com/AutoIt-Community/files-au3/commit/d7a153200c3c6a0c0f3bf8c4121a0356b241b8c4)
+- Update README by license note and third-party author credits. [1455cdd](https://github.com/AutoIt-Community/files-au3/commit/1455cdd9fb132fc3d2dc4e6ca28c68436816f358)
+- Update LICENSE.md file. [1bf48dc](https://github.com/AutoIt-Community/files-au3/commit/1bf48dc07411b89dc94ffa8c744774bd1337a0be)
 
 ### Fixed
 
-- Fixed resizing issue with child GUI frames and controls from GUIFrame UDF
-- Fixed issue in dark mode where separator frame flickered during initial GUI startup
+- Resizing issue with child GUI frames and controls from GUIFrame UDF. [c6aa277](https://github.com/AutoIt-Community/files-au3/commit/c6aa277cf1032c9edd9e4e11792782cdb4894993)
+- Fixed issue in dark mode where separator frame flickered during initial GUI startup. [d1b99fa](https://github.com/AutoIt-Community/files-au3/commit/d1b99fa6cf3ca036e56c9e105d22e823655ecd70)
+
+### Contributor Acknowledgment
+
+Thanks to:
+- [@sven-seyfert](https://github.com/sven-seyfert)
+- [@WildByDesign](https://github.com/WildByDesign)
 
 ## [0.2.0] - 2026-01-14
 
@@ -60,7 +79,8 @@ Thanks to:
 - [@sven-seyfert](https://github.com/sven-seyfert)
 - [@WildByDesign](https://github.com/WildByDesign)
 
-[Unreleased]: https://github.com/AutoIt-Community/files-au3/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/AutoIt-Community/files-au3/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/AutoIt-Community/files-au3/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AutoIt-Community/files-au3/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/AutoIt-Community/files-au3/releases/tag/v0.1.0
 
