@@ -33,11 +33,9 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 - Resizing issue with child GUI frames and controls from GUIFrame UDF. [c6aa277](https://github.com/AutoIt-Community/files-au3/commit/c6aa277cf1032c9edd9e4e11792782cdb4894993)
 - Fixed issue in dark mode where separator frame flickered during initial GUI startup. [d1b99fa](https://github.com/AutoIt-Community/files-au3/commit/d1b99fa6cf3ca036e56c9e105d22e823655ecd70)
 
-### Contributor Acknowledgment
+### Thanks to the contributors (committers)
 
-Thanks to:
-- [@sven-seyfert](https://github.com/sven-seyfert)
-- [@WildByDesign](https://github.com/WildByDesign)
+[@sven-seyfert](https://github.com/sven-seyfert), [@WildByDesign](https://github.com/WildByDesign)
 
 ## [0.2.0] - 2026-01-14
 
@@ -61,11 +59,9 @@ Thanks to:
 - Unused code with logic error. [bd0ef15](https://github.com/AutoIt-Community/files-au3/commit/bd0ef1534f731f86a4f97d41f4109fb0deacde83)
 - Removed usage of SetSysColors. [9297bd6](https://github.com/AutoIt-Community/files-au3/commit/9297bd6755d656c5d45dd5d86013b97569603342)
 
-### Contributor Acknowledgment
+### Thanks to the contributors (committers)
 
-Thanks to:
-- [@DonChunior](https://github.com/DonChunior)
-- [@WildByDesign](https://github.com/WildByDesign)
+[@DonChunior](https://github.com/DonChunior), [@WildByDesign](https://github.com/WildByDesign)
 
 ## [0.1.0] - 2026-01-13
 
@@ -73,11 +69,9 @@ Thanks to:
 
 - Initial commit (code base, assets, GitHub files). [17aab44](https://github.com/AutoIt-Community/files-au3/commit/17aab4409ea283ad181aed28984cb42c2cb8591f)
 
-### Contributor Acknowledgment
+### Thanks to the contributors (committers)
 
-Thanks to:
-- [@sven-seyfert](https://github.com/sven-seyfert)
-- [@WildByDesign](https://github.com/WildByDesign)
+[@sven-seyfert](https://github.com/sven-seyfert), [@WildByDesign](https://github.com/WildByDesign)
 
 [Unreleased]: https://github.com/AutoIt-Community/files-au3/compare/v0.3.0...HEAD
 [0.3.0]: https://github.com/AutoIt-Community/files-au3/compare/v0.2.0...v0.3.0
