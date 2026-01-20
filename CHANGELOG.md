@@ -11,8 +11,6 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-01-14
-
 ### Added
 
 - Added initial drag and drop support (no file movement yet)
@@ -20,6 +18,8 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 ### Fixed
 
 - Fixed resizing issue with child GUI frames and controls from GUIFrame UDF
+
+## [0.2.0] - 2026-01-14
 
 ### Added
 
