@@ -1086,7 +1086,7 @@ EndFunc  ;==>WM_COMMAND2
 Func _About()
     Local $sMsg
     $sMsg = "Version: " & @TAB & @TAB & $sVersion & @CRLF & @CRLF
-    $sMsg &= "Created by: " & @TAB & "AutoIt Community"
+    $sMsg &= "Made by: " & @TAB & "AutoIt Community"
 	MsgBox(0, "Files Au3", $sMsg)
 EndFunc
 
