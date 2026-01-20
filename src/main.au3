@@ -25,7 +25,7 @@
 ; UEZ           Lots and lots and lots
 ; DonChunior    Code review, bug fixes and refactoring
 
-Global $sVersion = "2026-01-20"
+Global $sVersion = "0.3.0 - 2026-01-20"
 
 ; set base DPI scale value and apply DPI
 Global $DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = -2
@@ -1474,7 +1474,7 @@ Func _GUICtrl_SetFont($hWnd, $iHeight = 15, $iWeight = 400, $iFontAtrributes = 0
         $hFont = _WinAPI_CreateFont($iHeight, 0, 0, 0, $iWeight, BitAND($iFontAtrributes, 2), BitAND($iFontAtrributes, 4), _
                                     BitAND($iFontAtrributes, 8), $DEFAULT_CHARSET, $OUT_DEFAULT_PRECIS, $CLIP_DEFAULT_PRECIS, _
                                     $DEFAULT_QUALITY, 0, $sFontName)
-    
+
         _SendMessage($hWnd, $WM_SETFONT, $hFont, 1)
 EndFunc ;==>_GUICtrl_SetFont
 
@@ -1618,10 +1618,10 @@ Func ApplyDPI()
     ; Returns DPI scaling factor (1.0 = 100%), defaults to 1.0 on error
     _WinAPI_SetThreadDpiAwarenessContext($DPI_AWARENESS_CONTEXT_SYSTEM_AWARE)
     If @error Then Return 1
-    
+
     Local $iDPI2 = Round(_WinAPI_GetDpiForSystem() / 96, 2)
     If @error Then Return 1
-    
+
     Return $iDPI2
 EndFunc
 
