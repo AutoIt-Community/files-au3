@@ -25,7 +25,7 @@
 ; UEZ           Lots and lots and lots
 ; DonChunior    Code review, bug fixes and refactoring
 
-Global $sVersion = "2026-01-14"
+Global $sVersion = "2026-01-19"
 
 ; set base DPI scale value and apply DPI
 Global $DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = -2
@@ -37,11 +37,12 @@ $iDPI = ApplyDPI()
 
 Opt("GUIOnEventMode", 1)
 
-Global $hTLESystem, $iFrame_A, $hSecondFrame, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus
+Global $hTLESystem, $iFrame_A, $hSecondFrame, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus, $idTreeView
 Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hChildLV, $hParentFrame, $g_iIconWidth, $g_hTreeView
 Global $g_hSizebox, $g_hOldProc, $g_iHeight, $g_aTextStatus, $g_aRatioW, $g_hDots
 Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
 Global $sBack, $sForward, $sUpLevel, $sRefresh
+Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $aListDragItems
 Global $idExitItem, $idAboutItem
 Global $hCursor, $hProc, $g_hBrush
 Global $iTimeCalled, $iTimeDiff
@@ -55,7 +56,7 @@ Global Const $CLR_TEXT = 0xFFFFFF ; The text color
 Global Const $SB_LEFT = 6
 Global Const $APPMODE_FORCEDARK = 2
 Global Const $APPMODE_FORCELIGHT = 3
-Global $iTopSpacer = 14
+Global $iTopSpacer = Round(12 * $iDPI)
 Global $aPosTip, $iOldaPos0, $iOldaPos1
 ; force light mode
 ;$isDarkMode = False
@@ -150,8 +151,11 @@ Func _FilesAu3()
     GUISetOnEvent($GUI_EVENT_CLOSE, "_EventsGUI")
     GUISetOnEvent($GUI_EVENT_MAXIMIZE, "_EventsGUI")
     GUISetOnEvent($GUI_EVENT_RESIZED, "_EventsGUI")
+    GUISetOnEvent($GUI_EVENT_PRIMARYUP, "_EventsGUI")
+    GUISetOnEvent($GUI_EVENT_MOUSEMOVE, "_EventsGUI")
 
-    $FrameWidth1 = @DesktopWidth / 4
+    ; used to determine separator position
+    $FrameWidth1 = (@DesktopWidth - 600) / 3
 
     _InitDarkSizebox()
 
@@ -242,32 +246,22 @@ Func _FilesAu3()
     GUICtrlSetResizing(-1, $GUI_DOCKMENUBAR + $GUI_DOCKLEFT + $GUI_DOCKRIGHT)
     $g_hInputPath = GUICtrlGetHandle($idInputPath)
 
-    ;Create Frames
-    Local $iSpacer
-    If $iDPI = 1 Then
-        $iSpacer = 4
-    ElseIf $iDPI = 1.25 Then
-        $iSpacer = 9
-    ElseIf $iDPI = 1.5 Then
-        $iSpacer = 13
-    ElseIf $iDPI = 2 Then
-        $iSpacer = 18
-    Else
-        $iSpacer = 6 * $iDPI
-    EndIf
-
-    ;$iFrame_A = _GUIFrame_Create($g_hGUI, 0, $FrameWidth1, 5, 0, $sRefreshPosV + 4)
-    ;$iFrame_A = _GUIFrame_Create($g_hGUI, 0, $FrameWidth1, 5, 0, $sRefreshPosV + 4, 0, $aClientSize[1] - _GUICtrlStatusBar_GetHeight($g_hStatus) - $sRefreshPosV - 9)
-    $iFrame_A = _GUIFrame_Create($g_hGUI, 0, $FrameWidth1, 9, 0, $sRefreshPosV + $iTopSpacer, 0, $aClientSize[1] - _GUICtrlStatusBar_GetHeight($g_hStatus) - $sRefreshPosV - $iSpacer)
+    Local $iStatusHeight =_WinAPI_GetWindowHeight($g_hStatus)
+    $aClientSize2 = WinGetClientSize($g_hGUI)
+    Local $iFrameHeight = $aClientSize2[1] - $iStatusHeight - $sRefreshPosV - $iTopSpacer
+    $iFrame_A = _GUIFrame_Create($g_hGUI, 0, $FrameWidth1, 9, 0, $sRefreshPosV + $iTopSpacer)
 
     ;Set min sizes for the frames
-    _GUIFrame_SetMin($iFrame_A, 200, 600)
+    _GUIFrame_SetMin($iFrame_A, 200, 600, True)
 
     ;Create Explorer Listviews
     _GUIFrame_Switch($iFrame_A, 1)
     $aWinSize1 = WinGetClientSize(_GUIFrame_GetHandle($iFrame_A, 1))
 
-    Global $idTreeView = GUICtrlCreateTreeView(0, 0, $aWinSize1[0], $aWinSize1[1] - $sRefreshPosV - $iTopSpacer, BitOR($GUI_SS_DEFAULT_TREEVIEW, $TVS_TRACKSELECT))
+    Local $iStyle = BitOR($TVS_HASBUTTONS, $TVS_HASLINES, $TVS_LINESATROOT, $TVS_SHOWSELALWAYS, $TVS_TRACKSELECT)
+    ;$idTreeView = GUICtrlCreateTreeView(0, 0, $aWinSize1[0], $aWinSize1[1] - $sRefreshPosV - $iTopSpacer, $iStyle)
+    $idTreeView = GUICtrlCreateTreeView(0, 0, $aWinSize1[0], $iFrameHeight, $iStyle)
+    GUICtrlSetState(-1, $GUI_DROPACCEPTED)
     GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
     $g_hTreeView = GUICtrlGetHandle($idTreeView)
 
@@ -306,7 +300,8 @@ Func _FilesAu3()
 
     ;_WinAPI_SetWindowPos_mod($g_hHeader, 0, 10, 0, $aWinSize2[0] - 11, $iHeaderHeight, BitOR($SWP_NOZORDER, $SWP_NOACTIVATE))
 
-    $idListview = GUICtrlCreateListView("Name|Size|Date Modified|Type", 0, $iHeaderHeight, $aWinSize2[0], $aWinSize2[1] - $iHeaderHeight - $sRefreshPosV - $iTopSpacer, BitOR($LVS_SHOWSELALWAYS, $LVS_NOCOLUMNHEADER), BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_DOUBLEBUFFER, $LVS_EX_TRACKSELECT))
+    $idListview = GUICtrlCreateListView("Name|Size|Date Modified|Type", 0, $iHeaderHeight, $aWinSize2[0], $iFrameHeight - $iHeaderHeight, BitOR($LVS_SHOWSELALWAYS, $LVS_NOCOLUMNHEADER), BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_DOUBLEBUFFER, $LVS_EX_TRACKSELECT))
+    GUICtrlSetState(-1, $GUI_DROPACCEPTED)
     GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
 
     $g_hListview = GUICtrlGetHandle($idListview)
@@ -437,6 +432,7 @@ Func _FilesAu3()
         EndIf
 
         Sleep(200)
+
     WEnd
 EndFunc
 
@@ -553,7 +549,7 @@ Func _selectionChangedLV()
 
     For $i = 1 To $aSelectedLV[0]
         $sSelectedItem = _GUICtrlListView_GetItemText($idListview, $aSelectedLV[$i], 0)
-        $sSelectedLV = GUICtrlRead($idInputPath) & $sSelectedItem
+        $sSelectedLV = __TreeListExplorer_GetPath($hTLESystem) & $sSelectedItem
         ; is selected path a folder
         If StringInStr(FileGetAttrib($sSelectedLV), "D") Then
             ; increase folder count
@@ -815,6 +811,12 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                 Case $LVN_ITEMCHANGED
                     ; item selection(s) have changed
                     _selectionChangedLV()
+                Case $LVN_BEGINDRAG
+                    Local $tNMListView = DllStructCreate($tagNMLISTVIEW, $lParam)
+                    $bDragTreeList = True
+                    $sDragSrc = "List"
+                    ; fire off adlib to get multiple selection drag details
+                    AdlibRegister("_ListGetSelections", 10)
                 Case $LVN_HOTTRACK; Sent by a list-view control When the user moves the mouse over an item
                     Local $tInfo2 = DllStructCreate($tagNMLISTVIEW, $lParam)
                     $gText = _GUICtrlListView_GetItemText($hWndFrom, DllStructGetData($tInfo2, "Item"), 0)
@@ -835,8 +837,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                 Case $NM_HOVER ; Sent by a list-view control when the mouse hovers over an item
                     ; need to determine if file or folder to get more details
                     If $gText <> "" Then
-                        $gText = GUICtrlRead($idInputPath) & $gText & @CRLF
-                        Local $gText2 = GUICtrlRead($idInputPath) & _GUICtrlListView_GetItemText($g_hListview, _GUICtrlListView_GetHotItem($g_hListview), 0)
+                        $gText = __TreeListExplorer_GetPath($hTLESystem) & $gText & @CRLF
+                        Local $gText2 = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListview, _GUICtrlListView_GetHotItem($g_hListview), 0)
                         ; is selected path a folder
                         If StringInStr(FileGetAttrib($gText2), "D") Then
                             If _WinAPI_PathIsRoot_mod($gText2) Then
@@ -870,6 +872,21 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                         $bTooltipActive = True
                     EndIf
                     Return 1 ; prevent the hover from being processed
+            EndSwitch
+        Case $g_hTreeView
+            Switch $iCode
+                Case $TVN_BEGINDRAGA, $TVN_BEGINDRAGW
+                    Local $tTree = DllStructCreate($tagNMTREEVIEW, $lParam)
+                    Local $hDragItem = DllStructGetData($tTree, "NewhItem")
+                    $sTreeDragItem = TreeItemToPath($g_hTreeView, $hDragItem)
+                    $bDragTreeList = True
+                    $sDragSrc = "Tree"
+
+                Case $TVN_ITEMCHANGEDA, $TVN_ITEMCHANGEDW
+                    Local $tTree2 = DllStructCreate($tagNMTVITEMCHANGE, $lParam)
+                    Local $sItem2 = DllStructGetData($tTree2, "hItem")
+                    Local $sItemText = _GUICtrlTreeView_GetText($g_hTreeView, $sItem2)
+                    ;ConsoleWrite("item changed: " & $sItemText & @CRLF)
             EndSwitch
     EndSwitch
 
@@ -1324,13 +1341,13 @@ Func _Properties()
     If $aSelectedLV[0] = 1 Then
         _WinAPI_ShellObjectProperties($sCurrentPath)
     ElseIf $aSelectedLV[0] = 0 Then
-        _WinAPI_ShellObjectProperties(GUICtrlRead($idInputPath))
+        _WinAPI_ShellObjectProperties(__TreeListExplorer_GetPath($hTLESystem))
     Else
         ;$sSelectedItems
         Local $aFiles = StringSplit($sSelectedItems, "|")
         _ArrayDelete($aFiles, $aFiles[0])
         _ArrayDelete($aFiles, 0)
-        _WinAPI_SHMultiFileProperties(GUICtrlRead($idInputPath), $aFiles)
+        _WinAPI_SHMultiFileProperties(__TreeListExplorer_GetPath($hTLESystem), $aFiles)
     EndIf
 EndFunc
 
@@ -1824,6 +1841,8 @@ Func _WinAPI_FlushMenuThemes()
 EndFunc   ;==>_WinAPI_FlushMenuThemes
 
 Func _EventsGUI()
+    Local Static $hTreeItemOrig = 0
+    Local Static $bTreeOrigStored = False
     Switch @GUI_CtrlId
         Case $GUI_EVENT_CLOSE
             Exit
@@ -1831,8 +1850,77 @@ Func _EventsGUI()
             _resizeLVCols2()
         Case $GUI_EVENT_RESIZED
             _resizeLVCols2()
+        Case $GUI_EVENT_MOUSEMOVE
+            If Not $bDragTreeList Then ContinueCase
+            If Not $bTreeOrigStored Then
+                ; store handle for the original treeview selection to restore selection
+                $hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
+                $bTreeOrigStored = True
+            EndIf
+            Local $hItemHover = TreeItemFromPoint($g_hTreeView)
+            If $hItemHover <> 0 Then
+                ; bring focus to treeview to properly show DROPHILITE
+                _WinAPI_SetFocus($g_hTreeView)
+                _GUICtrlTreeView_SelectItem($g_hTreeView, $hItemHover)
+                _GUICtrlTreeView_SetState($g_hTreeView, $hTreeItemOrig, $TVIS_SELECTED, True)
+            Else
+                ; restore original treeview selection if cursor leaves treeview
+                _GUICtrlTreeView_SelectItem($g_hTreeView, $hTreeItemOrig)
+                $bTreeOrigStored = False
+            EndIf
+
+            Local $iListHover = ListItemFromPoint($g_hListView)
+            If $iListHover <> -1 Then
+                ; bring focus to listview to show hot item (needed for listview to listview drag)
+                _WinAPI_SetFocus($g_hListView)
+                _GUICtrlListView_SetHotItem($idListview, $iListHover)
+            EndIf
+
+        Case $GUI_EVENT_PRIMARYUP
+            ; TO DO: maybe move this code below to its own function?
+            If $bDragTreeList Then
+                $g_hCursorBefore = Null
+                $bDragTreeList = False
+                $bTreeOrigStored = False
+                ; restore proper state back to original treeview selection
+                _GUICtrlTreeView_SelectItem($g_hTreeView, $hTreeItemOrig)
+                Local $aTreeList = GUIGetCursorInfo($g_hGUI)
+                If $aTreeList[4] = $idTreeView Then
+                    Select
+                        Case $sDragSrc = "Tree" ; drag and drop from treeview to treeview
+                            Local $iTreeItem = TreeItemFromPoint($g_hTreeView)
+                            Local $sTreeDropItem = TreeItemToPath($g_hTreeView, $iTreeItem)
+                            ConsoleWrite("Copying " & $sTreeDragItem & " to " & $sTreeDropItem & @CRLF)
+                        Case $sDragSrc = "List" ; drag and drop from listview to treeview
+                            Local $iTreeItem = TreeItemFromPoint($g_hTreeView)
+                            Local $sTreeDropItem = TreeItemToPath($g_hTreeView, $iTreeItem)
+                            ConsoleWrite("Copying " & $sListDragItems & " to " & $sTreeDropItem & @CRLF)
+                    EndSelect
+
+                ElseIf $aTreeList[4] = $idListview Then
+                    Select
+                        Case $sDragSrc = "Tree" ; drag and drop from treeview to listview
+                            Local $sListDropItem = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, _GUICtrlListView_GetHotItem($idListview), 0)
+                            ConsoleWrite("Copying " & $sTreeDragItem & " to " & $sListDropItem & @CRLF)
+                        Case $sDragSrc = "List" ; drag and drop from listview to listview
+                            Local $iListDrop = ListItemFromPoint($g_hListView)
+                            Local $sListDropItem = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
+                            ConsoleWrite("Copying " & $sListDragItems & " to " & $sListDropItem & @CRLF)
+                    EndSelect
+                EndIf
+            EndIf
     EndSwitch
 EndFunc   ;==>_EventsGUI
+
+Func TreeItemFromPoint($hWnd)
+    Local $tMPos = _WinAPI_GetMousePos(True, $hWnd)
+    Return _GUICtrlTreeView_HitTestItem($hWnd, DllStructGetData($tMPos, 1), DllStructGetData($tMPos, 2))
+EndFunc
+
+Func ListItemFromPoint($hWnd)
+    Local $aListItem = _GUICtrlListView_HitTest($hWnd, -1, -1)
+    Return $aListItem[0]
+EndFunc
 
 Func _ButtonFunctions()
     Switch @GUI_CtrlId
@@ -1896,8 +1984,8 @@ Func _PathInputChanged()
     ; update number of items (files and folders) in statusbar
     $g_aText[0] = "  " & _GUICtrlListView_GetItemCount($idListview) & " items"
     ; update drive space information
-    Local $iDriveFree = Round(DriveSpaceFree(GUICtrlRead($idInputPath)) / 1024, 1)
-    Local $iDriveTotal = Round(DriveSpaceTotal(GUICtrlRead($idInputPath)) / 1024, 1)
+    Local $iDriveFree = Round(DriveSpaceFree(__TreeListExplorer_GetPath($hTLESystem)) / 1024, 1)
+    Local $iDriveTotal = Round(DriveSpaceTotal(__TreeListExplorer_GetPath($hTLESystem)) / 1024, 1)
     Local $iPercentFree = Round(($iDriveFree / $iDriveTotal) * 100)
     $g_aText[3] = $iDriveFree & " GB free" & " (" & $iPercentFree & "%)"
     _WinAPI_RedrawWindow($g_hStatus)
@@ -1943,3 +2031,21 @@ Func WM_WINDOWPOSCHANGED_Handler($hWnd, $iMsg, $wParam, $lParam)
     _drawUAHMenuNCBottomLine($hWnd)
     Return $GUI_RUNDEFMSG
 EndFunc   ;==>_WM_WINDOWPOSCHANGED
+
+Func _ListGetSelections()
+    $sListDragItems = ""
+    $aListDragItems = _GUICtrlListView_GetSelectedIndices($g_hListView, True)
+    For $i = 1 To $aListDragItems[0]
+        $aListDragItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $aListDragItems[$i], 0)
+        $sListDragItems &= $aListDragItems[$i] & " + "
+    Next
+    $sListDragItems = StringTrimRight($sListDragItems, 3)
+    AdlibUnRegister("_ListGetSelections")
+EndFunc
+
+Func TreeItemToPath($hTree, $hItem)
+    Local $sPath = StringReplace(_GUICtrlTreeView_GetTree($hTree, $hItem), "|", "\")
+    $sPath = StringTrimLeft($sPath, StringInStr($sPath, "\")) ; remove this pc at the beginning
+    If StringInStr(FileGetAttrib($sPath), "D") Then $sPath&="\" ; let folders end with \
+    Return $sPath
+EndFunc

@@ -15,6 +15,14 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 ### Added
 
+- Added initial drag and drop support (no file movement yet)
+
+### Fixed
+
+- Fixed resizing issue with child GUI frames and controls from GUIFrame UDF
+
+### Added
+
 - Painting over white menubar line in dark mode. [9297bd6](https://github.com/AutoIt-Community/files-au3/commit/9297bd6755d656c5d45dd5d86013b97569603342)
 
 ### Changed

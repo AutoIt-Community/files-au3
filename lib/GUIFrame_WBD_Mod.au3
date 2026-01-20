@@ -22,7 +22,7 @@
 
 ; #GLOBAL VARIABLES# =================================================================================================
 
-Global $idSeparator, $g_hGUI, $iHeaderHeight
+Global $idSeparator, $g_hGUI, $iHeaderHeight, $iTopArea
 
 ; Array to hold handles for each frame set
 Global $aGF_HandleIndex[1][8] = [[0, 0, 0]]
@@ -101,6 +101,8 @@ OnAutoItExitRegister("_GUIFrame_Exit")
 ; Example........: Yes
 ;=====================================================================================================================
 Func _GUIFrame_Create($hWnd, $iSepOrient = 0, $iSepPos = 0, $iSepSize = 5, $iX = 0, $iY = 0, $iOrg_Width = 0, $iOrg_Height = 0, $iStyle = 0, $iExStyle = 0)
+
+    $iTopArea = $iY
 
     Local $iSeperator_Pos, $hSeparator, $hFirstFrame, $hSecondFrame, $nSepPercent
 	Local $iFrame_Style = BitOR(0x40000000, 0x10000000) ; $WS_CHILD, WS_VISIBLE
@@ -817,6 +819,8 @@ EndFunc   ;==>_GUIFrame_SepPassMsg
 ; Remarks .......: This function is used internally by _GUIFrame_SIZE_Handler
 ; ===============================================================================================================================
 Func _GUIFrame_Move($iFrame, $iX, $iY, $iWidth = 0, $iHeight = 0)
+
+    $iY = $iTopArea
 
     If $iFrame < 1 Or $iFrame > $aGF_HandleIndex[0][0] Then Return 0
 
