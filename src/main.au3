@@ -25,7 +25,7 @@
 ; UEZ           Lots and lots and lots
 ; DonChunior    Code review, bug fixes and refactoring
 
-Global $sVersion = "2026-01-19"
+Global $sVersion = "2026-01-20"
 
 ; set base DPI scale value and apply DPI
 Global $DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = -2
@@ -371,25 +371,23 @@ Func _FilesAu3()
         _WinAPI_DwmExtendFrameIntoClientArea($g_hGUI, _WinAPI_CreateMargins(-1, -1, -1, -1))
     EndIf
 
-    GUISetState(@SW_SHOW, $g_hGUI)
-    _drawUAHMenuNCBottomLine($g_hGUI)
-
-    ; get parent frame handle
-    Local $aData = _WinAPI_EnumChildWindows(_GetHwndFromPID(@AutoItPID))
-    For $i = 1 to $aData[0][0]
-        $aData[$i][1] = _WinAPI_GetWindowText($aData[$i][0])
-        If $aData[$i][1] = "FrameParent" Then $hParentFrame = $aData[$i][0]
+    ; enumerate all visible and non-visible child windows
+    Local $aWinList = _WinAPI_EnumWindows(False, _GetHwndFromPID(@AutoItPID))
+    Local $aWindows[$aWinList[0][0]][3]
+    For $i = 1 To $aWinList[0][0]
+        $aWindows[$i - 1][0] = $aWinList[$i][0]
+        $aWindows[$i - 1][1] = $aWinList[$i][1]
+        $aWindows[$i - 1][2] = WinGetTitle($aWinList[$i][0])
     Next
 
-    ; get separator frame handle
-    Local $aData = _WinAPI_EnumChildWindows(_GetHwndFromPID(@AutoItPID))
-    For $i = 1 to $aData[0][0]
-        $aData[$i][1] = _WinAPI_GetWindowText($aData[$i][0])
-        If $aData[$i][1] = "SeparatorFrame" Then $hSeparatorFrame = $aData[$i][0]
+    ; get handles for parent frame and separator frame
+    For $i = 0 to UBound($aWindows) - 1
+        If $aWindows[$i][2] = "FrameParent" Then $hParentFrame = $aWindows[$i][0]
+        If $aWindows[$i][2] = "SeparatorFrame" Then $hSeparatorFrame = $aWindows[$i][0]
     Next
 
     ; set background color for separator frame and parent frame
-    If $isDarkMode = True Then
+    If $isDarkMode Then
         If @OSBuild >= 22621 Then
             GUISetBkColor(0x000000, $hSeparatorFrame)
             GUISetBkColor(0x000000, $hParentFrame)
@@ -401,6 +399,9 @@ Func _FilesAu3()
         GUISetBkColor($iBackColorDef, $hSeparatorFrame)
         GUISetBkColor($iBackColorDef, $hParentFrame)
     EndIf
+
+    GUISetState(@SW_SHOW, $g_hGUI)
+    _drawUAHMenuNCBottomLine($g_hGUI)
 
     _removeExStyles()
 
