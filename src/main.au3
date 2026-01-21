@@ -256,7 +256,6 @@ Func _FilesAu3()
     GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
     $g_hTreeView = GUICtrlGetHandle($idTreeView)
 
-    ;_GUIToolTip_AddTool($hToolTip3, $g_hGUI, "", $g_hTreeView)
     _GUIToolTip_AddTool($hToolTip3, $g_hGUI, " ", $g_hGUI)
 
     _GUIToolTip_SetTitle($hToolTip3, 'File Operation', $TTI_INFO_LARGE)
@@ -1089,7 +1088,6 @@ EndFunc
 
 Func _CleanExit()
     __TreeListExplorer_Shutdown()
-    ;_GUICtrlListView_UnRegisterSortCallBack($g_hListview)
     _GUICtrlHeader_Destroy($g_hHeader)
     _GUIToolTip_Destroy($hToolTip1)
     _GUIToolTip_Destroy($hToolTip2)
@@ -1100,7 +1098,6 @@ Func _CleanExit()
     DllClose($hKernel32)
     DllClose($hGdi32)
     DllClose($hShlwapi)
-    ;DllClose($hUser32)
 EndFunc
 
 Func _ClearDarkSizebox()
@@ -1872,7 +1869,6 @@ Func _EventsGUI()
             EndIf
             Local $aPosTool3 = MouseGetPos()
             _GUIToolTip_TrackPosition($hToolTip3, $aPosTool3[0], $aPosTool3[1])
-            ;_GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to ")
 
             Local $aTreeList = GUIGetCursorInfo($g_hGUI)
             Local $sTreeItemText, $sListItemText
@@ -2101,11 +2097,11 @@ Func _ListGetSelections()
     $sListDragItems = ""
     $aListDragItems = _GUICtrlListView_GetSelectedIndices($g_hListView, True)
     If $aListDragItems[0] = 1 Then
-        ; TO DO: need to create icon for file being dragged
+        ; TODO: need to create icon for file being dragged
         ; will need to pass index number
         $iListDragIndex = $aListDragItems[1]
     Else
-        ; TO DO: need to create icon to signify multiple files
+        ; TODO: need to create icon to signify multiple files
         $iListDragIndex = $aListDragItems[1]
     EndIf
     For $i = 1 To $aListDragItems[0]
