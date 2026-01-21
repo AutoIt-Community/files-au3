@@ -25,7 +25,7 @@
 ; UEZ           Lots and lots and lots
 ; DonChunior    Code review, bug fixes and refactoring
 
-Global $sVersion = "0.3.0 - 2026-01-20"
+Global $sVersion = "0.3.0 - 2026-01-21"
 
 ; set base DPI scale value and apply DPI
 Global $DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = -2
@@ -41,13 +41,14 @@ Global $hTLESystem, $iFrame_A, $hSecondFrame, $hSeparatorFrame, $aWinSize2, $idI
 Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hChildLV, $hParentFrame, $g_iIconWidth, $g_hTreeView
 Global $g_hSizebox, $g_hOldProc, $g_iHeight, $g_aTextStatus, $g_aRatioW, $g_hDots
 Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
+Global $hListImgList, $iListDragIndex
 Global $sBack, $sForward, $sUpLevel, $sRefresh
-Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $aListDragItems
+Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $aListDragItems, $bDragToolActive = False
 Global $idExitItem, $idAboutItem
 Global $hCursor, $hProc, $g_hBrush
 Global $iTimeCalled, $iTimeDiff
 Global $sSelectedItems, $g_aText
-Global $idSeparator, $idThemeItem, $hToolTip2, $hToolTip1, $bTooltipActive
+Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $hToolTip3, $bTooltipActive
 Global $isDarkMode = _WinAPI_ShouldAppsUseDarkMode()
 Global $hFolderHistory=__History_Create("_doUnReDo", 100, "_historyChange"), $bFolderHistoryChanging = False
 Global $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, 0x000000)
@@ -118,19 +119,8 @@ _FilesAu3()
 Func _FilesAu3()
     _GDIPlus_Startup()
     Local $sButtonSpacing = 20
-    ; dpi
-    Local $iTreeListIconSize
-    If $iDPI = 1 Then
-        $iTreeListIconSize = 16
-    ElseIf $iDPI = 1.25 Then
-        $iTreeListIconSize = 20
-    ElseIf $iDPI = 1.5 Then
-        $iTreeListIconSize = 24
-    ElseIf $iDPI = 2 Then
-        $iTreeListIconSize = 32
-    Else
-        $iTreeListIconSize = 16
-    EndIf
+    ; calculate icon size for TreeListExplorer
+    Local $iTreeListIconSize = 16 * $iDPI
 
     ; check font availability
     Local $sButtonFont
@@ -165,10 +155,12 @@ Func _FilesAu3()
     $aClientSize = WinGetClientSize($g_hGUI)
 
     ; set tooltips theming
-    $hToolTip2 = _GUIToolTip_Create(0)
-    _GUIToolTip_SetMaxTipWidth($hToolTip2, 400)
     $hToolTip1 = _GUIToolTip_Create(0)
     _GUIToolTip_SetMaxTipWidth($hToolTip1, 400)
+    $hToolTip2 = _GUIToolTip_Create(0)
+    _GUIToolTip_SetMaxTipWidth($hToolTip2, 400)
+    $hToolTip3 = _GUIToolTip_Create(0)
+    _GUIToolTip_SetMaxTipWidth($hToolTip3, 400)
 
     GUISetFont(10, $FW_NORMAL, $GUI_FONTNORMAL, $sButtonFont)
 
@@ -259,11 +251,15 @@ Func _FilesAu3()
     $aWinSize1 = WinGetClientSize(_GUIFrame_GetHandle($iFrame_A, 1))
 
     Local $iStyle = BitOR($TVS_HASBUTTONS, $TVS_HASLINES, $TVS_LINESATROOT, $TVS_SHOWSELALWAYS, $TVS_TRACKSELECT)
-    ;$idTreeView = GUICtrlCreateTreeView(0, 0, $aWinSize1[0], $aWinSize1[1] - $sRefreshPosV - $iTopSpacer, $iStyle)
     $idTreeView = GUICtrlCreateTreeView(0, 0, $aWinSize1[0], $iFrameHeight, $iStyle)
     GUICtrlSetState(-1, $GUI_DROPACCEPTED)
     GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
     $g_hTreeView = GUICtrlGetHandle($idTreeView)
+
+    _GUIToolTip_AddTool($hToolTip3, $g_hGUI, " ", $g_hGUI)
+
+    _GUIToolTip_SetTitle($hToolTip3, 'File Operation', $TTI_INFO_LARGE)
+    _GUIToolTip_Deactivate($hToolTip3)
 
     ; Create TLE system
     $hTLESystem = __TreeListExplorer_CreateSystem($g_hGUI, "", "_folderCallback")
@@ -273,8 +269,6 @@ Func _FilesAu3()
     If @error Then ConsoleWrite("__TreeListExplorer_AddView $idInputPath failed: "&@error&":"&@extended&@crlf)
     __TreeListExplorer_AddView($hTLESystem, $idTreeView)
     If @error Then ConsoleWrite("__TreeListExplorer_AddView $idTreeView failed: "&@error&":"&@extended&@crlf)
-    ;__TreeListExplorer_SetCallback($idTreeView, $__TreeListExplorer_Callback_Click, "_clickCallback")
-    ;__TreeListExplorer_SetCallback($idTreeView, $__TreeListExplorer_Callback_DoubleClick, "_doubleClickCallback")
 
     _GUIFrame_Switch($iFrame_A, 2)
 
@@ -282,7 +276,6 @@ Func _FilesAu3()
 
     $hChildLV = _GUIFrame_GetHandle($iFrame_A, 2)
     $g_hHeader = _GUICtrlHeader_Create($hChildLV, BitOR($HDS_BUTTONS, $HDS_DRAGDROP, $HDS_FULLDRAG))
-    ;$g_hHeader = _GUICtrlHeader_Create($hChildLV, BitOR($HDS_BUTTONS, $HDS_HOTTRACK, $HDS_DRAGDROP))
     GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
     _GUICtrlHeader_AddItem($g_hHeader, "Name", 300)
     _GUICtrlHeader_AddItem($g_hHeader, "Size", 100)
@@ -399,6 +392,9 @@ Func _FilesAu3()
         GUISetBkColor($iBackColorDef, $hSeparatorFrame)
         GUISetBkColor($iBackColorDef, $hParentFrame)
     EndIf
+
+    ; get imagelist handles for treeview and listview
+    $hListImgList = _GUICtrlListView_GetImageList($idListview, 1)
 
     GUISetState(@SW_SHOW, $g_hGUI)
     _drawUAHMenuNCBottomLine($g_hGUI)
@@ -1092,15 +1088,16 @@ EndFunc
 
 Func _CleanExit()
     __TreeListExplorer_Shutdown()
-    ;_GUICtrlListView_UnRegisterSortCallBack($g_hListview)
     _GUICtrlHeader_Destroy($g_hHeader)
+    _GUIToolTip_Destroy($hToolTip1)
+    _GUIToolTip_Destroy($hToolTip2)
+    _GUIToolTip_Destroy($hToolTip3)
     GUIDelete($g_hGUI)
     _ClearDarkSizebox()
 
     DllClose($hKernel32)
     DllClose($hGdi32)
     DllClose($hShlwapi)
-    ;DllClose($hUser32)
 EndFunc
 
 Func _ClearDarkSizebox()
@@ -1844,6 +1841,7 @@ EndFunc   ;==>_WinAPI_FlushMenuThemes
 Func _EventsGUI()
     Local Static $hTreeItemOrig = 0
     Local Static $bTreeOrigStored = False
+    Local $hIcon, $iImgIndex
     Switch @GUI_CtrlId
         Case $GUI_EVENT_CLOSE
             Exit
@@ -1853,33 +1851,93 @@ Func _EventsGUI()
             _resizeLVCols2()
         Case $GUI_EVENT_MOUSEMOVE
             If Not $bDragTreeList Then ContinueCase
-            If Not $bTreeOrigStored Then
-                ; store handle for the original treeview selection to restore selection
-                $hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
-                $bTreeOrigStored = True
+            If Not $bDragToolActive Then
+                ; check drag source to determine where to fetch icon from
+                If $sDragSrc = "Tree" Then
+                    $hIcon = _GUICtrlTreeView_GetImageListIconHandle($idTreeView, 0) ; always folder icon
+                    _GUIToolTip_SetTitle($hToolTip3, 'File Operation', $hIcon)
+                ElseIf $sDragSrc = "List" Then
+                    $iImgIndex = _GUICtrlListView_GetItemImage($g_hListView, $iListDragIndex)
+                    $hIcon = _GUIImageList_GetIcon($hListImgList, $iImgIndex)
+                    _GUIToolTip_SetTitle($hToolTip3, 'File Operation', $hIcon)
+                EndIf
+                ; temporarily delay regular listview tooltips
+                _GUICtrlListView_SetHoverTime($idListview, 50000)
+                _GUIToolTip_Activate($hToolTip3)
+                _GUIToolTip_TrackActivate($hToolTip3, True, $g_hGUI, $g_hGUI)
+                $bDragToolActive = True
             EndIf
-            Local $hItemHover = TreeItemFromPoint($g_hTreeView)
-            If $hItemHover <> 0 Then
-                ; bring focus to treeview to properly show DROPHILITE
-                _WinAPI_SetFocus($g_hTreeView)
-                _GUICtrlTreeView_SelectItem($g_hTreeView, $hItemHover)
-                _GUICtrlTreeView_SetState($g_hTreeView, $hTreeItemOrig, $TVIS_SELECTED, True)
-            Else
-                ; restore original treeview selection if cursor leaves treeview
-                _GUICtrlTreeView_SelectItem($g_hTreeView, $hTreeItemOrig)
-                $bTreeOrigStored = False
-            EndIf
+            Local $aPosTool3 = MouseGetPos()
+            _GUIToolTip_TrackPosition($hToolTip3, $aPosTool3[0], $aPosTool3[1])
 
-            Local $iListHover = ListItemFromPoint($g_hListView)
-            If $iListHover <> -1 Then
-                ; bring focus to listview to show hot item (needed for listview to listview drag)
-                _WinAPI_SetFocus($g_hListView)
-                _GUICtrlListView_SetHotItem($idListview, $iListHover)
-            EndIf
+            Local $aTreeList = GUIGetCursorInfo($g_hGUI)
+            Local $sTreeItemText, $sListItemText
+            Local Static $sTreeItemTextPrev, $sListItemTextPrev
+            Select
+                Case $aTreeList[4] = $idTreeView
+                    If Not $bTreeOrigStored Then
+                        ; store handle for the original treeview selection to restore selection
+                        $hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
+                        $bTreeOrigStored = True
+                    EndIf
+                    Local $hItemHover = TreeItemFromPoint($g_hTreeView)
+                    If $hItemHover <> 0 Then
+                        ; bring focus to treeview to properly show DROPHILITE
+                        _WinAPI_SetFocus($g_hTreeView)
+                        _GUICtrlTreeView_SelectItem($g_hTreeView, $hItemHover)
+                        _GUICtrlTreeView_SetState($g_hTreeView, $hTreeItemOrig, $TVIS_SELECTED, True)
+                        Local $iTreeItem = TreeItemFromPoint($g_hTreeView)
+                        $sTreeItemText = _GUICtrlTreeView_GetText($g_hTreeView, $iTreeItem)
+                        If $sTreeItemText <> $sTreeItemTextPrev Then
+                            _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sTreeItemText)
+                        EndIf
+                        $sTreeItemTextPrev = $sTreeItemText
+                    Else
+                        ; restore original treeview selection if cursor leaves treeview
+                        _GUICtrlTreeView_SelectItem($g_hTreeView, $hTreeItemOrig)
+                        $bTreeOrigStored = False
+                    EndIf
+
+                Case $aTreeList[4] = $idListview
+                    Local $iListHover = ListItemFromPoint($g_hListView)
+                    If $iListHover <> -1 Then
+                        ; bring focus to listview to show hot item (needed for listview to listview drag)
+                        _WinAPI_SetFocus($g_hListView)
+                        _GUICtrlListView_SetHotItem($idListview, $iListHover)
+                        Local $iListDrop = ListItemFromPoint($g_hListView)
+                        Local $sListDropPath = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
+                        If __TreeListExplorer__PathIsFolder($sListDropPath) Then
+                            $sListItemText = _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
+                            If $sListItemTextPrev <> $sListItemText Then
+                                _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sListItemText)
+                            EndIf
+                            $sListItemTextPrev = $sListItemText
+                        Else
+                            $sListItemText = __TreeListExplorer_GetPath($hTLESystem)
+                            If $sListItemTextPrev <> $sListItemText Then
+                                _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sListItemText)
+                            EndIf
+                            $sListItemTextPrev = $sListItemText
+                        EndIf
+                    EndIf
+
+                Case Else ; or $aTreeList[4] <> $idListview And $aTreeList[4] <> $idTreeView
+                    ConsoleWrite("drag: cursor is not over treeview or listview" & @CRLF)
+                    ;_GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "<out-of-area>")
+            EndSelect
 
         Case $GUI_EVENT_PRIMARYUP
             ; TO DO: maybe move this code below to its own function?
             If $bDragTreeList Then
+                If $bDragToolActive Then
+                    _GUIToolTip_TrackActivate($hToolTip3, False, $g_hGUI, $g_hGUI)
+                    _GUIToolTip_Deactivate($hToolTip3)
+                    ; restore original listview hover time
+                    _GUICtrlListView_SetHoverTime($idListview, 500)
+                    _GUIImageList_DestroyIcon($hIcon)
+                    _GUIToolTip_SetTitle($hToolTip3, 'File Operation', $TTI_NONE)
+                    $bDragToolActive = False
+                EndIf
                 $g_hCursorBefore = Null
                 $bDragTreeList = False
                 $bTreeOrigStored = False
@@ -1908,6 +1966,8 @@ Func _EventsGUI()
                             Local $sListDropItem = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
                             ConsoleWrite("Copying " & $sListDragItems & " to " & $sListDropItem & @CRLF)
                     EndSelect
+                ElseIf $aTreeList[4] <> $idListview And $aTreeList[4] <> $idTreeView Then
+                    ConsoleWrite("drop: cursor is not over treeview or listview" & @CRLF)
                 EndIf
             EndIf
     EndSwitch
@@ -2036,6 +2096,14 @@ EndFunc   ;==>_WM_WINDOWPOSCHANGED
 Func _ListGetSelections()
     $sListDragItems = ""
     $aListDragItems = _GUICtrlListView_GetSelectedIndices($g_hListView, True)
+    If $aListDragItems[0] = 1 Then
+        ; TODO: need to create icon for file being dragged
+        ; will need to pass index number
+        $iListDragIndex = $aListDragItems[1]
+    Else
+        ; TODO: need to create icon to signify multiple files
+        $iListDragIndex = $aListDragItems[1]
+    EndIf
     For $i = 1 To $aListDragItems[0]
         $aListDragItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $aListDragItems[$i], 0)
         $sListDragItems &= $aListDragItems[$i] & " + "
