@@ -8,6 +8,7 @@
 #include <GuiTreeView.au3>
 #include <WinAPITheme.au3>
 #include <GuiToolTip.au3>
+#include <String.au3>
 
 #include "../lib/TreeListExplorer.au3"
 #include "../lib/GUIFrame_WBD_Mod.au3"
@@ -995,7 +996,8 @@ Func WM_COMMAND2($hWnd, $iMsg, $wParam, $lParam)
                     ; select all text in path input box
                     AdlibRegister("_PathSelectAll", 10)
                 Case $EN_CHANGE
-                    AdlibRegister("_PathInputChanged", 10)
+                    AdlibRegister("_PathInputChanged", 20)
+                    ; TODO: timing does not always work here, need better solution
             EndSwitch
     EndSwitch
     Return $GUI_RUNDEFMSG
@@ -1787,16 +1789,16 @@ Func _EventsGUI()
             Local $aPosTool3 = MouseGetPos()
             _GUIToolTip_TrackPosition($hToolTip3, $aPosTool3[0], $aPosTool3[1])
 
+            If Not $bTreeOrigStored Then
+                ; store handle for the original treeview selection to restore selection later
+                $hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
+                $bTreeOrigStored = True
+            EndIf
             Local $aTreeList = GUIGetCursorInfo($g_hGUI)
-            Local $sTreeItemText, $sListItemText
-            Local Static $sTreeItemTextPrev, $sListItemTextPrev
+            Local $sTreeListItemText
+            Local Static $sTreeListItemTextPrev
             Select
                 Case $aTreeList[4] = $idTreeView
-                    If Not $bTreeOrigStored Then
-                        ; store handle for the original treeview selection to restore selection
-                        $hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
-                        $bTreeOrigStored = True
-                    EndIf
                     Local $hItemHover = TreeItemFromPoint($g_hTreeView)
                     If $hItemHover <> 0 Then
                         ; bring focus to treeview to properly show DROPHILITE
@@ -1804,11 +1806,11 @@ Func _EventsGUI()
                         _GUICtrlTreeView_SelectItem($g_hTreeView, $hItemHover)
                         _GUICtrlTreeView_SetState($g_hTreeView, $hTreeItemOrig, $TVIS_SELECTED, True)
                         Local $iTreeItem = TreeItemFromPoint($g_hTreeView)
-                        $sTreeItemText = _GUICtrlTreeView_GetText($g_hTreeView, $iTreeItem)
-                        If $sTreeItemText <> $sTreeItemTextPrev Then
-                            _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sTreeItemText)
+                        $sTreeListItemText = _GUICtrlTreeView_GetText($g_hTreeView, $iTreeItem)
+                        If $sTreeListItemText <> $sTreeListItemTextPrev Then
+                            _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sTreeListItemText)
                         EndIf
-                        $sTreeItemTextPrev = $sTreeItemText
+                        $sTreeListItemTextPrev = $sTreeListItemText
                     Else
                         ; restore original treeview selection if cursor leaves treeview
                         _GUICtrlTreeView_SelectItem($g_hTreeView, $hTreeItemOrig)
@@ -1824,32 +1826,34 @@ Func _EventsGUI()
                         Local $iListDrop = ListItemFromPoint($g_hListView)
                         Local $sListDropPath = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
                         If __TreeListExplorer__PathIsFolder($sListDropPath) Then
-                            $sListItemText = _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
-                            If $sListItemTextPrev <> $sListItemText Then
-                                _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sListItemText)
+                            $sTreeListItemText = _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
+                            If $sTreeListItemTextPrev <> $sTreeListItemText Then
+                                _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sTreeListItemText)
                             EndIf
-                            $sListItemTextPrev = $sListItemText
+                            $sTreeListItemTextPrev = $sTreeListItemText
                         Else
-                            $sListItemText = __TreeListExplorer_GetPath($hTLESystem)
-                            If $sListItemTextPrev <> $sListItemText Then
-                                _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sListItemText)
+                            $sTreeListItemText = __TreeListExplorer_GetPath($hTLESystem)
+                            $sTreeListItemText = _StringBetween($sTreeListItemText, "\", "\")[UBound(_StringBetween($sTreeListItemText, "\", "\")) - 1]
+                            If $sTreeListItemTextPrev <> $sTreeListItemText Then
+                                _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sTreeListItemText)
                             EndIf
-                            $sListItemTextPrev = $sListItemText
+                            $sTreeListItemTextPrev = $sTreeListItemText
                         EndIf
                     ElseIf $iListHover = -1 Then
-                        $sListItemText = __TreeListExplorer_GetPath($hTLESystem)
-                        ; TODO: Needs to be folder name for tooltip not full path
-                        If $sListItemTextPrev <> $sListItemText Then
-                            _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sListItemText)
+                        $sTreeListItemText = __TreeListExplorer_GetPath($hTLESystem)
+                        $sTreeListItemText = _StringBetween($sTreeListItemText, "\", "\")[UBound(_StringBetween($sTreeListItemText, "\", "\")) - 1]
+                        If $sTreeListItemTextPrev <> $sTreeListItemText Then
+                            _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sTreeListItemText)
                         EndIf
-                        $sListItemTextPrev = $sListItemText
+                        $sTreeListItemTextPrev = $sTreeListItemText
                     EndIf
 
-                Case $aTreeList[4] <> $idListview And $aTreeList[4] <> $idTreeView And $aTreeList[4] <> $idSeparator
-                    If $sListItemTextPrev <> $sListItemText Then
-                        _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "<out-of-area>")
+                Case Else
+                    If $sTreeListItemTextPrev <> $sTreeListItemText Then
+                        $sTreeListItemText = " "
+                        _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, $sTreeListItemText)
                     EndIf
-                    $sListItemTextPrev = $sListItemText
+                    $sTreeListItemTextPrev = $sTreeListItemText
             EndSelect
 
         Case $GUI_EVENT_PRIMARYUP

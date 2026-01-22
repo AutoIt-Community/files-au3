@@ -15,6 +15,10 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 - Added tooltips for drag and drop functionality (no file movement yet)
 
+### Fixed
+
+- Fixed some issues with drag and drop tooltips
+
 ### Changed
 
 - Changed some of the drag and drop related structure
