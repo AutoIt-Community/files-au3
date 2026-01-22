@@ -13,6 +13,10 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 ## [0.4.0] - 2026-01-22
 
+### Fixed
+
+- Fixed enumeration of items on statusbar by ensuring that ListView update is complete
+
 ### Added
 
 - Tooltips for drag and drop functionality (no file movement yet). [589c563](https://github.com/AutoIt-Community/files-au3/commit/589c5638c482e5c339570106caec132cb6c5d6fa)

@@ -45,6 +45,7 @@ Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
 Global $hListImgList, $iListDragIndex
 Global $sBack, $sForward, $sUpLevel, $sRefresh
 Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $aListDragItems, $bDragToolActive = False
+Global $bPathInputChanged = False
 Global $idExitItem, $idAboutItem
 Global $hCursor, $hProc, $g_hBrush
 Global $iTimeCalled, $iTimeDiff
@@ -312,6 +313,7 @@ Func _FilesAu3()
 
     ; add listview and callbacks to TLE system
     __TreeListExplorer_AddView($hTLESystem, $idListview, True, True, True, False, False)
+    __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_Loading, "_loadingCallback")
     __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_DoubleClick, "_doubleClickCallback")
     __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_ListViewPaths, "_handleListViewData")
     __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_ListViewItemCreated, "_handleListViewItemCreated")
@@ -564,10 +566,10 @@ Func _selectionChangedLV()
     EndIf
 
     If $iItemCount <> 0 And $iItemCount <> 1 Then
-        $g_aText[1] = $iItemCount & " items selected"
+        $g_aText[1] = "  " & $iItemCount & " items selected"
         _WinAPI_RedrawWindow($g_hStatus)
     ElseIf $iItemCount = 1 Then
-        $g_aText[1] = $iItemCount & " item selected"
+        $g_aText[1] = "  " & $iItemCount & " item selected"
         _WinAPI_RedrawWindow($g_hStatus)
     Else
         $g_aText[1] = " "
@@ -579,7 +581,7 @@ Func _selectionChangedLV()
         $g_aText[2] = " "
         _WinAPI_RedrawWindow($g_hStatus)
     Else
-        $g_aText[2] = __TreeListExplorer__GetSizeString($iFileSizes)
+        $g_aText[2] = "  " & __TreeListExplorer__GetSizeString($iFileSizes)
         _WinAPI_RedrawWindow($g_hStatus)
     EndIf
 EndFunc
@@ -619,6 +621,16 @@ Func _doubleClickCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $item)
     If $Array[0] <> 0 And $Array[1] <> "" Then
         ; open file in ListView when double-clicking (uses Windows defaults per extension)
         ShellExecute($sRoot & $sFolder & $Array[1])
+    EndIf
+EndFunc
+
+Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $bLoading)
+    ; wait for ListView items to be done loading before getting item count for statusbar
+    If $bPathInputChanged Then
+        If Not $bLoading Then
+            _PathInputChanged()
+            $bPathInputChanged = False
+        EndIf
     EndIf
 EndFunc
 
@@ -996,8 +1008,8 @@ Func WM_COMMAND2($hWnd, $iMsg, $wParam, $lParam)
                     ; select all text in path input box
                     AdlibRegister("_PathSelectAll", 10)
                 Case $EN_CHANGE
-                    AdlibRegister("_PathInputChanged", 20)
-                    ; TODO: timing does not always work here, need better solution
+                    ; signal path input change to follow up in _loadingCallback() function
+                    $bPathInputChanged = True
             EndSwitch
     EndSwitch
     Return $GUI_RUNDEFMSG
@@ -1963,9 +1975,8 @@ Func _PathInputChanged()
     Local $iDriveFree = Round(DriveSpaceFree(__TreeListExplorer_GetPath($hTLESystem)) / 1024, 1)
     Local $iDriveTotal = Round(DriveSpaceTotal(__TreeListExplorer_GetPath($hTLESystem)) / 1024, 1)
     Local $iPercentFree = Round(($iDriveFree / $iDriveTotal) * 100)
-    $g_aText[3] = $iDriveFree & " GB free" & " (" & $iPercentFree & "%)"
+    $g_aText[3] = "  " & $iDriveFree & " GB free" & " (" & $iPercentFree & "%)"
     _WinAPI_RedrawWindow($g_hStatus)
-    AdlibUnRegister("_PathInputChanged")
 EndFunc
 
 Func _drawUAHMenuNCBottomLine($hWnd) ; ahmet
