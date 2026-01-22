@@ -23,7 +23,7 @@ Don't hesitate to open an issue, ask questions, and start a discussion.
 
 1. Create a **fork** of the repository (project).
 2. **Clone** the forked repository to your local machine.
-3. Create a **remote upstream** with `git remote add upstream git@github.com:AutoIt-Community/files-au3.git`.
+3. Create a **remote upstream** with `git remote add upstream https://github.com/AutoIt-Community/files-au3.git`.
 4. Create a feature branch based on the `main` branch with `git checkout -b your-feature-name main`.
 5. Make your changes and **commit** them with a meaningful commit message (see [Commit-message conventions](#commit-message-conventions)).
 6. **Push** your changes to your forked repository with `git push origin your-feature-name`.
