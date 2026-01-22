@@ -26,7 +26,7 @@
 ; UEZ           Lots and lots and lots
 ; DonChunior    Code review, bug fixes and refactoring
 
-Global $sVersion = "0.3.0 - 2026-01-21"
+Global $sVersion = "0.4.0 - 2026-01-22"
 
 ; set base DPI scale value and apply DPI
 Global $DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = -2
