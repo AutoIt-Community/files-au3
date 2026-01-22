@@ -132,11 +132,10 @@ Func _FilesAu3()
         $sButtonFont = "Segoe MDL2 Assets"
     EndIf
 
-    ; StartUp of the TreeListExplorer UDF (required)
+    ; Startup of the TreeListExplorer
     __TreeListExplorer_StartUp($__TreeListExplorer_Lang_EN, $iTreeListIconSize)
-    If @error Then ConsoleWrite("__TreeListExplorer_StartUp failed: "&@error&":"&@extended&@crlf)
 
-    ;Create GUI
+    ; Create GUI and register events
     $g_hGUI = GUICreate("Files Au3", @DesktopWidth - 600, @DesktopHeight - 400, -1, -1, $WS_OVERLAPPEDWINDOW)
     GUISetOnEvent($GUI_EVENT_CLOSE, "_EventsGUI")
     GUISetOnEvent($GUI_EVENT_MAXIMIZE, "_EventsGUI")
@@ -243,13 +242,14 @@ Func _FilesAu3()
     Local $iFrameHeight = $aClientSize2[1] - $iStatusHeight - $sRefreshPosV - $iTopSpacer
     $iFrame_A = _GUIFrame_Create($g_hGUI, 0, $FrameWidth1, 9, 0, $sRefreshPosV + $iTopSpacer)
 
-    ;Set min sizes for the frames
+    ; Set minimum sizes for the frames
     _GUIFrame_SetMin($iFrame_A, 200, 600, True)
 
-    ;Create Explorer Listviews
+    ; Create treeview frame
     _GUIFrame_Switch($iFrame_A, 1)
     $aWinSize1 = WinGetClientSize(_GUIFrame_GetHandle($iFrame_A, 1))
 
+    ; create treeview
     Local $iStyle = BitOR($TVS_HASBUTTONS, $TVS_HASLINES, $TVS_LINESATROOT, $TVS_SHOWSELALWAYS, $TVS_TRACKSELECT)
     $idTreeView = GUICtrlCreateTreeView(0, 0, $aWinSize1[0], $iFrameHeight, $iStyle)
     GUICtrlSetState(-1, $GUI_DROPACCEPTED)
@@ -263,17 +263,17 @@ Func _FilesAu3()
 
     ; Create TLE system
     $hTLESystem = __TreeListExplorer_CreateSystem($g_hGUI, "", "_folderCallback")
-    If @error Then ConsoleWrite("__TreeListExplorer_CreateSystem left failed: "&@error&":"&@extended&@crlf)
+
     ; Add Views to TLE system
     __TreeListExplorer_AddView($hTLESystem, $idInputPath)
-    If @error Then ConsoleWrite("__TreeListExplorer_AddView $idInputPath failed: "&@error&":"&@extended&@crlf)
     __TreeListExplorer_AddView($hTLESystem, $idTreeView)
-    If @error Then ConsoleWrite("__TreeListExplorer_AddView $idTreeView failed: "&@error&":"&@extended&@crlf)
 
+    ; Create listview frame
     _GUIFrame_Switch($iFrame_A, 2)
 
     $aWinSize2 = WinGetClientSize(_GUIFrame_GetHandle($iFrame_A, 2))
 
+    ; create header control
     $hChildLV = _GUIFrame_GetHandle($iFrame_A, 2)
     $g_hHeader = _GUICtrlHeader_Create($hChildLV, BitOR($HDS_BUTTONS, $HDS_DRAGDROP, $HDS_FULLDRAG))
     GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
@@ -291,9 +291,9 @@ Func _FilesAu3()
     ; get header height
     $iHeaderHeight = _WinAPI_GetWindowHeight($g_hHeader)
 
-    ;_WinAPI_SetWindowPos_mod($g_hHeader, 0, 10, 0, $aWinSize2[0] - 11, $iHeaderHeight, BitOR($SWP_NOZORDER, $SWP_NOACTIVATE))
-
-    $idListview = GUICtrlCreateListView("Name|Size|Date Modified|Type", 0, $iHeaderHeight, $aWinSize2[0], $iFrameHeight - $iHeaderHeight, BitOR($LVS_SHOWSELALWAYS, $LVS_NOCOLUMNHEADER), BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_DOUBLEBUFFER, $LVS_EX_TRACKSELECT))
+    ; create listview control
+    Local $iExStyles = BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_DOUBLEBUFFER, $LVS_EX_TRACKSELECT)
+    $idListview = GUICtrlCreateListView("Name|Size|Date Modified|Type", 0, $iHeaderHeight, $aWinSize2[0], $iFrameHeight - $iHeaderHeight, BitOR($LVS_SHOWSELALWAYS, $LVS_NOCOLUMNHEADER), $iExStyles)
     GUICtrlSetState(-1, $GUI_DROPACCEPTED)
     GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
 
@@ -309,9 +309,8 @@ Func _FilesAu3()
     $idPropertiesLV = GUICtrlCreateMenuItem("Properties", $idContextLV)
     GUICtrlSetOnEvent(-1, "_MenuFunctions")
 
+    ; add listview and callbacks to TLE system
     __TreeListExplorer_AddView($hTLESystem, $idListview, True, True, True, False, False)
-    If @error Then ConsoleWrite("__TreeListExplorer_AddView $idListview failed: "&@error&":"&@extended&@crlf)
-    ;__TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_Click, "_clickCallback")
     __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_DoubleClick, "_doubleClickCallback")
     __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_ListViewPaths, "_handleListViewData")
     __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_ListViewItemCreated, "_handleListViewItemCreated")
@@ -319,26 +318,18 @@ Func _FilesAu3()
     ; Set resizing flag for all created frames
     _GUIFrame_ResizeSet(0)
 
-    ; Register the $WM_SIZE handler to permit resizing
-    ;_GUIFrame_ResizeReg()
-
     GUIRegisterMsg($WM_COMMAND, "WM_COMMAND2")
     GUIRegisterMsg($WM_NOTIFY, "WM_NOTIFY2")
 
     ; get rid of the focus rectangle dots
     GUICtrlSendMsg($idTreeView, $WM_CHANGEUISTATE, 65537, 0)
 
-    ; add listview column for Type (for some reason this only works when added later)
-    ;_GUICtrlListView_AddColumn($g_hListview, "Type", 500)
-    ;_GUICtrlListView_SetColumnWidth($g_hListview, 3, 500)
-
     ; resize listview columns to match header widths + update global variable $g_iIconWidth
     _resizeLVCols()
 
-    ; statusbar
+    ; set ownerdraw parts for statusbar
     Local $iParts = $aClientSize[0] / 4
     Local $aParts[4] = [$iParts, $iParts * 2, $iParts * 3, -1]
-    ;Local $g_aText[4] = [" ", " ", " ", " "]
     Dim $g_aText[Ubound($aParts)] = [" ", " ", " ", " "]
     _GUICtrlStatusBar_SetParts($g_hStatus, $aParts)
     _GUICtrlStatusBar_SetText($g_hStatus, $g_aText[0], 0, $SBT_OWNERDRAW)
@@ -401,13 +392,9 @@ Func _FilesAu3()
 
     _removeExStyles()
 
-    ;_GUICtrlListView_RegisterSortCallBack($g_hListview, 2) ; 2 = natural sort
-    ; add sort arrow to header
-    ;$__g_aListViewSortInfo[1][10] = $g_hHeader
-
     _GUICtrlListView_SetHoverTime($idListview, 500)
 
-    ; apply theme separately to tooltips
+    ; apply theme to tooltips
     _themeTooltips()
 
     ; add composited to treeview frame
@@ -498,9 +485,6 @@ Func _switchTheme()
         $iTextColorDef = 0xFFFFFF
         $iTextColorDis = _WinAPI_ColorAdjustLuma($iTextColorDef, -50)
 
-        ; separator
-        ;Local $i_ExStyle_Old = _WinAPI_GetWindowLong_mod(GUICtrlGetHandle($idSeparator), $GWL_EXSTYLE)
-        ;_WinAPI_SetWindowLong_mod(GUICtrlGetHandle($idSeparator), $GWL_EXSTYLE, BitXOR($i_ExStyle_Old, $WS_EX_DLGMODALFRAME))
         GUICtrlSetBkColor($idSeparator, 0x505050)
         If @OSBuild >= 22621 Then
             GUISetBkColor(0x000000, $hSeparatorFrame)
@@ -627,34 +611,6 @@ Func _getType($sPath, $bFolder = False)
     Return DllStructGetData($tSHFILEINFO, 5)
 EndFunc
 
-Func _selectCallback($hSystem, $sRoot, $sFolder, $sSelected)
-    ;__TreeListExplorer__FileGetIconIndex($sRoot&$sFolder&$sSelected)
-	ConsoleWrite("Select "&$hSystem&": "&$sRoot&$sFolder&"["&$sSelected&"]"&@CRLF)
-EndFunc
-
-Func _clickCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $item)
-    ;ConsoleWrite("Click at "&$hView&": "&$sRoot&$sFolder&"["&$sSelected&"] :"&$item&@CRLF)
-
-    ConsoleWrite("Click at "&$hView&": "&$sRoot&$sFolder&"["&$sSelected&"] :"&$item&@CRLF)
-	If $hView=GUICtrlGetHandle($idListview) Then
-		Local $sSel = _GUICtrlListView_GetSelectedIndices($hView)
-		If StringInStr($sSel, "|") Then ConsoleWrite("Multiple selected items: "&$sSel&@CRLF)
-	EndIf
-
-    #cs
-    ; get filename for currently selected ListView item
-    Local $Array = _GUICtrlListView_GetItemTextArray($idListview, -1)
-    ; ensure that the array contains information and that file size is not blank
-    If $Array[0] <> 0 And $Array[2] <> "" Then
-        ; update statusbar part with file size
-        _GUICtrlStatusBar_SetText($g_hStatus, $Array[2] & " (selected)", 1, $SBT_NOBORDERS)
-    Else
-        ; selected file has been cleared, so clear status text
-        _GUICtrlStatusBar_SetText($g_hStatus, " ", 1, $SBT_NOBORDERS)
-    EndIf
-    #ce
-EndFunc
-
 Func _doubleClickCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $item)
     ; get filename for currently selected ListView item
     Local $Array = _GUICtrlListView_GetItemTextArray($idListview, -1)
@@ -663,15 +619,6 @@ Func _doubleClickCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $item)
         ; open file in ListView when double-clicking (uses Windows defaults per extension)
         ShellExecute($sRoot & $sFolder & $Array[1])
     EndIf
-EndFunc
-
-Func _filterCallback($hSystem, $hView, $bIsFolder, $sPath, $sName, $sExt)
-	; ConsoleWrite("Filter: "&$hSystem&" > "&$hView&" -- Folder: "&$bIsFolder&" Path: "&$sPath&" Filename: "&$sName&" Ext: "&$sExt&@crlf)
-	Return $bIsFolder Or $sExt=".au3"
-EndFunc
-
-Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $bLoading)
-	; ConsoleWrite("Loading "&$hSystem&": Status: "&$bLoading&" View: "&$hView&" >> "&$sRoot&$sFolder&"["&$sSelected&"] >> "&$sPath&@CRLF)
 EndFunc
 
 Func _folderCallback($hSystem, $sRoot, $sFolder, $sSelected)
@@ -711,7 +658,6 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
     Local $iItemRow
 
     ; header and listview combined functionality
-    ;Local $tNMHDR = DllStructCreate($tagNMHDR, $lParam)
     Local $hWndFrom = HWnd(DllStructGetData($tNMHDR, "hWndFrom"))
     Local $iCode = DllStructGetData($tNMHDR, "Code")
     Switch $hWndFrom
@@ -742,10 +688,6 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                     Local $iHeaderItem = $tNMHEADER.Item
                     Local $tHDITEM = DllStructCreate($tagHDITEM, $tNMHEADER.pItem)
                     Local $iHeaderItemWidth = $tHDITEM.XY
-                    ;Local $tRECT, $iHeaderColWidth
-                    ;$tRECT = _GUICtrlHeader_GetItemRectEx($g_hHeader, $iHeaderItem)
-                    ;$iHeaderColWidth = DllStructGetData($tRECT, "Right") - DllStructGetData($tRECT, "Left")
-                    ;_GUICtrlListView_SetColumnWidth($g_hListview, $iHeaderItem, $iHeaderColWidth)
                     _GUICtrlListView_SetColumnWidth($g_hListview, $iHeaderItem, $iHeaderItemWidth)
                     _resizeLVCols2()
                     Return False ; to continue tracking the divider
@@ -769,8 +711,6 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                     ; Let's use it to sort the corresponding listview column.
                     Local $tNMHEADER = DllStructCreate($tagNMHEADER, $lParam)
                     Local $iHeaderItem = $tNMHEADER.Item
-                    ;_GUICtrlListView_SortItems($g_hListview, $iHeaderItem)
-                    ;Local $tNMListView = DllStructCreate($tagNMLISTVIEW, $ilParam)
 					Local $iCol = $iHeaderItem
 					Local $hHeader = $g_hHeader
                     Local $hView = $g_hListView
@@ -825,9 +765,6 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                         ; reset the value stored in the tooltip
                         $gText = ""
                         _GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
-                    Else
-                        ; check if cursor is over listview (if not, clear tooltip)
-                        ;AdlibRegister("_IsCursorOverLV", 200)
                     EndIf
                     $iItemPrev = $iItemRow
                     Return 0; Allow the ListView to perform its normal track select processing.
@@ -879,11 +816,6 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                     $bDragTreeList = True
                     $sDragSrc = "Tree"
 
-                Case $TVN_ITEMCHANGEDA, $TVN_ITEMCHANGEDW
-                    Local $tTree2 = DllStructCreate($tagNMTVITEMCHANGE, $lParam)
-                    Local $sItem2 = DllStructGetData($tTree2, "hItem")
-                    Local $sItemText = _GUICtrlTreeView_GetText($g_hTreeView, $sItem2)
-                    ;ConsoleWrite("item changed: " & $sItemText & @CRLF)
             EndSwitch
     EndSwitch
 
@@ -912,7 +844,6 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 			_WinAPI_DeleteObject_mod($hBrush)
 			Return $CDRF_NOTIFYPOSTPAINT
 		Case $CDDS_POSTPAINT
-			;_WinAPI_InflateRect_mod($tRECT, -4, -6)
 			_WinAPI_InflateRect_mod($tRECT, -4, -6)
 			If BitAND($tInfo.ItemState, $CDIS_HOT) Then
 				; set hot track back color
@@ -938,15 +869,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 				; set default text color
 				_WinAPI_SetTextColor_mod($tInfo.hDC, $iTextColorDef)
 			EndIf
-            Local $tDTTOPTS = DllStructCreate($tagDTTOPTS)
-            DllStructSetData($tDTTOPTS, 'Size', DllStructGetSize($tDTTOPTS))
-            DllStructSetData($tDTTOPTS, 'Flags', BitOR($DTT_TEXTCOLOR, $DTT_GLOWSIZE, $DTT_COMPOSITED))
-            DllStructSetData($tDTTOPTS, 'clrText', $iTextColorDef)
-            DllStructSetData($tDTTOPTS, 'GlowSize', 12)
-            ;Local $hTheme = _WinAPI_OpenThemeData($g_hGUI, 'Globals')
+
 			_WinAPI_DrawText_mod($tInfo.hDC, GUICtrlRead($tInfo.IDFrom), $tRECT, BitOR($DT_CENTER, $DT_VCENTER))
-            ;_WinAPI_DrawThemeTextEx($hTheme, 0, 0, $tInfo.hDC, GUICtrlRead($tInfo.IDFrom), $tRECT, BitOR($DT_CENTER, $DT_SINGLELINE, $DT_VCENTER), $tDTTOPTS)
-            ;_WinAPI_CloseThemeData($hTheme)
 		EndSwitch
 	EndIf
 
@@ -1021,10 +945,8 @@ Func _resizeLVCols2() ; called while a header item is tracked or a divider is do
         $aRectLV[0] -= (4 + $g_iIconWidth) ; adjust LV col 0 left coord (+++)
     EndIf
     If $aRectLV[0] < 0 Then ; horizontal scrollbar is NOT at left => move and resize the detached header (mimic a normal listview)
-        ;WinMove($g_hHeader, "", $aRectLV[0], 0, WinGetClientSize($g_hChild)[0] - $aRectLV[0], Default)
         WinMove($g_hHeader, "", $aRectLV[0], 0, WinGetPos($g_hChild)[2] - $aRectLV[0], Default)
     Else ; horizontal scrollbar is at left => move and resize the detached header to its initial coords & size
-        ;WinMove($g_hHeader, "", 0, 0, WinGetClientSize($g_hChild)[0], Default)
         WinMove($g_hHeader, "", 0, 0, WinGetPos($g_hChild)[2], Default)
     EndIf
 EndFunc   ;==>_resizeLVCols2
@@ -1158,7 +1080,6 @@ EndFunc   ;==>_WinAPI_ReleaseDC_mod
 Func _WinAPI_GetDCEx_mod($hWnd, $hRgn, $iFlags)
 	Local $aCall = DllCall($hUser32, 'handle', 'GetDCEx', 'hwnd', $hWnd, 'handle', $hRgn, 'dword', $iFlags)
 	If @error Then Return SetError(@error, @extended, 0)
-	; If Not $aCall[0] Then Return SetError(1000, 0, 0)
 
 	Return $aCall[0]
 EndFunc   ;==>_WinAPI_GetDCEx_mod
@@ -1174,7 +1095,6 @@ EndFunc   ;==>_WinAPI_CreateRectRgn_mod
 Func _WinAPI_OffsetRect_mod(ByRef $tRECT, $iDX, $iDY)
 	Local $aCall = DllCall($hUser32, 'bool', 'OffsetRect', 'struct*', $tRECT, 'int', $iDX, 'int', $iDY)
 	If @error Then Return SetError(@error, @extended, 0)
-	; If Not $aCall[0] Then Return SetError(1000, 0, 0)
 
 	Return $aCall[0]
 EndFunc   ;==>_WinAPI_OffsetRect_mod
@@ -1268,7 +1188,6 @@ EndFunc   ;==>_WinAPI_DeleteObject_mod
 Func _WinAPI_InflateRect_mod(ByRef $tRECT, $iDX, $iDY)
 	Local $aCall = DllCall($hUser32, 'bool', 'InflateRect', 'struct*', $tRECT, 'int', $iDX, 'int', $iDY)
 	If @error Then Return SetError(@error, @extended, False)
-	; If Not $aCall[0] Then Return SetError(1000, 0, 0)
 
 	Return $aCall[0]
 EndFunc   ;==>_WinAPI_InflateRect_mod
@@ -1756,8 +1675,6 @@ Func _GUISetDarkTheme($hWnd, $bEnableDarkTheme = True)
 	_WinAPI_RefreshImmersiveColorPolicyState()
 	_WinAPI_FlushMenuThemes()
 	GUISetBkColor($iGUI_BkColor, $hWnd)
-	;_GUICtrlSetDarkTheme($hWnd, $bEnableDarkTheme)            ;To Color the GUI's own Scrollbar
-;~ 	DllCall('dwmapi.dll', 'long', 'DwmSetWindowAttribute', 'hwnd', $hWnd, 'dword', $DWMWA_USE_IMMERSIVE_DARK_MODE, 'dword*', Int($bEnableDarkTheme), 'dword', 4)
 	_WinAPI_DwmSetWindowAttribute_unr($hWnd, $DWMWA_USE_IMMERSIVE_DARK_MODE, $bEnableDarkTheme)
 EndFunc   ;==>_GUISetDarkTheme
 
@@ -1900,7 +1817,7 @@ Func _EventsGUI()
 
                 Case $aTreeList[4] = $idListview
                     Local $iListHover = ListItemFromPoint($g_hListView)
-                    If $iListHover <> -1 Then
+                    If $iListHover >= 0 Then
                         ; bring focus to listview to show hot item (needed for listview to listview drag)
                         _WinAPI_SetFocus($g_hListView)
                         _GUICtrlListView_SetHotItem($idListview, $iListHover)
@@ -1919,15 +1836,23 @@ Func _EventsGUI()
                             EndIf
                             $sListItemTextPrev = $sListItemText
                         EndIf
+                    ElseIf $iListHover = -1 Then
+                        $sListItemText = __TreeListExplorer_GetPath($hTLESystem)
+                        ; TODO: Needs to be folder name for tooltip not full path
+                        If $sListItemTextPrev <> $sListItemText Then
+                            _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sListItemText)
+                        EndIf
+                        $sListItemTextPrev = $sListItemText
                     EndIf
 
-                Case Else ; or $aTreeList[4] <> $idListview And $aTreeList[4] <> $idTreeView
-                    ConsoleWrite("drag: cursor is not over treeview or listview" & @CRLF)
-                    ;_GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "<out-of-area>")
+                Case $aTreeList[4] <> $idListview And $aTreeList[4] <> $idTreeView And $aTreeList[4] <> $idSeparator
+                    If $sListItemTextPrev <> $sListItemText Then
+                        _GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "<out-of-area>")
+                    EndIf
+                    $sListItemTextPrev = $sListItemText
             EndSelect
 
         Case $GUI_EVENT_PRIMARYUP
-            ; TO DO: maybe move this code below to its own function?
             If $bDragTreeList Then
                 If $bDragToolActive Then
                     _GUIToolTip_TrackActivate($hToolTip3, False, $g_hGUI, $g_hGUI)
@@ -1938,7 +1863,6 @@ Func _EventsGUI()
                     _GUIToolTip_SetTitle($hToolTip3, 'File Operation', $TTI_NONE)
                     $bDragToolActive = False
                 EndIf
-                $g_hCursorBefore = Null
                 $bDragTreeList = False
                 $bTreeOrigStored = False
                 ; restore proper state back to original treeview selection
@@ -2009,19 +1933,6 @@ Func _MenuFunctions()
         Case $idAboutItem
             _About()
     EndSwitch
-EndFunc
-
-Func _IsCursorOverLV()
-    ; check if cursor is over listview
-    Local $aCInfo = GUIGetCursorInfo($g_hGUI)
-    If $aCInfo[4] <> $idListview Or $aCInfo[4] = 0 Then
-        ; clear tooltip if not over listview
-        _GUIToolTip_TrackActivate($hToolTip1, False, $g_hGUI, $g_hListview)
-        ; reset the value stored in the tooltip
-        $gText = ""
-        _GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
-    EndIf
-    AdlibUnRegister("_IsCursorOverLV")
 EndFunc
 
 Func _EndDrag()
@@ -2097,11 +2008,8 @@ Func _ListGetSelections()
     $sListDragItems = ""
     $aListDragItems = _GUICtrlListView_GetSelectedIndices($g_hListView, True)
     If $aListDragItems[0] = 1 Then
-        ; TODO: need to create icon for file being dragged
-        ; will need to pass index number
         $iListDragIndex = $aListDragItems[1]
     Else
-        ; TODO: need to create icon to signify multiple files
         $iListDragIndex = $aListDragItems[1]
     EndIf
     For $i = 1 To $aListDragItems[0]
