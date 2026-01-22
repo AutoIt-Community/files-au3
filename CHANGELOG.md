@@ -11,21 +11,29 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-01-22
+
 ### Added
 
-- Added tooltips for drag and drop functionality (no file movement yet)
-
-### Fixed
-
-- Fixed some issues with drag and drop tooltips
+- Tooltips for drag and drop functionality (no file movement yet). [589c563](https://github.com/AutoIt-Community/files-au3/commit/589c5638c482e5c339570106caec132cb6c5d6fa)
+- Community standard files like issue templates and pull request template. [50c78a2](https://github.com/AutoIt-Community/files-au3/commit/50c78a2c9c5c3a87f3c5d474f1a88b52456f7d4e)
 
 ### Changed
 
-- Changed some of the drag and drop related structure
+- Some of the drag and drop related structure. [589c563](https://github.com/AutoIt-Community/files-au3/commit/589c5638c482e5c339570106caec132cb6c5d6fa)
+
+### Fixed
+
+- Some issues with drag and drop tooltips. [3c4c977](https://github.com/AutoIt-Community/files-au3/commit/3c4c97779b72303953594ad6ad7cebd99a7218d4)
 
 ### Refactored
 
-- Removed unused code and general code cleanup
+- Cleanup of dead code. [07a6e82](https://github.com/AutoIt-Community/files-au3/commit/07a6e824e8f296e2272e9893c86b2b8145fc27d0)
+- Unused code and general code cleanup. [c95ad59](https://github.com/AutoIt-Community/files-au3/commit/c95ad59680309bc57a200fa55ef4300f25b24422)
+
+### Thanks to the contributors (committers)
+
+[@sven-seyfert](https://github.com/sven-seyfert), [@WildByDesign](https://github.com/WildByDesign)
 
 ## [0.3.0] - 2026-01-20
 
@@ -89,7 +97,8 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 [@sven-seyfert](https://github.com/sven-seyfert), [@WildByDesign](https://github.com/WildByDesign)
 
-[Unreleased]: https://github.com/AutoIt-Community/files-au3/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/AutoIt-Community/files-au3/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/AutoIt-Community/files-au3/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/AutoIt-Community/files-au3/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/AutoIt-Community/files-au3/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/AutoIt-Community/files-au3/releases/tag/v0.1.0
