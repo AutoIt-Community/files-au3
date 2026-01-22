@@ -19,6 +19,10 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 - Changed some of the drag and drop related structure
 
+### Refactored
+
+- Removed unused code and general code cleanup
+
 ## [0.3.0] - 2026-01-20
 
 ### Added
