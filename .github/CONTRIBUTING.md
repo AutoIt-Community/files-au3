@@ -70,14 +70,14 @@ git commit -m "Refactored: Usage of map data type instead of array."
 
 #### *Why*
 
-Why is this important? Consistent commit messages allow the [CHANGELOG.md](../CHANGELOG.md) file to be generated automatically when creating a new release. This helps maintainers and users to keep track of changes in each version.
+Why is this important? Consistent commit messages allow the [CHANGELOG.md](./CHANGELOG.md) file to be generated automatically when creating a new release. This helps maintainers and users to keep track of changes in each version.
 
 <br>
 
 ### Additional notes
 
-- You do not need to update the [CHANGELOG.md](../CHANGELOG.md) file yourself. The document will be updated when a new release is created.
-- Please remember to update the [README.md](../README.md) file if necessary.
+- You do not need to update the [CHANGELOG.md](./CHANGELOG.md) file yourself. The document will be updated when a new release is created.
+- Please remember to update the [README.md](./README.md) file if necessary.
 
 <br>
 <br>
