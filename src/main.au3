@@ -993,10 +993,9 @@ Func _reorderLVCols()
 
 	; add LVS_NOCOLUMNHEADER back to listview
 	_WinAPI_SetWindowLong_mod($g_hListview, $GWL_STYLE, $i_Style_Old)
-
 EndFunc   ;==>_reorderLVCols
 
-;Function for getting HWND from PID
+; Function for getting HWND from PID
 Func _GetHwndFromPID($PID)
 	$hWnd = 0
 	$winlist = WinList()
@@ -1416,7 +1415,7 @@ Func _WinAPI_CIDLData_CreateFromIDArray($PIDL, $iItems, $aPIDL)
 EndFunc   ;==>_WinAPI_CIDLData_CreateFromIDArray
 
 Func _GUICtrl_SetFont($hWnd, $iHeight = 15, $iWeight = 400, $iFontAtrributes = 0, $sFontName = "Arial")
-	;Author: Rasim
+	; Author: Rasim
 	$hFont = _WinAPI_CreateFont($iHeight, 0, 0, 0, $iWeight, BitAND($iFontAtrributes, 2), BitAND($iFontAtrributes, 4), _
 			BitAND($iFontAtrributes, 8), $DEFAULT_CHARSET, $OUT_DEFAULT_PRECIS, $CLIP_DEFAULT_PRECIS, _
 			$DEFAULT_QUALITY, 0, $sFontName)
@@ -1434,7 +1433,7 @@ Func WM_DRAWITEM2($hWnd, $Msg, $wParam, $lParam)
 
 	If DllStructGetData($tDRAWITEMSTRUCT, "hwndItem") <> $g_hStatus Then Return $GUI_RUNDEFMSG     ; Only process the statusbar
 
-	Local $itemID = DllStructGetData($tDRAWITEMSTRUCT, "itemID")     ;part number
+	Local $itemID = DllStructGetData($tDRAWITEMSTRUCT, "itemID")     ; part number
 	Local $hDC = DllStructGetData($tDRAWITEMSTRUCT, "hDC")
 	Local $tRECT = DllStructCreate("long left;long top;long right; long bottom", DllStructGetPtr($tDRAWITEMSTRUCT, "rcItem"))
 	Local $iTop = DllStructGetData($tRECT, "top")
@@ -1572,14 +1571,14 @@ Func ApplyDPI()
 EndFunc   ;==>ApplyDPI
 
 Func _WinAPI_SetThreadDpiAwarenessContext($DPI_AWARENESS_CONTEXT_value) ; UEZ
-	Local $aResult = DllCall("user32.dll", "uint", "SetThreadDpiAwarenessContext", @AutoItX64 ? "int64" : "int", $DPI_AWARENESS_CONTEXT_value)     ;requires Win10 v1703+ / Windows Server 2016+
+	Local $aResult = DllCall("user32.dll", "uint", "SetThreadDpiAwarenessContext", @AutoItX64 ? "int64" : "int", $DPI_AWARENESS_CONTEXT_value)     ; requires Win10 v1703+ / Windows Server 2016+
 	If Not IsArray($aResult) Or @error Then Return SetError(1, @extended, 0)
 	If Not $aResult[0] Then Return SetError(2, @extended, 0)
 	Return $aResult[0]
 EndFunc   ;==>_WinAPI_SetThreadDpiAwarenessContext
 
 Func _WinAPI_GetDpiForSystem() ; UEZ
-	Local $aResult = DllCall("user32.dll", "uint", "GetDpiForSystem")     ;requires Win10 v1607+ / no server support
+	Local $aResult = DllCall("user32.dll", "uint", "GetDpiForSystem")     ; requires Win10 v1607+ / no server support
 	If Not IsArray($aResult) Or @error Then Return SetError(1, @extended, 0)
 	If Not $aResult[0] Then Return SetError(2, @extended, 0)
 	Return $aResult[0]
@@ -2010,7 +2009,7 @@ Func _drawUAHMenuNCBottomLine($hWnd) ; ahmet
 			"hwnd", $hWnd, _         ; hWndFrom
 			"hwnd", 0, _             ; hWndTo
 			"ptr", DllStructGetPtr($rcClient), _
-			"uint", 2)               ;number of points - 2 for RECT structure
+			"uint", 2)               ; number of points - 2 for RECT structure
 
 	$rcWindow = _WinAPI_GetWindowRect($hWnd)
 
