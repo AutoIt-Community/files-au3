@@ -40,7 +40,7 @@ $iDPI = ApplyDPI()
 Opt("GUIOnEventMode", 1)
 
 Global $hTLESystem, $iFrame_A, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus, $idTreeView
-Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hChildLV, $hParentFrame, $g_iIconWidth, $g_hTreeView
+Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hParentFrame, $g_iIconWidth, $g_hTreeView
 Global $g_hSizebox, $g_hOldProc, $g_iHeight, $g_hDots
 Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
 Global $hListImgList, $iListDragIndex
@@ -276,7 +276,7 @@ Func _FilesAu3()
     $aWinSize2 = WinGetClientSize(_GUIFrame_GetHandle($iFrame_A, 2))
 
     ; create header control
-    $hChildLV = _GUIFrame_GetHandle($iFrame_A, 2)
+    Local $hChildLV = _GUIFrame_GetHandle($iFrame_A, 2)
     $g_hHeader = _GUICtrlHeader_Create($hChildLV, BitOR($HDS_BUTTONS, $HDS_DRAGDROP, $HDS_FULLDRAG))
     GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
     _GUICtrlHeader_AddItem($g_hHeader, "Name", 300)
