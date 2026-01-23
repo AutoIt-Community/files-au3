@@ -45,6 +45,7 @@ Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
 Global $hListImgList, $iListDragIndex
 Global $sBack, $sForward, $sUpLevel, $sRefresh
 Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $aListDragItems, $bDragToolActive = False
+Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
 Global $idExitItem, $idAboutItem
 Global $hCursor, $hProc, $g_hBrush
 Global $iTimeCalled, $iTimeDiff
@@ -312,6 +313,7 @@ Func _FilesAu3()
 
     ; add listview and callbacks to TLE system
     __TreeListExplorer_AddView($hTLESystem, $idListview, True, True, True, False, False)
+    __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_Loading, "_loadingCallback")
     __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_DoubleClick, "_doubleClickCallback")
     __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_ListViewPaths, "_handleListViewData")
     __TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_ListViewItemCreated, "_handleListViewItemCreated")
@@ -563,25 +565,22 @@ Func _selectionChangedLV()
         GUICtrlSetState($idPropertiesLV, $GUI_DISABLE)
     EndIf
 
-    If $iItemCount <> 0 And $iItemCount <> 1 Then
-        $g_aText[1] = $iItemCount & " items selected"
-        _WinAPI_RedrawWindow($g_hStatus)
+    If $iItemCount > 1 Then
+        $g_aText[1] = "  " & $iItemCount & " items selected"
     ElseIf $iItemCount = 1 Then
-        $g_aText[1] = $iItemCount & " item selected"
-        _WinAPI_RedrawWindow($g_hStatus)
+        $g_aText[1] = "  1 item selected"
     Else
         $g_aText[1] = " "
-        _WinAPI_RedrawWindow($g_hStatus)
     EndIf
 
     If $iFileSizes = 0 Then
         ; clear size status if size equals zero
         $g_aText[2] = " "
-        _WinAPI_RedrawWindow($g_hStatus)
     Else
-        $g_aText[2] = __TreeListExplorer__GetSizeString($iFileSizes)
-        _WinAPI_RedrawWindow($g_hStatus)
+        $g_aText[2] = "  " & __TreeListExplorer__GetSizeString($iFileSizes)
     EndIf
+
+    _WinAPI_RedrawWindow($g_hStatus)
 EndFunc
 
 Func _handleListViewData($hSystem, $hView, $sPath, ByRef $arPaths)
@@ -620,6 +619,41 @@ Func _doubleClickCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $item)
         ; open file in ListView when double-clicking (uses Windows defaults per extension)
         ShellExecute($sRoot & $sFolder & $Array[1])
     EndIf
+EndFunc
+
+Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $bLoading)
+    $bLoadStatus = $bLoading
+    ; wait for ListView items to be done loading before getting item count for statusbar
+    If Not $bPathInputChanged Then
+        Return
+    EndIf
+
+    If $bLoading Then
+        ; add delay before changing cursor and clearing status item count
+        AdlibRegister("_ClearStatus", 250)
+        Return
+    EndIf
+
+    If $bCursorOverride Then
+        ; reset GUI cursor if it has been overridden
+        GUISetCursor($MCID_ARROW, 0, $g_hGUI)
+        $bCursorOverride = False
+    EndIf
+
+    _PathInputChanged()
+    $bPathInputChanged = False
+EndFunc
+
+Func _ClearStatus()
+    If $bLoadStatus Then
+        ; override GUI with loading/waiting cursor on directories that are slower to load
+        $bCursorOverride = True
+        GUISetCursor($MCID_WAIT, 1, $g_hGUI)
+        ; clear statusbar item count
+        $g_aText[0] = ""
+        _WinAPI_RedrawWindow($g_hStatus)
+    EndIf
+    AdlibUnRegister("_ClearStatus")
 EndFunc
 
 Func _folderCallback($hSystem, $sRoot, $sFolder, $sSelected)
@@ -996,8 +1030,8 @@ Func WM_COMMAND2($hWnd, $iMsg, $wParam, $lParam)
                     ; select all text in path input box
                     AdlibRegister("_PathSelectAll", 10)
                 Case $EN_CHANGE
-                    AdlibRegister("_PathInputChanged", 20)
-                    ; TODO: timing does not always work here, need better solution
+                    ; signal path input change to follow up in _loadingCallback() function
+                    $bPathInputChanged = True
             EndSwitch
     EndSwitch
     Return $GUI_RUNDEFMSG
@@ -1958,14 +1992,18 @@ Func _PathInputChanged()
     WinMove($g_hHeader, "", 0, 0, WinGetPos($g_hChild)[2], Default)
 
     ; update number of items (files and folders) in statusbar
-    $g_aText[0] = "  " & _GUICtrlListView_GetItemCount($idListview) & " items"
+    Local $iLVItemCount = _GUICtrlListView_GetItemCount($idListview)
+    $g_aText[0] = "  " & $iLVItemCount & " item"
+    If $iLVItemCount > 1 Then
+        $g_aText[0] &= "s"
+    EndIf
+
     ; update drive space information
     Local $iDriveFree = Round(DriveSpaceFree(__TreeListExplorer_GetPath($hTLESystem)) / 1024, 1)
     Local $iDriveTotal = Round(DriveSpaceTotal(__TreeListExplorer_GetPath($hTLESystem)) / 1024, 1)
     Local $iPercentFree = Round(($iDriveFree / $iDriveTotal) * 100)
-    $g_aText[3] = $iDriveFree & " GB free" & " (" & $iPercentFree & "%)"
+    $g_aText[3] = "  " & $iDriveFree & " GB free" & " (" & $iPercentFree & "%)"
     _WinAPI_RedrawWindow($g_hStatus)
-    AdlibUnRegister("_PathInputChanged")
 EndFunc
 
 Func _drawUAHMenuNCBottomLine($hWnd) ; ahmet
