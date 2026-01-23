@@ -627,7 +627,11 @@ EndFunc
 Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $bLoading)
     ; wait for ListView items to be done loading before getting item count for statusbar
     If $bPathInputChanged Then
-        If Not $bLoading Then
+        If $bLoading Then
+            ; clear statusbar item count
+            $g_aText[0] = ""
+            _WinAPI_RedrawWindow($g_hStatus)
+        ElseIf Not $bLoading Then
             _PathInputChanged()
             $bPathInputChanged = False
         EndIf
@@ -1970,7 +1974,12 @@ Func _PathInputChanged()
     WinMove($g_hHeader, "", 0, 0, WinGetPos($g_hChild)[2], Default)
 
     ; update number of items (files and folders) in statusbar
-    $g_aText[0] = "  " & _GUICtrlListView_GetItemCount($idListview) & " items"
+    Local $iLVItemCount = _GUICtrlListView_GetItemCount($idListview)
+    If $iLVItemCount = 1 Then
+        $g_aText[0] = "  " & _GUICtrlListView_GetItemCount($idListview) & " item"
+    Else
+        $g_aText[0] = "  " & _GUICtrlListView_GetItemCount($idListview) & " items"
+    EndIf
     ; update drive space information
     Local $iDriveFree = Round(DriveSpaceFree(__TreeListExplorer_GetPath($hTLESystem)) / 1024, 1)
     Local $iDriveTotal = Round(DriveSpaceTotal(__TreeListExplorer_GetPath($hTLESystem)) / 1024, 1)
