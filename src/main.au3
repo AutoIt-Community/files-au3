@@ -39,9 +39,9 @@ $iDPI = ApplyDPI()
 
 Opt("GUIOnEventMode", 1)
 
-Global $hTLESystem, $iFrame_A, $hSecondFrame, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus, $idTreeView
+Global $hTLESystem, $iFrame_A, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus, $idTreeView
 Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hChildLV, $hParentFrame, $g_iIconWidth, $g_hTreeView
-Global $g_hSizebox, $g_hOldProc, $g_iHeight, $g_aTextStatus, $g_aRatioW, $g_hDots
+Global $g_hSizebox, $g_hOldProc, $g_iHeight, $g_hDots
 Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
 Global $hListImgList, $iListDragIndex
 Global $sBack, $sForward, $sUpLevel, $sRefresh
@@ -49,7 +49,6 @@ Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $aLis
 Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
 Global $idExitItem, $idAboutItem
 Global $hCursor, $hProc, $g_hBrush
-Global $iTimeCalled, $iTimeDiff
 Global $sSelectedItems, $g_aText
 Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $hToolTip3, $bTooltipActive
 Global $isDarkMode = _WinAPI_ShouldAppsUseDarkMode()
