@@ -1553,7 +1553,6 @@ Func WM_MOVE($hWnd, $iMsg, $wParam, $lParam)
 				$bSizeboxOffScreen = False
 			EndIf
 		EndIf
-		;_WinAPI_RedrawWindow($g_hSizebox)
 	EndIf
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_MOVE
