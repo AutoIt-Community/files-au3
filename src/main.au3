@@ -1,18 +1,19 @@
 #AutoIt3Wrapper_UseX64=Y
 ;#AutoIt3Wrapper_Au3Check_Parameters=-d -w 1 -w 2 -w 3 -w 4 -w 5 -w 6 -w 7
 
+#include-once
 #include <GUIConstantsEx.au3>
+#include <GuiToolTip.au3>
+#include <GuiTreeView.au3>
+#include <String.au3>
+#include <WinAPITheme.au3>
+#include <WindowsConstants.au3>
 #include <WindowsNotifsConstants.au3>
 #include <WindowsStylesConstants.au3>
-#include <WindowsConstants.au3>
-#include <GuiTreeView.au3>
-#include <WinAPITheme.au3>
-#include <GuiToolTip.au3>
-#include <String.au3>
 
-#include "../lib/TreeListExplorer.au3"
 #include "../lib/GUIFrame_WBD_Mod.au3"
 #include "../lib/History.au3"
+#include "../lib/TreeListExplorer.au3"
 
 ; CREDITS:
 ; Kanashius     TreeListExplorer UDF
