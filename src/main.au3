@@ -48,7 +48,7 @@ Global $sBack, $sForward, $sUpLevel, $sRefresh
 Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $aListDragItems, $bDragToolActive = False
 Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
 Global $idExitItem, $idAboutItem
-Global $hCursor, $hProc, $g_hBrush
+Global $hCursor, $hProc
 Global $sSelectedItems, $g_aText
 Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $hToolTip3, $bTooltipActive
 Global $isDarkMode = _WinAPI_ShouldAppsUseDarkMode()
@@ -1078,12 +1078,10 @@ Func _InitDarkSizebox()
 
     $hCursor = _WinAPI_LoadCursor(0, $OCR_SIZENWSE)
     _WinAPI_SetClassLongEx($g_hSizebox, -12, $hCursor) ; $GCL_HCURSOR = -12
-    $g_hBrush = _WinAPI_CreateSolidBrush($iBackColorDef)
 
     ; Sizebox height with DPI
     $g_iHeight = (16 * $iDPI) + 2
     $g_hDots = CreateDots($g_iHeight, $g_iHeight, 0x00000000 + $iBackColorDef, 0xFF000000 + 0xBFBFBF)
-
 EndFunc
 
 Func __Timer_QueryPerformanceFrequency_mod()
