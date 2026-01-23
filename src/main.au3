@@ -54,11 +54,6 @@ Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $hToolTip3, $bTooltip
 Global $isDarkMode = _WinAPI_ShouldAppsUseDarkMode()
 Global $hFolderHistory=__History_Create("_doUnReDo", 100, "_historyChange"), $bFolderHistoryChanging = False
 Global $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, 0x000000)
-Global Const $SBS_SIZEBOX = 0x08, $SBS_SIZEGRIP = 0x10
-Global Const $CLR_TEXT = 0xFFFFFF ; The text color
-Global Const $SB_LEFT = 6
-Global Const $APPMODE_FORCEDARK = 2
-Global Const $APPMODE_FORCELIGHT = 3
 Global $iTopSpacer = Round(12 * $iDPI)
 Global $aPosTip, $iOldaPos0, $iOldaPos1
 ; force light mode
@@ -1067,10 +1062,11 @@ Func _ClearDarkSizebox()
 EndFunc
 
 Func _InitDarkSizebox()
-        ;-----------------
+    Local Const $SBS_SIZEBOX = 0x08
+
     ; Create a sizebox window (Scrollbar class) BEFORE creating the StatusBar control
     $g_hSizebox = _WinAPI_CreateWindowEx(0, "Scrollbar", "", $WS_CHILD + $WS_VISIBLE + $SBS_SIZEBOX, _
-    0, 0, 0, 0, $g_hGUI) ; $SBS_SIZEBOX or $SBS_SIZEGRIP
+    0, 0, 0, 0, $g_hGUI)
 
     ; Subclass the sizebox (by changing the window procedure associated with the Scrollbar class)
     $hProc = DllCallbackRegister('ScrollbarProc', 'lresult', 'hwnd;uint;wparam;lparam')
@@ -1703,6 +1699,7 @@ EndFunc   ;==>_WinAPI_DwmSetWindowAttribute_unr
 ; Example .......: No
 ; ===============================================================================================================================
 Func _GUISetDarkTheme($hWnd, $bEnableDarkTheme = True)
+    Local Const $APPMODE_FORCEDARK = 2, $APPMODE_FORCELIGHT = 3
 	Local $iPreferredAppMode = ($bEnableDarkTheme == True) ? $APPMODE_FORCEDARK : $APPMODE_FORCELIGHT
 	Local $iGUI_BkColor = $iBackColorDef
 	_WinAPI_SetPreferredAppMode($iPreferredAppMode)
@@ -1985,6 +1982,8 @@ Func _PathSelectAll()
 EndFunc
 
 Func _PathInputChanged()
+    Local Const $SB_LEFT = 6
+
     ; reset position of header and listview
     GUICtrlSendMsg($idListview, $WM_HSCROLL, $SB_LEFT, 0)
     WinMove($g_hHeader, "", 0, 0, WinGetPos($g_hChild)[2], Default)
