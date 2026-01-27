@@ -785,6 +785,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					$sDragSrc = "List"
 					; fire off adlib to get multiple selection drag details
 					AdlibRegister("_ListGetSelections", 10)
+					Return 0
 				Case $LVN_HOTTRACK                ; Sent by a list-view control When the user moves the mouse over an item
 					Local $tInfo2 = DllStructCreate($tagNMLISTVIEW, $lParam)
 					$gText = _GUICtrlListView_GetItemText($hWndFrom, DllStructGetData($tInfo2, "Item"), 0)
@@ -844,7 +845,6 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					$aDragSource = ""
 					Local $tTree = DllStructCreate($tagNMTREEVIEW, $lParam)
 					Local $hDragItem = DllStructGetData($tTree, "NewhItem")
-					;$sTreeDragItem = TreeItemToPath($g_hTreeView, $hDragItem)
 					$aDragSource = TreeItemToPath($g_hTreeView, $hDragItem, True)
 					$bDragTreeList = True
 					$sDragSrc = "Tree"
@@ -2086,11 +2086,16 @@ EndFunc   ;==>_ListGetSelections
 Func TreeItemToPath($hTree, $hItem, $bArray = False)
 	Local $sPath = StringReplace(_GUICtrlTreeView_GetTree($hTree, $hItem), "|", "\")
 	$sPath = StringTrimLeft($sPath, StringInStr($sPath, "\"))     ; remove this pc at the beginning
-	If StringInStr(FileGetAttrib($sPath), "D") Then $sPath &= "\"   ; let folders end with \
-	If $bArray Then
-		Local $aPath = _ArrayFromString($sPath)
-		_ArrayInsert($aPath, 0, 1)
-		Return $aPath
+
+	If StringInStr(FileGetAttrib($sPath), "D") Then
+		$sPath &= "\"   ; let folders end with \
 	EndIf
-	Return $sPath
+
+	If Not $bArray Then
+		Return $sPath
+	EndIf
+
+	Local $aPath = _ArrayFromString($sPath)
+	_ArrayInsert($aPath, 0, 1)
+	Return $aPath
 EndFunc   ;==>TreeItemToPath
