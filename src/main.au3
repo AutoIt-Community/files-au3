@@ -17,6 +17,7 @@
 
 ; CREDITS:
 ; Kanashius     TreeListExplorer UDF
+; SOLVE-SMART	Code review, organization and refactoring
 ; pixelsearch   Detached Header and ListView synchronization
 ; ioa747        Detached Header subclassing for dark mode
 ; Nine          Custom Draw for Buttons
@@ -43,9 +44,9 @@ Global $hTLESystem, $iFrame_A, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hI
 Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hParentFrame, $g_iIconWidth, $g_hTreeView
 Global $g_hSizebox, $g_hOldProc, $g_iHeight, $g_hDots
 Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
-Global $hListImgList, $iListDragIndex
+Global $hListImgList, $iListDragIndex, $aDragSource
 Global $sBack, $sForward, $sUpLevel, $sRefresh
-Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $aListDragItems, $bDragToolActive = False
+Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $bDragToolActive = False
 Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
 Global $idExitItem, $idAboutItem
 Global $hCursor, $hProc
@@ -840,9 +841,11 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 		Case $g_hTreeView
 			Switch $iCode
 				Case $TVN_BEGINDRAGA, $TVN_BEGINDRAGW
+					$aDragSource = ""
 					Local $tTree = DllStructCreate($tagNMTREEVIEW, $lParam)
 					Local $hDragItem = DllStructGetData($tTree, "NewhItem")
-					$sTreeDragItem = TreeItemToPath($g_hTreeView, $hDragItem)
+					;$sTreeDragItem = TreeItemToPath($g_hTreeView, $hDragItem)
+					$aDragSource = TreeItemToPath($g_hTreeView, $hDragItem, True)
 					$bDragTreeList = True
 					$sDragSrc = "Tree"
 
@@ -1884,6 +1887,7 @@ Func _EventsGUI()
 			EndSelect
 
 		Case $GUI_EVENT_PRIMARYUP
+			Local $iTreeItem, $sTreeDropItem, $sDragDest
 			If $bDragTreeList Then
 				If $bDragToolActive Then
 					_GUIToolTip_TrackActivate($hToolTip3, False, $g_hGUI, $g_hGUI)
@@ -1900,33 +1904,54 @@ Func _EventsGUI()
 				_GUICtrlTreeView_SelectItem($g_hTreeView, $hTreeItemOrig)
 				Local $aTreeList = GUIGetCursorInfo($g_hGUI)
 				If $aTreeList[4] = $idTreeView Then
-					Select
-						Case $sDragSrc = "Tree"                         ; drag and drop from treeview to treeview
-							Local $iTreeItem = TreeItemFromPoint($g_hTreeView)
-							Local $sTreeDropItem = TreeItemToPath($g_hTreeView, $iTreeItem)
-							ConsoleWrite("Copying " & $sTreeDragItem & " to " & $sTreeDropItem & @CRLF)
-						Case $sDragSrc = "List"                         ; drag and drop from listview to treeview
-							Local $iTreeItem = TreeItemFromPoint($g_hTreeView)
-							Local $sTreeDropItem = TreeItemToPath($g_hTreeView, $iTreeItem)
-							ConsoleWrite("Copying " & $sListDragItems & " to " & $sTreeDropItem & @CRLF)
-					EndSelect
+					$iTreeItem = TreeItemFromPoint($g_hTreeView)
+					$sTreeDropItem = TreeItemToPath($g_hTreeView, $iTreeItem)
+					$sDragDest = $sTreeDropItem
+
+					; example showing which source files should go to which destination
+					_MsgExample($aDragSource, $sDragDest)
 
 				ElseIf $aTreeList[4] = $idListview Then
 					Select
 						Case $sDragSrc = "Tree"                         ; drag and drop from treeview to listview
 							Local $sListDropItem = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, _GUICtrlListView_GetHotItem($idListview), 0)
-							ConsoleWrite("Copying " & $sTreeDragItem & " to " & $sListDropItem & @CRLF)
+							If __TreeListExplorer__PathIsFolder($sListDropItem) Then
+								$sDragDest = $sListDropItem
+							Else
+								$sDragDest = __TreeListExplorer_GetPath($hTLESystem)
+							EndIf
+
 						Case $sDragSrc = "List"                         ; drag and drop from listview to listview
 							Local $iListDrop = ListItemFromPoint($g_hListview)
 							Local $sListDropItem = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
-							ConsoleWrite("Copying " & $sListDragItems & " to " & $sListDropItem & @CRLF)
+							If __TreeListExplorer__PathIsFolder($sListDropItem) Then
+								$sDragDest = $sListDropItem
+							Else
+								$sDragDest = __TreeListExplorer_GetPath($hTLESystem)
+							EndIf
 					EndSelect
+
+					; example showing which source files should go to which destination
+					_MsgExample($aDragSource, $sDragDest)
+
 				ElseIf $aTreeList[4] <> $idListview And $aTreeList[4] <> $idTreeView Then
-					ConsoleWrite("drop: cursor is not over treeview or listview" & @CRLF)
+					MsgBox($MB_ICONERROR, "Example", "Cursor has been released in an area not yet supported by drag and drop.")
 				EndIf
 			EndIf
 	EndSwitch
 EndFunc   ;==>_EventsGUI
+
+Func _MsgExample($aDragSource, $sDestination)
+	Local $sMsg
+	$sMsg = "Source Files: " & @CRLF
+	For $i = 1 To $aDragSource[0]
+		$sMsg &= $aDragSource[$i] & @CRLF
+	Next
+	$sMsg &= @CRLF
+	$sMsg &= "Destination: " & @CRLF
+	$sMsg &= $sDestination
+	MsgBox(0, "Example", $sMsg)
+EndFunc   ;==>_MsgExample
 
 Func TreeItemFromPoint($hWnd)
 	Local $tMPos = _WinAPI_GetMousePos(True, $hWnd)
@@ -2043,23 +2068,29 @@ EndFunc   ;==>WM_WINDOWPOSCHANGED_Handler
 
 Func _ListGetSelections()
 	$sListDragItems = ""
-	$aListDragItems = _GUICtrlListView_GetSelectedIndices($g_hListview, True)
-	If $aListDragItems[0] = 1 Then
-		$iListDragIndex = $aListDragItems[1]
+	$aDragSource = ""
+	$aDragSource = _GUICtrlListView_GetSelectedIndices($g_hListview, True)
+	If $aDragSource[0] = 1 Then
+		$iListDragIndex = $aDragSource[1]
 	Else
-		$iListDragIndex = $aListDragItems[1]
+		$iListDragIndex = $aDragSource[1]
 	EndIf
-	For $i = 1 To $aListDragItems[0]
-		$aListDragItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $aListDragItems[$i], 0)
-		$sListDragItems &= $aListDragItems[$i] & " + "
+	For $i = 1 To $aDragSource[0]
+		$aDragSource[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $aDragSource[$i], 0)
+		$sListDragItems &= $aDragSource[$i] & " + "
 	Next
 	$sListDragItems = StringTrimRight($sListDragItems, 3)
 	AdlibUnRegister("_ListGetSelections")
 EndFunc   ;==>_ListGetSelections
 
-Func TreeItemToPath($hTree, $hItem)
+Func TreeItemToPath($hTree, $hItem, $bArray = False)
 	Local $sPath = StringReplace(_GUICtrlTreeView_GetTree($hTree, $hItem), "|", "\")
 	$sPath = StringTrimLeft($sPath, StringInStr($sPath, "\"))     ; remove this pc at the beginning
 	If StringInStr(FileGetAttrib($sPath), "D") Then $sPath &= "\"   ; let folders end with \
+	If $bArray Then
+		Local $aPath = _ArrayFromString($sPath)
+		_ArrayInsert($aPath, 0, 1)
+		Return $aPath
+	EndIf
 	Return $sPath
 EndFunc   ;==>TreeItemToPath
