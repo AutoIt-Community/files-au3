@@ -1,17 +1,18 @@
 #include-once
-#include <WinAPISysWin.au3>
-#include <WinAPISys.au3>
+#include <EditConstants.au3>
+#include <File.au3>
+#include <GDIPlus.au3>
+#include <GuiComboBoxEx.au3>
+#include <GuiEdit.au3>
 #include <GuiImageList.au3>
 #include <GuiListView.au3>
 #include <GuiTreeView.au3>
-#include <GuiEdit.au3>
-#include <EditConstants.au3>
-#include <File.au3>
-#include <WindowsConstants.au3>
-#include <GDIPlus.au3>
-#include <WinAPIShellEx.au3>
-#Include <WinAPIReg.au3>
 #include <WinAPIConstants.au3>
+#Include <WinAPIReg.au3>
+#include <WinAPIShellEx.au3>
+#include <WinAPISys.au3>
+#include <WinAPISysWin.au3>
+#include <WindowsConstants.au3>
 
 ; #INDEX# =======================================================================================================================
 ; Title .........: TreeListExplorer
@@ -20,7 +21,7 @@
 ; Description ...: UDF to use a Listview or Treeview as a File/Folder Explorer
 ; Author(s) .....: Kanashius
 ; Special Thanks.: WildByDesign for testing this UDF a lot and helping me to make it better
-; Version .......: 2.12
+; Version .......: 2.13
 ; ===============================================================================================================================
 
 ; #CURRENT# =====================================================================================================================
@@ -30,10 +31,14 @@
 ; __TreeListExplorer_CreateSystem
 ; __TreeListExplorer_DeleteSystem
 ; __TreeListExplorer_AddView
+; __TreeListExplorer_SetViewIconSize
+; __TreeListExplorer_FileGetIconBitmap
+; __TreeListExplorer_ComboSetDropDownHeight
 ; __TreeListExplorer_SetCallback
 ; __TreeListExplorer_RemoveView
 ; __TreeListExplorer_OpenPath
 ; __TreeListExplorer_Reload
+; __TreeListExplorer_ReloadView
 ; __TreeListExplorer_GetPath
 ; __TreeListExplorer_GetRoot
 ; __TreeListExplorer_GetSelected
@@ -57,6 +62,7 @@
 ; __TreeListExplorer__FileGetIconIndex
 ; __TreeListExplorer__ExpandTreeitem
 ; __TreeListExplorer__UpdateTreeItemContent
+; __TreeListExplorer__TreeViewGetTree
 ; __TreeListExplorer__GetTreeViewItemDepth
 ; __TreeListExplorer__UpdateTreeItemExpandable
 ; __TreeListExplorer__GetDrives
@@ -94,9 +100,15 @@ Global $__TreeListExplorer_Callback_ListViewPaths = 32
 ; ===============================================================================================================================
 
 ; #INTERNAL_USE_ONLY GLOBAL CONSTANTS # =========================================================================================
-Global $__TreeListExplorer__Type_TreeView = 1, $__TreeListExplorer__Type_ListView = 2, $__TreeListExplorer__Type_Input = 3
-Global $__TreeListExplorer__Status_UpdateView = 1, $__TreeListExplorer__Status_ExpandTree = 2
-Global $__TreeListExplorer__Status_LoadTree = 4, $__TreeListExplorer__Status_WaitOpenPath = 8
+Global Const $__TreeListExplorer__Type_TreeView = 1, $__TreeListExplorer__Type_ListView = 2, $__TreeListExplorer__Type_Input = 4
+Global Const $__TreeListExplorer__Type_Combo = 8, $__TreeListExplorer__Type_ComboEx = 16
+Global Const $__TreeListExplorer__Status_UpdateView = 1, $__TreeListExplorer__Status_ExpandTree = 2
+Global Const $__TreeListExplorer__Status_LoadTree = 4, $__TreeListExplorer__Status_WaitOpenPath = 8
+Global Const $__TreeListExplorer__Icon_Folder = "FOLDER", $__TreeListExplorer__Icon_File = "FILE", $__TreeListExplorer__Icon_Disc = "DISC"
+Global Const $__TreeListExplorer__Icon_ChangeableInput = "CHANGEABLE", $__TreeListExplorer__Icon_Harddrive = "HARDDRIVE"
+Global Const $__TreeListExplorer__Icon_CDROM = "CDROM", $__TreeListExplorer__Icon_Networkdrive = "NETWORKDRIVE"
+Global Const $__TreeListExplorer__Icon_Unknown = "UNKNOWN", $__TreeListExplorer__Icon_This_PC = "THISPC"
+Global Const $__TreeListExplorer__Icon_Dummy = "DUMMY"
 ; ===============================================================================================================================
 
 ; #INTERNAL_USE_ONLY GLOBAL VARIABLES # =========================================================================================
@@ -106,9 +118,8 @@ Global $__TreeListExplorer__Data[]
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: __TreeListExplorer_StartUp
 ; Description ...: StartUp of the TLE UDF initializing required variables. Must be called before using other UDF functions.
-; Syntax ........: __TreeListExplorer_StartUp([$iLang = $__TreeListExplorer_Lang_EN[, $iIconSize = 16]])
+; Syntax ........: __TreeListExplorer_StartUp([$iLang = $__TreeListExplorer_Lang_EN])
 ; Parameters ....: $iLang               - [optional] an integer to set the language ($__TreeListExplorer_Lang_EN, $__TreeListExplorer_Lang_DE). Default is $__TreeListExplorer_Lang_EN.
-;                  $iIconSize           - [optional] the size for icons in the Tree-/ListView. Default is 16.
 ; Return values .: True on success.
 ; Author ........: Kanashius
 ; Modified ......:
@@ -118,38 +129,21 @@ Global $__TreeListExplorer__Data[]
 ;                 and create the $__TreeListExplorer_Lang_?? variable.
 ;
 ;                 Errors:
-;                 1 - Parameter not valid (@extended: 1 - $iLang, 2 - $iIconSize)
+;                 1 - Parameter not valid (@extended: 1 - $iLang)
 ; Related .......:
 ; Link ..........:
 ; Example .......: No
 ; ===============================================================================================================================
-Func __TreeListExplorer_StartUp($iLang = $__TreeListExplorer_Lang_EN, $iIconSize = 16)
+Func __TreeListExplorer_StartUp($iLang = $__TreeListExplorer_Lang_EN)
 	Local $arLangData = [["Filename", "Size", "Date created", "This PC"], _
 						 ["Dateiname", "Größe", "Erstelldatum", "Dieser PC"]]
 
 	If Not IsInt($iLang) Or $iLang<0 Or $iLang>UBound($arLangData)-1 Then Return SetError(1, 1, False)
-	If Not IsInt($iIconSize) Or $iIconSize<0 Then Return SetError(1, 2, False)
 
 	$__TreeListExplorer__Data.iDoubleClickTime = 500
 	Local $arDoubleClickTime = DllCall('user32.dll', 'uint', 'GetDoubleClickTime')
 	If Not @error And UBound($arDoubleClickTime)>0 And IsInt($arDoubleClickTime[0]) Then $__TreeListExplorer__Data.iDoubleClickTime = $arDoubleClickTime[0]
-	$__TreeListExplorer__Data.iIconSize = $iIconSize
 	_GDIPlus_Startup()
-	Local $hImageList = _GUIImageList_Create($iIconSize, $iIconSize, 5, 1)
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 3) ; Folder-Icon
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 110) ; Folder-Icon checked
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 0) ; File-Icon
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 5) ; Disc-Icon
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 7) ; Changeableinput-Icon
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 8) ; Harddrive-Icon
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 11) ; CDROM-Icon
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 12) ; Networkdrive-Icon
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 53) ; Unknown-Icon
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 15) ; This PC
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 109) ; Dummy element (Crossed O)
-	_GUIImageList_AddIcon($hImageList, 'shell32.dll', 305) ; Dummy element (Crossed O)
-	$__TreeListExplorer__Data.iCustomIconsStartIndex = _GUIImageList_GetImageCount($hImageList)
-	$__TreeListExplorer__Data.hIconList = $hImageList
 	Local $mIcons[]
 	$__TreeListExplorer__Data.mIcons = $mIcons
 	Local $mSystems[]
@@ -168,34 +162,6 @@ Func __TreeListExplorer_StartUp($iLang = $__TreeListExplorer_Lang_EN, $iIconSize
 	Local $mOpenPathViews[]
 	$__TreeListExplorer__Data.mOpenPathViews = $mOpenPathViews
 	Return True
-EndFunc
-
-; #INTERNAL_USE_ONLY# ===========================================================================================================
-; Name ..........: __TreeListExplorer_FreeIconCache
-; Description ...: Removes all cached icons for all extensions or files
-; Syntax ........: __TreeListExplorer_FreeIconCache()
-; Parameters ....:
-; Return values .: None
-; Author ........: Kanashius
-; Modified ......:
-; Remarks .......:
-; Related .......:
-; Link ..........:
-; Example .......: No
-; ===============================================================================================================================
-Func __TreeListExplorer_FreeIconCache()
-	Local $hImageList = $__TreeListExplorer__Data.hIconList, $iCustomIndex = $__TreeListExplorer__Data.iCustomIconsStartIndex
-	While _GUIImageList_GetImageCount($hImageList)>$iCustomIndex
-		Local $hIcon = _GUIImageList_GetIcon($hImageList, $iCustomIndex)
-		_GUIImageList_Remove($hImageList, $iCustomIndex)
-		_GUIImageList_DestroyIcon($hIcon)
-	WEnd
-	Local $mEmpty[]
-	$__TreeListExplorer__Data["mIcons"] = $mEmpty
-	Local $arSystemKeys = MapKeys($__TreeListExplorer__Data.mSystems)
-	For $i=0 To UBound($arSystemKeys)-1 Step 1
-		__TreeListExplorer_Reload(__TreeListExplorer__GetHandleFromSystemID($arSystemKeys[$i]), True)
-	Next
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
@@ -219,11 +185,10 @@ Func __TreeListExplorer_Shutdown()
 	DllCallbackFree($__TreeListExplorer__Data.hProc)
 	_WinAPI_UnhookWindowsHookEx($__TreeListExplorer__Data.hKeyPrevHook)
 	DllCallbackFree($__TreeListExplorer__Data.hKeyProc)
-	_GUIImageList_Destroy($__TreeListExplorer__Data.hIconList)
+	__TreeListExplorer_FreeIconCache(Default, False)
 	Local $mMap[]
 	$__TreeListExplorer__Data = $mMap
 	_GDIPlus_Shutdown()
-	__TreeListExplorer_FreeIconCache()
 	Return True
 EndFunc
 
@@ -342,25 +307,27 @@ EndFunc
 ; Description ...: Add a view (TreeView/ListView) to a TLE system.
 ; Syntax ........: __TreeListExplorer_AddView($hSystem, $hView, [$bShowFolders = Default, [$bShowFiles = Default, [$bNavigation = True, [$bListViewFolderUp = True, [$iLineNumber = @ScriptLineNumber]]]]])
 ; Parameters ....: $hSystem             - the system handle.
-;                  $hView               - the view to add (must be a TreeView or ListView).
+;                  $hView               - the view to add (must be a TreeView, ListView, Input or ComboBoxEx).
 ;                  $bShowFolders        - [optional] a boolean defining, if folders will be shown in the view. Default depends on the view type (see remarks).
 ;                  $bShowFiles          - [optional] a boolean defining, if files will be shown in the view. Default depends on the view type (see remarks).
-;                  $bNavigation         - [optional] boolean. Default is True. If False, the view cannot be used to navigate folders. (ListViews only)
-;                  $bListViewFolderUp   - [optional] boolean. Default is True. If False, the view wil not have the ".." folder at the top to go to the parent directory. (ListViews only)
-;                  $bLVDefaultColumns   - [optional] boolean. Default is True. If True, the default columns for the listview will be created. (ListViews only)
-;                  $bEnableSorting      - [optional] boolean. Default is True. If True, simple sorting is enabled for the ListView, where clicking at the header sorts by that column. (ListViews only)
+;                  $bNavigation         - [optional] boolean. Default is True. If False, the view cannot be used to navigate folders. (ListView only)
+;                  $bListViewFolderUp   - [optional] boolean. Default is True. If False, the view wil not have the ".." folder at the top to go to the parent directory. (ListView only)
+;                  $bLVDefaultColumns   - [optional] boolean. Default is True. If True, the default columns for the listview will be created. (ListView only)
+;                  $bEnableSorting      - [optional] boolean. Default is True. If True, simple sorting is enabled for the ListView, where clicking at the header sorts by that column. (ListView/ComboBox)
 ;                  $iLineNumber         - [optional] an integer value. Default is @ScriptLineNumber. (should not be changed)
 ; Return values .: True on success
 ; Author ........: Kanashius
 ; Modified ......:
-; Remarks .......: Default for $bShowFolders is True for TreeViews and ListViews, False for Inputs.
+; Remarks .......: Default for $bShowFolders is True (TreeView, ListView, ComboBoxEx) and False (Input).
 ;
-;                  Default for $bShowFiles is True for ListViews and False for TreeViews and Inputs.
+;                  Default for $bShowFiles is True (ListView, ComboBoxEx) and False (TreeView, Input).
 ;
 ;                  Additional functionality can be accomplished using callbacks (click detection/handle loading/filtering/custom columns/sorting/...).
 ;                  See __TreeListExplorer_SetCallback for further information.
 ;
 ;                  $bEnableSorting only allows for simple sorting. To sort by yourself, you can use the $__TreeListExplorer_Callback_ListViewPaths callback (see __TreeListExplorer_SetCallback).
+;                  The ComboBoxEx uses the same sorting method as the ListView, so if it is enabled, it is sorted by name (with folders at the top).
+;                  The $__TreeListExplorer_Callback_ListViewPaths callback can be set for the ComboBoxEx as well.
 ;
 ;                  Errors:
 ;                  1 - $hSystem is not a valid TLE system
@@ -387,6 +354,10 @@ Func __TreeListExplorer_AddView($hSystem, $hView, $bShowFolders = Default, $bSho
 		$iType = $__TreeListExplorer__Type_ListView
 	ElseIf StringInStr($sClass, "Edit") And (Not BitAND(_WinAPI_GetWindowLong($hView, $GWL_STYLE), $ES_MULTILINE)) Then ; check if control is input
 		$iType = $__TreeListExplorer__Type_Input
+	ElseIf StringInStr($sClass, "ComboBoxEx") Then
+		$iType = $__TreeListExplorer__Type_ComboEx
+	ElseIf StringInStr($sClass, "ComboBox") Then
+		$iType = $__TreeListExplorer__Type_Combo
 	Else
 		Return SetError(2, 50, False) ; $hView is not a valid control (wrong control type)
 	EndIf
@@ -404,11 +375,11 @@ Func __TreeListExplorer_AddView($hSystem, $hView, $bShowFolders = Default, $bSho
 		Case $__TreeListExplorer__Type_TreeView
 			If $bShowFolders = Default Then $bShowFolders=True
 			If $bShowFiles = Default Then $bShowFiles=False
-			_GUICtrlTreeView_SetNormalImageList($hView, $__TreeListExplorer__Data.hIconList)
+			_GUICtrlTreeView_DeleteAll($hView)
 		Case $__TreeListExplorer__Type_ListView
 			If $bShowFolders = Default Then $bShowFolders=True
 			If $bShowFiles = Default Then $bShowFiles=True
-			_GUICtrlListView_SetImageList($hView, $__TreeListExplorer__Data.hIconList, 1)
+			_GUICtrlListView_DeleteAllItems($hView)
 			_GUICtrlListView_SetExtendedListViewStyle($hView, BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_SUBITEMIMAGES))
 			Local $iListWidth = _WinAPI_GetWindowWidth($hView)
 			If $bLVDefaultColumns Then
@@ -425,6 +396,14 @@ Func __TreeListExplorer_AddView($hSystem, $hView, $bShowFolders = Default, $bSho
 			$bShowFolders=False
 			$bShowFiles=False
 			GUICtrlSetData($hView, "")
+		Case $__TreeListExplorer__Type_Combo
+			$bShowFolders=True
+			$bShowFiles=True
+			_GUICtrlComboBox_ResetContent($hView)
+		Case $__TreeListExplorer__Type_ComboEx
+			$bShowFolders=True
+			$bShowFiles=True
+			_GUICtrlComboBoxEx_ResetContent($hView)
 	EndSwitch
 	Local $mView[]
 	$mView.hWnd = $hView
@@ -437,13 +416,7 @@ Func __TreeListExplorer_AddView($hSystem, $hView, $bShowFolders = Default, $bSho
 	$mView.sSelected = -1
 	$mView.iUpdating = 0
 	$mView.iPathIndex = 0
-	$mView.bNavigation = $bNavigation
-	$mView.bListViewFolderUp = $bListViewFolderUp
-	Local $mSorting[]
-	$mSorting.bEnabled = $bEnableSorting
-	$mSorting.iCol = $mView.iPathIndex
-	$mSorting.iDir = 0 ; 0 ASC, 1 DESC
-	$mView.mSorting = $mSorting
+	$mView.iIconSize = -1
 	$mView.sCallbackClick = Default
 	$mView.sCallbackDoubleClick = Default
 	$mView.sCallbackLoading = Default
@@ -451,10 +424,301 @@ Func __TreeListExplorer_AddView($hSystem, $hView, $bShowFolders = Default, $bSho
 	$mView.sCallbackListViewItemCreated = Default
 	$mView.sCallbackListViewPaths = Default
 	$mView.iLineNumber = $iLineNumber
+	Local $bAddSortingEntries = False
+	Switch $iType
+		Case $__TreeListExplorer__Type_Combo, $__TreeListExplorer__Type_ComboEx
+			$mView.iComboListHeight = 100
+			Local $hCombo = $hView
+			If $iType = $__TreeListExplorer__Type_ComboEx Then $hCombo = _GUICtrlComboBoxEx_GetComboControl($hView)
+			Local $tInfo
+			_GUICtrlComboBox_GetComboBoxInfo($hCombo, $tInfo)
+			$mView.hCombo = DllStructGetData($tInfo, "hCombo")
+			$mView.hComboEdit = DllStructGetData($tInfo, "hEdit")
+			If $iType = $__TreeListExplorer__Type_ComboEx Then $mView.hComboEdit = _GUICtrlComboBoxEx_GetEditControl($hView)
+			$mView.hComboList = DllStructGetData($tInfo, "hList")
+			$bAddSortingEntries = True
+		Case $__TreeListExplorer__Type_ListView
+			$mView.bNavigation = $bNavigation
+			$mView.bListViewFolderUp = $bListViewFolderUp
+			$bAddSortingEntries = True
+	EndSwitch
+	If $bAddSortingEntries Then
+		Local $mSorting[]
+		$mSorting.bEnabled = $bEnableSorting
+		$mSorting.iCol = $mView.iPathIndex
+		$mSorting.iDir = 0 ; 0 ASC, 1 DESC
+		$mView.mSorting = $mSorting
+	EndIf
 	$__TreeListExplorer__Data["mViews"][$hView] = $mView
 	$__TreeListExplorer__Data["mSystems"][$iSystem]["mViews"][$hView] = 1
-	__TreeListExplorer__UpdateView($hView)
+	__TreeListExplorer_SetViewIconSize($hView) ; includes __TreeListExplorer__UpdateView
+	If @error Then __TreeListExplorer__UpdateView($hView, True)
 	Return True
+EndFunc
+
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: __TreeListExplorer_SetViewIconSize
+; Description ...: Set the icon size for the Tree-/ListView.
+; Syntax ........: __TreeListExplorer_SetViewIconSize($hView[, $iIconSize = 16])
+; Parameters ....: $hView               - the view where the callback should be added to (must be a TreeView, ListView or ComboBoxEx).
+;                  $iIconSize           - (optional) the desired icon size. Default: 16.
+; Return values .: True on success
+; Author ........: Kanashius
+; Modified ......:
+; Remarks .......: Errors:
+;                  1 - Parameter is invalid (@extended 1 - $hView, 2 - $iIconSize)
+; Related .......:
+; Link ..........:
+; Example .......: No
+; ===============================================================================================================================
+Func __TreeListExplorer_SetViewIconSize($hView, $iIconSize = 16)
+	If Not IsHWnd($hView) Then
+		$hView = GUICtrlGetHandle($hView)
+		If @error Then Return SetError(2, @error, False) ; $hView is not a control
+	EndIf
+	If Not IsHWnd($hView) Or Not MapExists($__TreeListExplorer__Data.mViews, $hView) Then Return SetError(1, 1, False)
+	If $__TreeListExplorer__Data.mViews[$hView].iType=$__TreeListExplorer__Type_Input Or $__TreeListExplorer__Data.mViews[$hView].iType=$__TreeListExplorer__Type_Combo Then Return SetError(1, 1, False) ; inputs and normal combo boxes cannot have icons
+	If Not IsInt($iIconSize) Then Return SetError(1, 2, False)
+	If $__TreeListExplorer__Data["mViews"][$hView]["iIconSize"]<>$iIconSize Then
+		Local $iIconSizeBefore = $__TreeListExplorer__Data["mViews"][$hView]["iIconSize"]
+		$__TreeListExplorer__Data["mViews"][$hView]["iIconSize"] = $iIconSize
+		If Not MapExists($__TreeListExplorer__Data.mIcons, $iIconSize) Then
+			Local $mIcon[], $mCache[], $mViews[]
+			$mIcon["hList"] = _GUIImageList_Create($iIconSize, $iIconSize, 5, 1, 12)
+			$mCache[$__TreeListExplorer__Icon_File] = _GUIImageList_AddIcon($mIcon.hList, "shell32.dll", 0, True)
+			$mCache[$__TreeListExplorer__Icon_Folder] = _GUIImageList_AddIcon($mIcon.hList, "shell32.dll", 3, True)
+			$mCache[$__TreeListExplorer__Icon_Disc] = _GUIImageList_AddIcon($mIcon.hList, "shell32.dll", 5, True)
+			$mCache[$__TreeListExplorer__Icon_ChangeableInput] = _GUIImageList_AddIcon($mIcon.hList, "shell32.dll", 7, True)
+			$mCache[$__TreeListExplorer__Icon_Harddrive] = _GUIImageList_AddIcon($mIcon.hList, "shell32.dll", 8, True)
+			$mCache[$__TreeListExplorer__Icon_CDROM] = _GUIImageList_AddIcon($mIcon.hList, "shell32.dll", 11, True)
+			$mCache[$__TreeListExplorer__Icon_Networkdrive] = _GUIImageList_AddIcon($mIcon.hList, "shell32.dll", 12, True)
+			$mCache[$__TreeListExplorer__Icon_Unknown] = _GUIImageList_AddIcon($mIcon.hList, "shell32.dll", 53, True)
+			$mCache[$__TreeListExplorer__Icon_This_PC] = _GUIImageList_AddIcon($mIcon.hList, "shell32.dll", 15, True)
+			$mCache[$__TreeListExplorer__Icon_Dummy] = _GUIImageList_AddIcon($mIcon.hList, "shell32.dll", 109, True)
+			$mIcon["mCache"] = $mCache
+			$mViews[$hView] = 1
+			$mIcon["mViews"] = $mViews
+			$__TreeListExplorer__Data["mIcons"][$iIconSize] = $mIcon
+		Else
+			$__TreeListExplorer__Data["mIcons"][$iIconSize]["mViews"][$hView] = 1
+		EndIf
+		Switch $__TreeListExplorer__Data.mViews[$hView].iType
+			Case $__TreeListExplorer__Type_TreeView
+				_GUICtrlTreeView_SetNormalImageList($hView, $__TreeListExplorer__Data.mIcons[$iIconSize].hList)
+				_GUICtrlTreeView_SetIndent($hView, $iIconSize+4)
+			Case $__TreeListExplorer__Type_ListView
+				_GUICtrlListView_SetImageList($hView, $__TreeListExplorer__Data.mIcons[$iIconSize].hList, 0)
+				_GUICtrlListView_SetImageList($hView, $__TreeListExplorer__Data.mIcons[$iIconSize].hList, 1)
+			Case $__TreeListExplorer__Type_ComboEx
+				_GUICtrlComboBoxEx_SetImageList($hView, $__TreeListExplorer__Data.mIcons[$iIconSize].hList)
+			Case Else
+				ConsoleWrite("Control does not support an icon size."&@crlf)
+		EndSwitch
+		If $iIconSizeBefore<>-1 And MapExists($__TreeListExplorer__Data.mIcons, $iIconSizeBefore) Then ; MapExists crashes with $iIconSizeBefore = -1 for some reason...
+			MapRemove($__TreeListExplorer__Data.mIcons[$iIconSizeBefore]["mViews"], $hView)
+			If UBound(MapKeys($__TreeListExplorer__Data.mIcons[$iIconSizeBefore]["mViews"]))<=0 Then __TreeListExplorer_FreeIconCache($iIconSizeBefore, False)
+		EndIf
+		__TreeListExplorer_ReloadView($hView, True)
+	EndIf
+	Return True
+EndFunc
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: __TreeListExplorer_FileGetIconBitmap
+; Description ...: Get the bitmap of an icon for a file. (May need to be converted to a HBitmap to use in _GUIImageList.)
+; Syntax ........: __TreeListExplorer_FileGetIconBitmap($sPath[, $iSize = Default[, $sExt = Default]])
+; Parameters ....: $sPath               - the absolute path.
+;                  $iIconSize           - (optional) the desired size of the icon.
+;                                         Default: If $hView is provided the size for that control is used, 16 otherwise.
+;                  $sExt                - (optional) if Default the extension will be parsed from $sPath. (Ignored for folder/drive paths)
+; Return values .: The bitmap
+; Author ........: Kanashius
+; Modified ......:
+; Remarks .......: Errors:
+;                  1 - Invalid parameter (@extended 2 - $iIconSize)
+;                  2 - Bitmap could not be found/created/...
+; Related .......:
+; Link ..........:
+; Example .......: No
+; ===============================================================================================================================
+Func __TreeListExplorer_FileGetIconBitmap($sPath, $iIconSize = Default, $sExt = Default)
+	If Not ($iIconSize<>Default Or IsInt($iIconSize)) Then Return SetError(1, 2, 0)
+	Local $sIconPath = -1, $iIconIndex = 0, $bAddForExtension = False
+	; check for drives
+	Local $arRegExpDrive = StringRegExp($sPath, "^([^\/]+?:)\/*$", 1)
+	If UBound($arRegExpDrive)>0 Then
+		$sIconPath = "shell32.dll"
+		$iIconIndex = __TreeListExplorer__GetDriveIconId($arRegExpDrive[0])
+	EndIf
+	; check for folders (would also match drives)
+	If __TreeListExplorer__PathIsFolder($sPath) Then
+		$sIconPath = "shell32.dll"
+		$iIconIndex = 3 ; Default folder icon
+	EndIf
+	If $sIconPath=-1 And $sExt=Default Then
+		Local $arExt = StringRegExp($sPath, "^.*[^\\](\.[^\\]*?)$", 1)
+		If Not (@error Or UBound($arExt)<>1) Then $sExt = StringLower($arExt[0])
+	EndIf
+	If $sIconPath=-1 Then
+		; Handling for special extensions
+		Switch $sExt
+			Case ".exe"
+				$sIconPath = $sPath
+			Case ".url"
+				$sIconPath = IniRead($sPath, "InternetShortcut", "IconFile", -1)
+				$iIconIndex = IniRead($sPath, "InternetShortcut", "IconIndex", -1)
+			Case ".lnk" ; todo add the link symbol (arrow) to the icon
+				Local $arShortcutData = FileGetShortcut($sPath)
+				If $arShortcutData[4]<>"" Then ; icon file provided
+					$sIconPath = $arShortcutData[4]
+					$iIconIndex = $arShortcutData[5]
+				Else ; otherwise get icon from the linked path
+					Return __TreeListExplorer_FileGetIconBitmap($arShortcutData[0], $iIconSize)
+				EndIf
+		EndSwitch
+	EndIf
+	If $sIconPath=-1 Then
+		Local $sRegData = RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" & $sExt, "ProgID")
+		If @error Then
+			$sRegData = RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" & $sExt & "\UserChoice", "ProgID")
+			If @error Then
+				$sRegData = RegRead("HKCR\" & $sExt, "")
+			EndIf
+		EndIf
+		If $sRegData<>"" Then $sRegData = RegRead("HKCR\" & $sRegData & "\DefaultIcon", "")
+		If $sRegData="" Then $sRegData = _WinAPI_AssocQueryString($sExt, $ASSOCSTR_DEFAULTICON)
+		If StringInStr($sRegData, "@")=1 Then ; Handle urls with @{...}
+			Local $sIconPath = _WinAPI_LoadIndirectString($sRegData)
+			If @error Then $sIconPath = -1
+			Local $arRes = StringRegExp($sIconPath, "^(.*\\)(.*-)(\d+)(\.\S+)$", 1)
+			If Not (@error And UBound($arRes)<>4) Then ; check for files with a pixel resolution closer to $iIconSize
+				Local $arFiles = _FileListToArray($arRes[0], $arRes[1]&"*"&$arRes[3])
+				Local $arOptions[UBound($arFiles)-1][2], $iCount = 0
+				For $i=1 To UBound($arFiles)-1 Step 1 ; get icon size for all files
+					Local $arFileParts = StringRegExp($arFiles[$i], "^.*-(\d+)\.\S+$", 1)
+					If Not @error Then
+						$arOptions[$iCount][0] = Int($arFileParts[0])
+						$arOptions[$iCount][1] = $arFiles[$i]
+						$iCount+=1
+					EndIf
+				Next
+				ReDim $arOptions[$iCount][2]
+				_ArraySort($arOptions) ; sort by size
+				For $i=0 To UBound($arOptions)-1 Step 1 ; take the best icon to be used (>= target icon size); Resize will be done later
+					If $iIconSize<=$arOptions[$i][0] Then
+						$sIconPath = $arRes[0]&$arOptions[$i][1]
+						ExitLoop
+					EndIf
+				Next
+			EndIf
+		ElseIf StringInStr($sRegData, ",") Then ; Handle <Path>, <iIndex> e.g.:  ...shell32.dll, 0
+			Local $arParts = StringRegExp($sRegData, '"?(.*?)"?,(-?\d+)', 1)
+			If UBound($arParts)=2 Then
+				$sIconPath = $arParts[0]
+				$iIconIndex = $arParts[1]
+			EndIf
+		ElseIf $sRegData<>"" Then ; Handle path without index
+			$sIconPath = $sRegData
+		EndIf
+		$bAddForExtension = True
+	EndIf
+	Local $hBitmap = 0
+	If $sIconPath=-1 Then
+		Local $tSHFILEINFO = DllStructCreate($tagSHFILEINFO)
+		Local $dwFlags = BitOR($SHGFI_USEFILEATTRIBUTES, $SHGFI_ICON, $SHGFI_LARGEICON) ; $SHGFI_ICON
+		_WinAPI_ShellGetFileInfo($sPath, $dwFlags, $FILE_ATTRIBUTE_NORMAL, $tSHFILEINFO)
+		If DllStructGetData($tSHFILEINFO, 1)>0 Then
+			Local $hIcon = _WinAPI_Create32BitHICON(DllStructGetData($tSHFILEINFO, 1))
+			_WinAPI_DestroyIcon(DllStructGetData($tSHFILEINFO, 1))
+			$hBitmap = _GDIPlus_BitmapCreateFromHICON($hIcon)
+			_WinAPI_DestroyIcon($hIcon)
+		EndIf
+	EndIf
+	If $sIconPath<>-1 Or $hBitmap<>0 Then
+		Local $sIconExt = StringRight($sIconPath, 4)
+		If $hBitmap=0 And ($sIconExt=".dll" Or $sIconExt=".exe" Or $sIconExt=".ico") Then ; icon to extract
+			Local $hIcon = _WinAPI_ShellExtractIcon($sIconPath, $iIconIndex, $iIconSize, $iIconSize)
+			Local $hBitmap = _GDIPlus_BitmapCreateFromHICON($hIcon)
+			_WinAPI_DestroyIcon($hIcon)
+			If $hIcon<>0 Then Return $hBitmap
+		Else ; normal image file
+			If $hBitmap=0 Then $hBitmap = _GDIPlus_BitmapCreateFromFile($sIconPath)
+			If $hBitmap<>0 Then
+				; todo check size to only scale up
+				Local $hBitmapResized = _GDIPlus_ImageResize($hBitmap, $iIconSize, $iIconSize)
+				_GDIPlus_BitmapDispose($hBitmap)
+				Return $hBitmapResized
+			EndIf
+		EndIf
+	EndIf
+	Local $hIcon = _WinAPI_ShellExtractIcon("shell32.dll", 0, $iIconSize, $iIconSize) ; Default file icon
+	If $hIcon<>0 Then Return SetExtended(1, _GDIPlus_BitmapCreateFromHICON($hIcon))
+	Return SetError(2, 0, 0)
+EndFunc
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: __TreeListExplorer_ComboSetDropDownHeight
+; Description ...: Set the height of the drop down list of a comboboxex control.
+; Syntax ........: __TreeListExplorer_ComboSetDropDownHeight($hView[, $iHeight = 100])
+; Parameters ....: $hView          - the handle of the control
+;                  $iHeight        - (optional) Default: 100. The height in pixel.
+; Return values .: True on success, False otherwise
+; Author ........: Kanashius
+; Modified ......:
+; Remarks .......:
+; Related .......:
+; Link ..........:
+; Example .......: No
+; ===============================================================================================================================
+Func __TreeListExplorer_ComboSetDropDownHeight($hView, $iHeight = 100)
+	If Not IsHWnd($hView) Or Not MapExists($__TreeListExplorer__Data.mViews, $hView) Then Return SetError(1, 1, False)
+	If Not ($__TreeListExplorer__Data.mViews[$hView].iType = $__TreeListExplorer__Type_Combo Or $__TreeListExplorer__Data.mViews[$hView].iType = $__TreeListExplorer__Type_ComboEx) Then Return SetError(1, 1, False)
+	If Not IsInt($iHeight) Then Return SetError(1, 2, False)
+	$__TreeListExplorer__Data["mViews"][$hView]["iComboListHeight"] = $iHeight
+	__TreeListExplorer__UpdateView($hView) ; no force update required; begin/end update is always called
+	Return True
+EndFunc
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: __TreeListExplorer_FreeIconCache
+; Description ...: Removes cached icons
+; Syntax ........: __TreeListExplorer_FreeIconCache($iIconSize[, $bReload = True])
+; Parameters ....: $iIconSize          - (optional) Default: Free all IconSizes. If defined, only for that icon size, if it exists.
+;                  $bReload            - (optional) Default: True. Reload views using the cache.
+; Return values .: None
+; Author ........: Kanashius
+; Modified ......:
+; Remarks .......:
+; Related .......:
+; Link ..........:
+; Example .......: No
+; ===============================================================================================================================
+Func __TreeListExplorer_FreeIconCache($iIconSize = Default, $bReload = True)
+	Local $arFree[0][0]
+	If $iIconSize=Default Then
+		For $iIconSize in MapKeys($__TreeListExplorer__Data.mIcons)
+			_GUIImageList_Destroy($__TreeListExplorer__Data.mIcons[$iIconSize].hList)
+			Local $arKeys = MapKeys($__TreeListExplorer__Data.mIcons[$iIconSize]["mViews"])
+			MapRemove($__TreeListExplorer__Data.mIcons, $iIconSize)
+			If $bReload Then
+				For $hView in $arKeys
+					 __TreeListExplorer_ReloadView($hView, True)
+				Next
+			EndIf
+		Next
+	Else
+		If MapExists($__TreeListExplorer__Data.mIcons, $iIconSize) Then
+			_GUIImageList_Destroy($__TreeListExplorer__Data.mIcons[$iIconSize].hList)
+			Local $arKeys = MapKeys($__TreeListExplorer__Data.mIcons[$iIconSize]["mViews"])
+			MapRemove($__TreeListExplorer__Data.mIcons, $iIconSize)
+			If $bReload Then
+				For $hView in $arKeys
+					 __TreeListExplorer_ReloadView($hView, True)
+				Next
+			EndIf
+		EndIf
+	EndIf
 EndFunc
 
 ; #FUNCTION# ====================================================================================================================
@@ -565,6 +829,12 @@ Func __TreeListExplorer_RemoveView($hView)
 	Local $iSystem = $mView.iSystem
 	Local $iType = $mView.iType
 
+	; Remove view from icon map
+	Local $iIconSize = $__TreeListExplorer__Data["mViews"][$hView]["iIconSize"]
+	If $iIconSize<>-1 And MapExists($__TreeListExplorer__Data.mIcons, $iIconSize) Then
+		MapRemove($__TreeListExplorer__Data.mIcons[$iIconSize]["mViews"], $hView)
+		If UBound(MapKeys($__TreeListExplorer__Data.mIcons[$iIconSize]["mViews"]))<=0 Then __TreeListExplorer_FreeIconCache($iIconSize, False)
+	EndIf
 	; Remove from maps first, to prevent events (WinProc) from being handled during deletion
 	MapRemove($__TreeListExplorer__Data.mViews, $hView)
 	MapRemove($__TreeListExplorer__Data["mSystems"][$iSystem]["mViews"], $hView)
@@ -583,6 +853,15 @@ Func __TreeListExplorer_RemoveView($hView)
 			WEnd
 			_GUICtrlListView_SetImageList($hView, 0)
 			_GUICtrlListView_EndUpdate($hView)
+		Case $__TreeListExplorer__Type_Combo
+			_GUICtrlComboBox_BeginUpdate($hView)
+			_GUICtrlComboBox_ResetContent($hView)
+			_GUICtrlComboBox_EndUpdate($hView)
+		Case $__TreeListExplorer__Type_ComboEx
+			_GUICtrlComboBoxEx_BeginUpdate($hView)
+			_GUICtrlComboBoxEx_ResetContent($hView)
+			_GUICtrlComboBoxEx_SetImageList($hView, 0)
+			_GUICtrlComboBoxEx_EndUpdate($hView)
 	EndSwitch
 	Return True
 EndFunc
@@ -651,6 +930,40 @@ Func __TreeListExplorer_Reload($hSystem, $bAllFoldersOnPath = False)
 	If $bAllFoldersOnPath Then $__TreeListExplorer__Data["mSystems"][$iSystem]["bReloadAllFolders"] = True
 
 	__TreeListExplorer__UpdateSystemViews($iSystem)
+
+	$__TreeListExplorer__Data["mSystems"][$iSystem]["bReloadFolder"] = False
+	If $bAllFoldersOnPath Then $__TreeListExplorer__Data["mSystems"][$iSystem]["bReloadAllFolders"] = False
+EndFunc
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: __TreeListExplorer_ReloadView
+; Description ...: Reloads the folders and files in all views of the system.
+; Syntax ........: __TreeListExplorer_ReloadView($hView[, $bAllFoldersOnPath = False])
+; Parameters ....: $hSystem             - the view handle.
+;                  $bAllFoldersOnPath   - [optional] if false, only the current folder is reloaded.
+;                                         If true, all folders in the view will be reloaded.
+;                                         Default is False.
+; Return values .: None
+; Author ........: Kanashius
+; Modified ......:
+; Remarks .......:
+; Related .......:
+; Link ..........:
+; Example .......: No
+; ===============================================================================================================================
+Func __TreeListExplorer_ReloadView($hView, $bAllFoldersOnPath = False)
+	If Not IsHWnd($hView) Then
+		$hView = GUICtrlGetHandle($hView)
+		If @error Then Return SetError(2, @error, False) ; $hView is not a control
+	EndIf
+	If Not IsHWnd($hView) Or Not MapExists($__TreeListExplorer__Data.mViews, $hView) Then Return SetError(1, 0, False)
+	Local $mView = $__TreeListExplorer__Data.mViews[$hView]
+	Local $iSystem = $mView.iSystem
+
+	$__TreeListExplorer__Data["mSystems"][$iSystem]["bReloadFolder"] = True
+	If $bAllFoldersOnPath Then $__TreeListExplorer__Data["mSystems"][$iSystem]["bReloadAllFolders"] = True
+
+	__TreeListExplorer__UpdateView($hView)
 
 	$__TreeListExplorer__Data["mSystems"][$iSystem]["bReloadFolder"] = False
 	If $bAllFoldersOnPath Then $__TreeListExplorer__Data["mSystems"][$iSystem]["bReloadAllFolders"] = False
@@ -950,7 +1263,7 @@ EndFunc
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
 ; Name ..........: __TreeListExplorer__UpdateView
 ; Description ...: Update a view to match a TLE systems root folder and current folder
-; Syntax ........: __TreeListExplorer__UpdateView($hView)
+; Syntax ........: __TreeListExplorer__UpdateView($hView[, $bReload = False])
 ; Parameters ....: $hView               - the control handle.
 ;                  $bReload             - [optional] Default False. Forces a reload.
 ; Return values .: None
@@ -971,6 +1284,10 @@ Func __TreeListExplorer__UpdateView($hView, $bReload = False)
 			_GUICtrlTreeView_BeginUpdate($hView)
 		Case $__TreeListExplorer__Type_ListView
 			_GUICtrlListView_BeginUpdate($hView)
+		Case $__TreeListExplorer__Type_Combo
+			_GUICtrlComboBox_BeginUpdate($hView)
+		Case $__TreeListExplorer__Type_ComboEx
+			_GUICtrlComboBoxEx_BeginUpdate($hView)
 	EndSwitch
 	; Root different
 	Local $bRootOrFolderChanged = False
@@ -987,14 +1304,15 @@ Func __TreeListExplorer__UpdateView($hView, $bReload = False)
 					_GUICtrlTreeView_DeleteAll($hView)
 					Local $hRoot
 					If $mSystem.sRoot="" Then
-						$hRoot = _GUICtrlTreeView_Add($hView, 0, $__TreeListExplorer__Data.arLangData[$__TreeListExplorer__Data.iLang][3], 9, 9) ; maybe remove text here
+						Local $iIconIndex = $__TreeListExplorer__Data.mIcons[$__TreeListExplorer__Data.mViews[$hView].iIconSize].mCache[$__TreeListExplorer__Icon_This_PC]
+						$hRoot = _GUICtrlTreeView_Add($hView, 0, $__TreeListExplorer__Data.arLangData[$__TreeListExplorer__Data.iLang][3], $iIconIndex, $iIconIndex) ; maybe remove text here
 					Else
 						Local $arPath = __TreeListExplorer__GetPathAndLast($mSystem.sRoot)
 						$hRoot = _GUICtrlTreeView_Add($hView, 0, $arPath[1], 0, 0)
 					EndIf
 					_GUICtrlTreeView_AddChild($hView, $hRoot, "HasChilds", 10, 10)
 					__TreeListExplorer__ExpandTreeitem($hView, $hRoot)
-				Case $__TreeListExplorer__Type_ListView
+				Case $__TreeListExplorer__Type_ListView, $__TreeListExplorer__Type_Combo, $__TreeListExplorer__Type_ComboEx
 					$bReload = True
 			EndSwitch
 			__TreeListExplorer__HandleViewCallback($hView, "sCallbackLoading", $mSystem.sRoot, False)
@@ -1069,16 +1387,24 @@ Func __TreeListExplorer__UpdateView($hView, $bReload = False)
 					__TreeListExplorer__HandleSystemCallback($iSystem, "sCallbackSelect")
 				EndIf
 				__TreeListExplorer__HandleViewCallback($hView, "sCallbackLoading", $mSystem.sFolder, False)
-			Case $__TreeListExplorer__Type_ListView
+			Case $__TreeListExplorer__Type_ListView, $__TreeListExplorer__Type_Combo, $__TreeListExplorer__Type_ComboEx
 				If $bUpdateFolder Then
 					__TreeListExplorer__HandleViewCallback($hView, "sCallbackLoading", $mSystem.sFolder, True)
 					; clear old data
 					$__TreeListExplorer__Data["mViews"][$hView]["iIndex"] = -1
 					__TreeListExplorer__SetViewUpdating($hView, True, $__TreeListExplorer__Status_UpdateView)
-					_GUICtrlListView_DeleteAllItems($hView)
+					Switch $mView.iType
+						Case $__TreeListExplorer__Type_ListView
+							_GUICtrlListView_DeleteAllItems($hView)
+						Case $__TreeListExplorer__Type_Combo
+							_GUICtrlComboBox_ResetContent($hView)
+						Case $__TreeListExplorer__Type_ComboEx
+							_GUICtrlComboBoxEx_SetCurSel($hView, -1)
+							_GUICtrlComboBoxEx_ResetContent($hView)
+					EndSwitch
 					; do not display .. folder in root directory,...
-					If $mSystem.sFolder<>"" And $mView.bNavigation And $mView.bListViewFolderUp Then
-						_GUICtrlListView_AddItem($hView, "", 0)
+					If $mView.iType=$__TreeListExplorer__Type_ListView And $mSystem.sFolder<>"" And $mView.bNavigation And $mView.bListViewFolderUp Then
+						_GUICtrlListView_AddItem($hView, "", $__TreeListExplorer__Data.mIcons[$__TreeListExplorer__Data.mViews[$hView].iIconSize].mCache[$__TreeListExplorer__Icon_Folder])
 						_GUICtrlListView_SetItemText($hView, 0, "..", $mView.iPathIndex)
 					EndIf
 					; collect drives/folders/files
@@ -1133,11 +1459,12 @@ Func __TreeListExplorer__UpdateView($hView, $bReload = False)
 						Next
 					EndIf
 					; add entries to listview
+					If $mView.iType = $__TreeListExplorer__Type_Combo Then _GUICtrlComboBox_InitStorage(UBound($arPaths), 150, 300)
+					If $mView.iType = $__TreeListExplorer__Type_ComboEx Then _GUICtrlComboBoxEx_InitStorage(UBound($arPaths), 150, 300)
 					For $i=0 to UBound($arPaths)-1
 						Local $sFile = $arPaths[$i][$mView.iPathIndex]
 						Local $sFilePath = $sPath & $sFile
 						Local $bDriveOrFolder = __TreeListExplorer__PathIsFolder($sFilePath)
-						Local $iIconIndex = __TreeListExplorer__FileGetIconIndex($sFilePath)
 						Local $sFileName = $sFile, $sExt = ""
 						If Not $bDriveOrFolder Then
 							Local $arFileParts = StringRegExp($sFilename, "^(.+?)(\.[^.]{1,5}){0,1}$", 1)
@@ -1148,32 +1475,68 @@ Func __TreeListExplorer__UpdateView($hView, $bReload = False)
 						EndIf
 						If $mView.sCallbackFilter=Default Or __TreeListExplorer__HandleCallback($iSystem, $hView, "sCallbackFilter", True, $sPath, $sFilename, $sExt) Then
 							If UBound($arPaths, 2)>0 Then
-								Local $iIndex = _GUICtrlListView_AddItem($hView, $arPaths[$i][0], $iIconIndex)
-								For $j=1 To UBound($arPaths, 2)-1
-									_GUICtrlListView_SetItemText($hView, $iIndex, $arPaths[$i][$j], $j)
-								Next
+								Switch $mView.iType
+									Case $__TreeListExplorer__Type_ListView
+										Local $iIconIndex = __TreeListExplorer__FileGetIconIndex($hView, $sFilePath)
+										Local $iIndex = _GUICtrlListView_AddItem($hView, $arPaths[$i][0], $iIconIndex)
+										For $j=1 To UBound($arPaths, 2)-1
+											_GUICtrlListView_SetItemText($hView, $iIndex, $arPaths[$i][$j], $j)
+										Next
+									Case $__TreeListExplorer__Type_Combo
+										_GUICtrlComboBox_AddString($hView, $sFile)
+									Case $__TreeListExplorer__Type_ComboEx
+										Local $iIconIndex = __TreeListExplorer__FileGetIconIndex($hView, $sFilePath)
+										_GUICtrlComboBoxEx_AddString($hView, $sFile, $iIconIndex, $iIconIndex)
+								EndSwitch
 							EndIf
 							If $mView.sCallbackListViewItemCreated<>Default Then __TreeListExplorer__HandleCallback($iSystem, $hView, "sCallbackListViewItemCreated", $sFilePath, $sFile, $iIndex, $bDriveOrFolder)
 						EndIf
 					Next
 					__TreeListExplorer__SetViewUpdating($hView, False, $__TreeListExplorer__Status_UpdateView)
-					__TreeListExplorer__HandleViewCallback($hView, "sCallbackLoading", $mSystem.sFolder, False)
 				EndIf
 				If $mSystem.sSelected<>"" Then
 					Local $sSelected = $mSystem.sSelected
-					For $i=0 To _GUICtrlListView_GetItemCount($hView)
-						If _GUICtrlListView_GetItemText($hView, $i, $mView.iPathIndex)=$sSelected Then
-							_GUICtrlListView_EnsureVisible($hView, $i)
-							Local $arSel = _GUICtrlListView_GetSelectedIndices($hView, True)
-							For $j=1 To UBound($arSel)-1 Step 1
-								_GUICtrlListView_SetItemSelected($hView, $arSel[$j], False)
+					Switch $mView.iType
+						Case $__TreeListExplorer__Type_ListView
+							For $i=0 To _GUICtrlListView_GetItemCount($hView)-1
+								If _GUICtrlListView_GetItemText($hView, $i, $mView.iPathIndex)=$sSelected Then
+									_GUICtrlListView_EnsureVisible($hView, $i)
+									Local $arSel = _GUICtrlListView_GetSelectedIndices($hView, True)
+									For $j=1 To UBound($arSel)-1 Step 1
+										_GUICtrlListView_SetItemSelected($hView, $arSel[$j], False)
+									Next
+									_GUICtrlListView_SetSelectionMark($hView, $i)
+									_GUICtrlListView_SetItemSelected($hView, $i)
+									ExitLoop
+								EndIf
 							Next
-							_GUICtrlListView_SetSelectionMark($hView, $i)
-							_GUICtrlListView_SetItemSelected($hView, $i)
-							ExitLoop
-						EndIf
-					Next
+						Case $__TreeListExplorer__Type_Combo
+							Local $sText, $iCount = _GUICtrlComboBox_GetCount($hView)
+							If $iCount>0 Then
+								For $i=0 to $iCount-1
+									_GUICtrlComboBox_GetLBText($hView, $i, $sText)
+									If $sText=$sSelected Then
+										_GUICtrlComboBox_SetEditText($hView, $sSelected)
+										_GUICtrlComboBox_SetCurSel($hView, $i)
+										ExitLoop
+									EndIf
+								Next
+							EndIf
+						Case $__TreeListExplorer__Type_ComboEx
+							Local $sText, $iCount = _GUICtrlComboBoxEx_GetCount($hView)
+							If $iCount>0 Then
+								For $i=0 To $iCount-1
+									_GUICtrlComboBoxEx_GetItemText($hView, $i, $sText)
+									If $sText=$sSelected Then
+										_GUICtrlComboBoxEx_SetEditText($hView, $sSelected)
+										_GUICtrlComboBoxEx_SetCurSel($hView, $i)
+										ExitLoop
+									EndIf
+								Next
+							EndIf
+					EndSwitch
 				EndIf
+				If $bUpdateFolder Then __TreeListExplorer__HandleViewCallback($hView, "sCallbackLoading", $mSystem.sFolder, False)
 			Case $__TreeListExplorer__Type_Input
 				If $bFolderChanged Then _GUICtrlEdit_SetText($hView, $mSystem.sFolder)
 		EndSwitch
@@ -1184,6 +1547,14 @@ Func __TreeListExplorer__UpdateView($hView, $bReload = False)
 			$mView.bUpdating = False
 		Case $__TreeListExplorer__Type_ListView
 			_GUICtrlListView_EndUpdate($hView)
+		Case $__TreeListExplorer__Type_Combo, $__TreeListExplorer__Type_ComboEx
+			_GUICtrlComboBox_EndUpdate($hView)
+			Local $arPos = WinGetPos($mView.hComboList)
+			If $arPos[3]<>$mView.iComboListHeight Then
+				$arPos[3] = $mView.iComboListHeight
+				WinMove($mView.hComboList, "", $arPos[0], $arPos[1], $arPos[2], $arPos[3])
+			EndIf
+			_WinAPI_RedrawWindow($hView)
 	EndSwitch
 EndFunc
 
@@ -1261,9 +1632,10 @@ EndFunc
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
 ; Name ..........: __TreeListExplorer__FileGetIconIndex
-; Description ...: Get the index of an icon in $__TreeListExplorer__Data.hIconList for a given extension and add missing icons.
-; Syntax ........: __TreeListExplorer__FileGetIconIndex($sPath)
+; Description ...: Get the index of an icon for a given path and add missing icons.
+; Syntax ........: __TreeListExplorer__FileGetIconIndex($hView, $sPath)
 ; Parameters ....: $sPath               - the absolute path.
+;                  $hView               - the handle to the Tree-/ListView.
 ; Return values .: The index
 ; Author ........: Kanashius
 ; Modified ......:
@@ -1272,137 +1644,49 @@ EndFunc
 ; Link ..........:
 ; Example .......: No
 ; ===============================================================================================================================
-Func __TreeListExplorer__FileGetIconIndex($sPath)
-	; test for drive
+Func __TreeListExplorer__FileGetIconIndex($hView, $sPath)
+	Local $mView = $__TreeListExplorer__Data.mViews[$hView]
+	Local $iIconSize = $mView.iIconSize
+
+	; handle drives
 	Local $arRegExpDrive = StringRegExp($sPath, "^([^\/]+?:)\/*$", 1)
-	If UBound($arRegExpDrive)>0 Then return __TreeListExplorer__GetDriveIconId($arRegExpDrive[0])
-
-	; test for folder
-	If __TreeListExplorer__PathIsFolder($sPath) Then Return 0 ; Default folder icon
-
+	If UBound($arRegExpDrive)>0 Then
+		Local $sType = __TreeListExplorer__GetDriveIconId($arRegExpDrive[0], True)
+		Return $__TreeListExplorer__Data.mIcons[$iIconSize]["mCache"][$sType]
+	EndIf
+	If __TreeListExplorer__PathIsFolder($sPath) Then
+		Return $__TreeListExplorer__Data.mIcons[$iIconSize]["mCache"][$__TreeListExplorer__Icon_Folder]
+	EndIf
 	; extract and handle cached extensions
-	Local $arExt = StringRegExp($sPath, "^.*[^\\](\.[^\\]*?)$", 1)
-	If @error Or UBound($arExt)<>1 Then Return 2 ; Default file icon
-	Local $sExt = StringLower($arExt[0])
-	If MapExists($__TreeListExplorer__Data.mIcons, $sExt) Then Return $__TreeListExplorer__Data.mIcons[$sExt]
-	If MapExists($__TreeListExplorer__Data.mIcons, $sPath) Then Return $__TreeListExplorer__Data.mIcons[$sPath]
-
-	Local $sIconPath = -1, $iIconIndex = 0, $bAddForExtension = False
-	; handle .url (links)
-	If $sExt=".url" Then
-		$sIconPath = IniRead($sPath, "InternetShortcut", "IconFile", -1)
-		$iIconIndex = IniRead($sPath, "InternetShortcut", "IconIndex", -1)
-	EndIf
-	; handle .lnk (shortcuts)
-	If $sExt=".lnk" Then ; todo maybe add the link symbol (arrow) to the icon
-
-	EndIf
-	; Handling for special extensions
-	Switch $sExt
-		Case ".exe"
-			$sIconPath = $sPath
-		Case ".url"
-			$sIconPath = IniRead($sPath, "InternetShortcut", "IconFile", -1)
-			$iIconIndex = IniRead($sPath, "InternetShortcut", "IconIndex", -1)
-		Case ".lnk"
-			Local $arShortcutData = FileGetShortcut($sPath)
-			If $arShortcutData[4]<>"" Then ; icon file provided
-				$sIconPath = $arShortcutData[4]
-				$iIconIndex = $arShortcutData[5]
-			Else ; otherwise get icon from the linked path
-				Return __TreeListExplorer__FileGetIconIndex($arShortcutData[0])
-			EndIf
-	EndSwitch
-	If $sIconPath=-1 Then
-		Local $sRegData = RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" & $sExt, "ProgID")
-		If @error Then
-			$sRegData = RegRead("HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\" & $sExt & "\UserChoice", "ProgID")
-			If @error Then
-				$sRegData = RegRead("HKCR\" & $sExt, "")
-			EndIf
-		EndIf
-		If $sRegData<>"" Then $sRegData = RegRead("HKCR\" & $sRegData & "\DefaultIcon", "")
-		If $sRegData="" Then $sRegData = _WinAPI_AssocQueryString($sExt, $ASSOCSTR_DEFAULTICON)
-		If StringInStr($sRegData, "@")=1 Then ; Handle urls with @{...}
-			Local $sIconPath = _WinAPI_LoadIndirectString($sRegData)
-			If @error Then $sIconPath = -1
-			Local $arRes = StringRegExp($sIconPath, "^(.*\\)(.*-)(\d+)(\.\S+)$", 1)
-			If Not (@error And UBound($arRes)<>4) Then ; check for files with a pixel resolution closer to $iIconSize
-				Local $iIconSize = $__TreeListExplorer__Data.iIconSize
-				Local $arFiles = _FileListToArray($arRes[0], $arRes[1]&"*"&$arRes[3])
-				Local $arOptions[UBound($arFiles)-1][2], $iCount = 0
-				For $i=1 To UBound($arFiles)-1 Step 1 ; get icon size for all files
-					Local $arFileParts = StringRegExp($arFiles[$i], "^.*-(\d+)\.\S+$", 1)
-					If Not @error Then
-						$arOptions[$iCount][0] = Int($arFileParts[0])
-						$arOptions[$iCount][1] = $arFiles[$i]
-						$iCount+=1
-					EndIf
-				Next
-				ReDim $arOptions[$iCount][2]
-				_ArraySort($arOptions) ; sort by size
-				For $i=0 To UBound($arOptions)-1 Step 1 ; take the best icon to be used (>= target icon size); Resize will be done later
-					If $iIconSize<=$arOptions[$i][0] Then
-						$sIconPath = $arRes[0]&$arOptions[$i][1]
-						ExitLoop
-					EndIf
-				Next
-			EndIf
-		ElseIf StringInStr($sRegData, ",") Then ; Handle <Path>, <iIndex> e.g.:  ...shell32.dll, 0
-			Local $arParts = StringRegExp($sRegData, '"?(.*?)"?,(-?\d+)', 1)
-			If UBound($arParts)=2 Then
-				$sIconPath = $arParts[0]
-				$iIconIndex = $arParts[1]
-			EndIf
-		ElseIf $sRegData<>"" Then ; Handle path without index
-			$sIconPath = $sRegData
-		EndIf
-		$bAddForExtension = True
-	EndIf
-	If $sIconPath<>-1 Then
-		Local $sIconExt = StringRight($sIconPath, 4), $sMapKey = $sPath
-		If $bAddForExtension Then $sMapKey = $sExt
-		If $sIconExt=".dll" Or $sIconExt=".exe" Or $sIconExt=".ico" Then ; icon to extract
-			Local $iIconSize = $__TreeListExplorer__Data.iIconSize
-			Local $hIcon = _WinAPI_ShellExtractIcon($sIconPath, $iIconIndex, $iIconSize, $iIconSize)
-			If $hIcon<>0 Then
-				Local $iIndex = _GUIImageList_ReplaceIcon($__TreeListExplorer__Data.hIconList, -1, $hIcon)
-				If $iIndex>=0 Then
-					$__TreeListExplorer__Data["mIcons"][$sMapKey] = $iIndex
-					Return $iIndex
-				EndIf
-			EndIf
-		Else ; normal image file
-			Local $hBitmap = _GDIPlus_BitmapCreateFromFile($sIconPath)
-			If @error Then Return 2 ; Default file icon
-			Local $iIconSize = $__TreeListExplorer__Data.iIconSize
-			Local $hBitmapResized = _GDIPlus_ImageResize($hBitmap, $iIconSize, $iIconSize)
-			Local $hImg = _GDIPlus_BitmapCreateHBITMAPFromBitmap($hBitmapResized)
-			Local $iIndex = _GUIImageList_Add($__TreeListExplorer__Data.hIconList, $hImg)
-			_GDIPlus_BitmapDispose($hBitmap)
-			_GDIPlus_BitmapDispose($hBitmapResized)
-			If $iIndex>=0 Then
-				$__TreeListExplorer__Data["mIcons"][$sMapKey] = $iIndex
-				Return $iIndex
-			EndIf
-		EndIf
+	Local $arExt = StringRegExp($sPath, "^.*[^\\](\.[^\\]*?)$", 1), $sExt = Default, $bExtension = False, $bAddFileIcon = False
+	If Not (@error Or UBound($arExt)<>1) Then $sExt = StringLower($arExt[0])
+	If $sExt<>Default And $sExt<>".exe" And $sExt<>".url" And $sExt<>".lnk" Then ; files with these extensions may have icons different from each other
+		If MapExists($__TreeListExplorer__Data.mIcons[$iIconSize]["mCache"], $sExt) Then Return $__TreeListExplorer__Data.mIcons[$iIconSize]["mCache"][$sExt]
+		$bExtension = True
+	ElseIf $sExt=".exe" Or $sExt=".url" Or $sExt=".lnk" Then
+		If MapExists($__TreeListExplorer__Data.mIcons[$iIconSize]["mCache"], $sPath) Then Return $__TreeListExplorer__Data.mIcons[$iIconSize]["mCache"][$sPath]
 	Else
-		Local $tSHFILEINFO = DllStructCreate($tagSHFILEINFO)
-		Local $dwFlags = BitOR($SHGFI_USEFILEATTRIBUTES, $SHGFI_ICON, $SHGFI_ICONLOCATION)
-		_WinAPI_ShellGetFileInfo($sPath, $dwFlags, $FILE_ATTRIBUTE_NORMAL, $tSHFILEINFO)
-		If DllStructGetData($tSHFILEINFO, 2)<>0 Then ; ignore missing icons (SystemIcon=0 equals Default file icon)
-			If DllStructGetData($tSHFILEINFO, 1)>0 Then
-				Local $iIndex = _GUIImageList_ReplaceIcon($__TreeListExplorer__Data.hIconList, -1, DllStructGetData($tSHFILEINFO, 1))
-				If $iIndex>=0 Then
-					$__TreeListExplorer__Data["mIcons"][$sExt] = $iIndex
-					Return $iIndex
-				EndIf
-			EndIf
-		Else
-			If DllStructGetData($tSHFILEINFO, 1)>0 Then _WinAPI_DestroyIcon(DllStructGetData($tSHFILEINFO, 1))
-		EndIf
+		Return $__TreeListExplorer__Data.mIcons[$iIconSize]["mCache"][$__TreeListExplorer__Icon_File]
 	EndIf
-	Return 2 ; Default file icon
+	; retrieve bitmap
+	Local $iIndex = -1
+	Local $hBitmap = __TreeListExplorer_FileGetIconBitmap($sPath, $iIconSize, $sExt)
+	If Not @error And @extended = 1 Then ; handle default file icon
+		$iIndex = $__TreeListExplorer__Data.mIcons[$iIconSize]["mCache"][$__TreeListExplorer__Icon_File]
+	ElseIf Not @error Then
+		Local $hHBitmap = _GDIPlus_BitmapCreateHBITMAPFromBitmap($hBitmap, 0x00000000)
+		$iIndex = _GUIImageList_Add($__TreeListExplorer__Data.mIcons[$iIconSize]["hList"], $hHBitmap)
+	EndIf
+	_GDIPlus_BitmapDispose($hBitmap)
+	If $iIndex>=0 Then
+		If $bExtension Then
+			$__TreeListExplorer__Data["mIcons"][$iIconSize]["mCache"][$sExt] = $iIndex
+		Else
+			$__TreeListExplorer__Data["mIcons"][$iIconSize]["mCache"][$sPath] = $iIndex
+		EndIf
+		Return $iIndex
+	EndIf
+	Return $__TreeListExplorer__Data.mIcons[$iIconSize]["mCache"][$__TreeListExplorer__Icon_File]
 EndFunc
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
@@ -1456,7 +1740,7 @@ Func __TreeListExplorer__UpdateTreeItemContent($hView, $hItem, $bRecursive = Fal
 
 	If Not $bRecursive Then __TreeListExplorer__SetViewUpdating($hView, True, $__TreeListExplorer__Status_LoadTree)
 	; get absolute path for item
-	Local $arPath = StringRegExp(StringReplace(_GUICtrlTreeView_GetTree($hView, $hItem), "|", "\"), "[^\\]*\\?(.*)$", 1) ; remove first element (root)
+	Local $arPath = StringRegExp(__TreeListExplorer__TreeViewGetTree($hView, $hItem), "[^\\]*\\?(.*)$", 1) ; remove first element (root)
 	If @error Or UBound($arPath)<>1 Then Return False
 	Local $sPath = $mSystem.sRoot & $arPath[0]
 	; Get Content data (drives/folders/files)
@@ -1466,7 +1750,7 @@ Func __TreeListExplorer__UpdateTreeItemContent($hView, $hItem, $bRecursive = Fal
 		ReDim $arEntries[UBound($arDrives)][3]
 		For $i=0 To UBound($arDrives)-1 Step 1
 			$arEntries[$i][0] = $arDrives[$i][0]
-			$arEntries[$i][1] = $arDrives[$i][1]
+			$arEntries[$i][1] = $__TreeListExplorer__Data.mIcons[$__TreeListExplorer__Data.mViews[$hView].iIconSize].mCache[__TreeListExplorer__GetDriveIconId($arDrives[$i][0], True)]
 			$arEntries[$i][2] = True
 			If $bHasFilterCallback Then
 				$arEntries[$i][2] = __TreeListExplorer__HandleCallback($iSystem, $hView, "sCallbackFilter", True, "", $arDrives[$i][0], "")
@@ -1481,7 +1765,7 @@ Func __TreeListExplorer__UpdateTreeItemContent($hView, $hItem, $bRecursive = Fal
 		ReDim $arEntries[$iSize][3]
 		For $i=1 To UBound($arFolders)-1 Step 1
 			$arEntries[$i-1][0] = $arFolders[$i]
-			$arEntries[$i-1][1] = 0
+			$arEntries[$i-1][1] = $__TreeListExplorer__Data.mIcons[$__TreeListExplorer__Data.mViews[$hView].iIconSize].mCache[$__TreeListExplorer__Icon_Folder]
 			$arEntries[$i-1][2] = True
 			If $bHasFilterCallback Then
 				$arEntries[$i-1][2] = __TreeListExplorer__HandleCallback($iSystem, $hView, "sCallbackFilter", True, $sPath, $arFolders[$i], "")
@@ -1490,7 +1774,7 @@ Func __TreeListExplorer__UpdateTreeItemContent($hView, $hItem, $bRecursive = Fal
 		Local $iIndex = UBound($arFolders)-1-(UBound($arFolders)>0?1:0)
 		For $i=1 To UBound($arFiles)-1 Step 1
 			$arEntries[$iIndex+$i][0] = $arFiles[$i]
-			$arEntries[$iIndex+$i][1] = __TreeListExplorer__FileGetIconIndex($sPath & "\" & $arFiles[$i])
+			$arEntries[$iIndex+$i][1] = __TreeListExplorer__FileGetIconIndex($hView, $sPath & "\" & $arFiles[$i])
 			$arEntries[$iIndex+$i][2] = True
 			If $bHasFilterCallback Then
 				Local $sFilename = $arFiles[$i], $sExt = ""
@@ -1563,6 +1847,29 @@ Func __TreeListExplorer__UpdateTreeItemContent($hView, $hItem, $bRecursive = Fal
 	Next
 	If Not $bRecursive Then __TreeListExplorer__SetViewUpdating($hView, False, $__TreeListExplorer__Status_LoadTree)
 	Return True
+EndFunc
+
+
+; #INTERNAL_USE_ONLY# ===========================================================================================================
+; Name ..........: __TreeListExplorer__TreeViewGetTree
+; Description ...: Get the tree of the element seperated by \ without influencing the users GUIDataSeparatorChar
+; Syntax ........: __TreeListExplorer__TreeViewGetTree($hView, $hItem)
+; Parameters ....: $hView               - the treeview handle.
+;                  $hItem               - the item handle.
+; Return values .: The \ seperated tree
+; Author ........: Kanashius
+; Modified ......:
+; Remarks .......:
+; Related .......:
+; Link ..........:
+; Example .......: No
+; ===============================================================================================================================
+Func __TreeListExplorer__TreeViewGetTree($hView, $hItem)
+	If Not IsHWnd($hView) Then $hView = GUICtrlGetHandle($hView)
+	Local $sSepBefore = Opt("GUIDataSeparatorChar", "\")
+	Local $sTree = _GUICtrlTreeView_GetTree($hView, $hItem)
+	Opt("GUIDataSeparatorChar", $sSepBefore)
+	Return $sTree
 EndFunc
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
@@ -1668,19 +1975,7 @@ Func __TreeListExplorer__GetDrives()
 	Local $arResult[UBound($arDrives)-1][2]
 	For $i = 1 To UBound($arDrives)-1
 		$arResult[$i-1][0] = StringUpper($arDrives[$i])
-		Switch DriveGetType($arDrives[$i])
-			Case 'Fixed'
-				$arResult[$i-1][1] = 5
-			Case 'CDROM'
-				$arResult[$i-1][1] = 6
-			Case 'RAMDisk'
-				$arResult[$i-1][1] = 7
-			Case 'Removable'
-				$arResult[$i-1][1] = 4
-				If StringLeft($arDrives[$i], 2) = "A:" Or StringLeft($arDrives[$i], 2) = "B:" Then $arResult[$i-1][1] = 3
-			Case Else
-				$arResult[$i-1][1] = 8
-		EndSwitch
+		$arResult[$i-1][1] = __TreeListExplorer__GetDriveIconId($arDrives[$i])
 	Next
 	Return $arResult
 EndFunc
@@ -1688,10 +1983,11 @@ EndFunc
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
 ; Name ..........: __TreeListExplorer__GetDriveIconId
-; Description ...: Get the icon for a drive.
-; Syntax ........: __TreeListExplorer__GetDriveIconId($sDrive)
-; Parameters ....:
-; Return values .: Id of the icon (or 0 if not matched)
+; Description ...: Get the icon id or string for a drive.
+; Syntax ........: __TreeListExplorer__GetDriveIconId($sDrive[, $bString = False])
+; Parameters ....: $sDrive         - The drive path
+;                  $bString        - (optional) Default: False. If True the string for $__TreeListExplorer__Icon_... is provided.
+; Return values .: Id/String of the icon (or 0 if not matched)
 ; Author ........: Kanashius
 ; Modified ......:
 ; Remarks .......:
@@ -1699,21 +1995,21 @@ EndFunc
 ; Link ..........:
 ; Example .......: No
 ; ===============================================================================================================================
-Func __TreeListExplorer__GetDriveIconId($sDrive)
+Func __TreeListExplorer__GetDriveIconId($sDrive, $bString = False)
 	Switch DriveGetType($sDrive)
 		Case 'Fixed'
-			return 5
+			return $bString?$__TreeListExplorer__Icon_Harddrive:8
 		Case 'CDROM'
-			return 6
+			return $bString?$__TreeListExplorer__Icon_CDROM:11
 		Case 'RAMDisk'
-			return 7
+			return $bString?$__TreeListExplorer__Icon_Networkdrive:12
 		Case 'Removable'
-			return 4
-			If StringLeft($sDrive, 2) = "A:" Or StringLeft($sDrive, 2) = "B:" Then return 3
+			return $bString?$__TreeListExplorer__Icon_ChangeableInput:7
+			If StringLeft($sDrive, 2) = "A:" Or StringLeft($sDrive, 2) = "B:" Then return $bString?$__TreeListExplorer__Icon_Disc:5
 		Case Else
-			return 8
+			return $bString?$__TreeListExplorer__Icon_Unknown:53
 	EndSwitch
-	return 0
+	return $bString?$__TreeListExplorer__Icon_Folder:3
 EndFunc
 
 ; #INTERNAL_USE_ONLY# ===========================================================================================================
@@ -1765,7 +2061,7 @@ EndFunc
 ; Example .......: No
 ; ===============================================================================================================================
 Func __TreeListExplorer__TreeViewGetRelPath($iSystem, $hView, $hItem)
-	Local $sPath = StringReplace(_GUICtrlTreeView_GetTree($hView, $hItem), "|", "\")
+	Local $sPath = __TreeListExplorer__TreeViewGetTree($hView, $hItem)
 	$arPath = StringRegExp($sPath, "[^\\]*\\?(.*)$", 1) ; remove first root element
 	If UBound($arPath)>0 Then $sPath = $arPath[0]
 	If $sPath<>"" And StringRight($sPath, 1)<>"\" And __TreeListExplorer__RelPathIsFolder($iSystem, $sPath) Then $sPath &= "\"
@@ -1925,10 +2221,10 @@ Func __TreeListExplorer__KeyProc($nCode, $wParam, $lParam)
 				Local $hView = ControlGetHandle($hGui, "", $sControl)
 				Local $arHwnds = MapKeys($__TreeListExplorer__Data.mViews)
 				For $i=0 To UBound($arHwnds)-1 Step 1
-					If $arHwnds[$i]<>$hView Then ContinueLoop
-					Local $mView = $__TreeListExplorer__Data.mViews[$hView]
+					Local $mView = $__TreeListExplorer__Data.mViews[$arHwnds[$i]]
+					If $arHwnds[$i]<>$hView And (Not (MapExists($mView, "hComboEdit") And $mView.hComboEdit=$hView)) Then ContinueLoop
 					Local $iSystem = $mView.iSystem
-					Switch $__TreeListExplorer__Data.mViews[$hView].iType
+					Switch $mView.iType
 						Case $__TreeListExplorer__Type_Input
 							If $vkCode=13 Then __TreeListExplorer_OpenPath(__TreeListExplorer__GetHandleFromSystemID($iSystem), _GUICtrlEdit_GetText($hView))
 						Case $__TreeListExplorer__Type_ListView
@@ -1942,6 +2238,17 @@ Func __TreeListExplorer__KeyProc($nCode, $wParam, $lParam)
 										Next
 									EndIf
 							EndSwitch
+						Case $__TreeListExplorer__Type_Combo, $__TreeListExplorer__Type_ComboEx
+							If $vkCode = 13 Then
+								Local $sPath = _GUICtrlEdit_GetText($mView.hComboEdit)
+								Local $hSystem = __TreeListExplorer__GetHandleFromSystemID($iSystem)
+								If $sPath="" Then
+									$sPath = __TreeListExplorer_GetRoot($hSystem)
+								ElseIf Not FileExists($sPath) Then
+									$sPath=__TreeListExplorer_GetRoot($hSystem)&__TreeListExplorer_GetPath($hSystem)&$sPath
+								EndIf
+								__TreeListExplorer_OpenPath($hSystem, $sPath)
+							EndIf
 					EndSwitch
 				Next
 			EndIf
@@ -2055,6 +2362,7 @@ Func __TreeListExplorer__WinProc($hWnd, $iMsg, $iwParam, $ilParam)
 									If NOT $__TreeListExplorer__Data.bCTRL_DOWN Then ; do not open/select when CTRL+CLICK multiselecting
 										Local $arPath = __TreeListExplorer__GetPathAndLast(__TreeListExplorer__GetCurrentPath($iSystem) & _GUICtrlListView_GetItemText($hView, $iIndex, $mView.iPathIndex))
 										Local $mOpenPathData[]
+										$mOpenPathData.iType = $__TreeListExplorer__Type_ListView
 										$mOpenPathData.sFolder = $arPath[0]
 										$mOpenPathData.sSelect = $arPath[1]
 										$mOpenPathData.iSystem = $iSystem
@@ -2087,10 +2395,10 @@ Func __TreeListExplorer__WinProc($hWnd, $iMsg, $iwParam, $ilParam)
 								$__TreeListExplorer__Data["mViews"][$hView]["mSorting"]["iCol"] = $iCol
 								If BitAND($iFormat, $HDF_SORTUP) Then ; ascending
 									_GUICtrlHeader_SetItemFormat($hHeader, $iCol, BitOR(BitXOR($iFormat, $HDF_SORTUP), $HDF_SORTDOWN))
-									$__TreeListExplorer__Data["mViews"][$hView]["mSorting"]["iDir"] = 0
+									$__TreeListExplorer__Data["mViews"][$hView]["mSorting"]["iDir"] = 1
 								Else ; descending
 									_GUICtrlHeader_SetItemFormat($hHeader, $iCol, BitOR(BitXOR($iFormat, $HDF_SORTDOWN), $HDF_SORTUP))
-									$__TreeListExplorer__Data["mViews"][$hView]["mSorting"]["iDir"] = 1
+									$__TreeListExplorer__Data["mViews"][$hView]["mSorting"]["iDir"] = 0
 								EndIf
 								__TreeListExplorer__UpdateView($hView, True)
 							EndIf
@@ -2099,6 +2407,31 @@ Func __TreeListExplorer__WinProc($hWnd, $iMsg, $iwParam, $ilParam)
 					EndSwitch
 			EndSwitch
 			ExitLoop
+		Next
+	EndIf
+    If $iMsg=$WM_COMMAND Then
+		Local $iCode = _WinAPI_HiWord($iwParam)
+		Local $hView = $ilParam
+		Local $arHwnds = MapKeys($__TreeListExplorer__Data.mViews)
+		For $i=0 To UBound($arHwnds)-1 Step 1
+			If $arHwnds[$i]<>$hView Then ContinueLoop
+			Local $mView = $__TreeListExplorer__Data.mViews[$hView]
+			Local $iSystem = $mView.iSystem
+			Local $iType = $__TreeListExplorer__Data.mViews[$hView].iType
+			Switch $iType
+				Case $__TreeListExplorer__Type_Combo, $__TreeListExplorer__Type_ComboEx
+					Switch $iCode
+						Case $CBN_SELENDOK
+							Local $mOpenPathData[]
+							$mOpenPathData.iType = $iType
+							$mOpenPathData.sFolder = __TreeListExplorer__GetCurrentPath($iSystem)
+							$mOpenPathData.iSystem = $iSystem
+							$mOpenPathData.hView = $hView
+							$__TreeListExplorer__Data["mOpenPathViews"][$hView] = $mOpenPathData
+							__TreeListExplorer__SetViewUpdating($hView, True, $__TreeListExplorer__Status_WaitOpenPath)
+							AdlibRegister("__TreeListExplorer__RegisteredOpenPath", 10)
+					EndSwitch
+			EndSwitch
 		Next
 	EndIf
 	If MapExists($__TreeListExplorer__Data.mGuis, $hWnd) Then Return _WinAPI_CallWindowProc($__TreeListExplorer__Data.mGuis[$hWnd].hPrevProc, $hWnd, $iMsg, $iwParam, $ilParam)
@@ -2124,15 +2457,31 @@ Func __TreeListExplorer__RegisteredOpenPath()
 	For $i=0 to UBound($arViews)-1 Step 1
 		If __TreeListExplorer__IsViewUpdating($arViews[$i], $__TreeListExplorer__Status_WaitOpenPath) Then
 			Local $mOpenPathData = $__TreeListExplorer__Data["mOpenPathViews"][$arViews[$i]]
-			Local $hView = $mOpenPathData.hView
-			Local $arSel[0]
-			If $mOpenPathData.bMarquee Then $arSel = _GUICtrlListView_GetSelectedIndices(HWnd($hView), True)
-			__TreeListExplorer__OpenPath($mOpenPathData.iSystem, $mOpenPathData.sFolder, $mOpenPathData.sSelect)
-			__TreeListExplorer__SetViewUpdating($hView, False, $__TreeListExplorer__Status_WaitOpenPath)
-			If $mOpenPathData.bWasClick Then __TreeListExplorer__HandleViewCallback($hView, "sCallbackClick", $mOpenPathData.iIndex)
-			For $j=1 To UBound($arSel)-1
-				_GUICtrlListView_SetItemSelected($hView, $arSel[$j], True)
-			Next
+			Switch $mOpenPathData.iType
+				Case $__TreeListExplorer__Type_ListView
+					Local $hView = $mOpenPathData.hView
+					Local $arSel[0]
+					If $mOpenPathData.bMarquee Then $arSel = _GUICtrlListView_GetSelectedIndices(HWnd($hView), True)
+					__TreeListExplorer__OpenPath($mOpenPathData.iSystem, $mOpenPathData.sFolder, $mOpenPathData.sSelect)
+					__TreeListExplorer__SetViewUpdating($hView, False, $__TreeListExplorer__Status_WaitOpenPath)
+					If $mOpenPathData.bWasClick Then __TreeListExplorer__HandleViewCallback($hView, "sCallbackClick", $mOpenPathData.iIndex)
+					For $j=1 To UBound($arSel)-1
+						_GUICtrlListView_SetItemSelected($hView, $arSel[$j], True)
+					Next
+				Case $__TreeListExplorer__Type_Combo, $__TreeListExplorer__Type_ComboEx
+					Local $hCombo = -1
+					If $mOpenPathData.iType=$__TreeListExplorer__Type_Combo Then $hCombo = HWnd($mOpenPathData.hView)
+					If $mOpenPathData.iType=$__TreeListExplorer__Type_ComboEx Then $hCombo = _GUICtrlComboBoxEx_GetComboControl($mOpenPathData.hView)
+					If $hCombo<>-1 Then
+						Local $iIndex = _GUICtrlComboBox_GetCurSel($hCombo)
+						If $iIndex>=0 Then
+							Local $sSelText
+							_GUICtrlComboBox_GetLBText($hCombo, $iIndex, $sSelText)
+							Local $arPath = __TreeListExplorer__GetPathAndLast(__TreeListExplorer__GetCurrentPath($mOpenPathData.iSystem) & $sSelText)
+							__TreeListExplorer__OpenPath($mOpenPathData.iSystem, $arPath[0], $arPath[1])
+						EndIf
+					EndIf
+			EndSwitch
 		EndIf
 		MapRemove($__TreeListExplorer__Data.mOpenPathViews, $arViews[$i])
 	Next

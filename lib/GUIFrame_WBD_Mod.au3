@@ -107,7 +107,6 @@ Func _GUIFrame_Create($hWnd, $iSepOrient = 0, $iSepPos = 0, $iSepSize = 5, $iX =
     Local $iSeperator_Pos, $hSeparator, $hFirstFrame, $hSecondFrame, $nSepPercent
 	Local $iFrame_Style = BitOR(0x40000000, 0x10000000) ; $WS_CHILD, WS_VISIBLE
 	Local $iFrame_Ext_Style = 0x02000000 ; WS_EX_COMPOSITED
-    ;Local $iFrame_Ext_Style = 0
 
 	; Set separator size
     Local $iSeparatorSize = 9
