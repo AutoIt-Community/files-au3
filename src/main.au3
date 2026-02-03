@@ -50,9 +50,9 @@ Global $hTLESystem, $iFrame_A, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hI
 Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hParentFrame, $g_iIconWidth, $g_hTreeView
 Global $g_hSizebox, $g_hOldProc, $g_iHeight, $g_hDots
 Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
-Global $hListImgList, $iListDragIndex, $aDragSource, $sTargetCtrl, $hTreeItemOrig, $hIcon
+Global $hListImgList, $iListDragIndex, $sTargetCtrl, $hTreeItemOrig, $hIcon
 Global $sBack, $sForward, $sUpLevel, $sRefresh
-Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $bDragToolActive = False
+Global $sTreeDragItem, $sListDragItems, $bDragToolActive = False
 Global $pLVDropTarget, $pTVDropTarget
 Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
 Global $idExitItem, $idAboutItem
@@ -793,16 +793,26 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 				Case $LVN_ITEMCHANGED
 					; item selection(s) have changed
 					_selectionChangedLV()
-				Case $LVN_BEGINDRAG
+				Case $LVN_BEGINDRAG, $LVN_BEGINRDRAG
 					Local $tNMListView = DllStructCreate($tagNMLISTVIEW, $lParam)
-					Local $sItemText = _GUICtrlListView_GetItemText($tNMHDR.hwndFrom, $tNMLISTVIEW.item)
-					$sItemText = __TreeListExplorer_GetPath($hTLESystem) & $sItemText
-					$bDragTreeList = True
-					$sDragSrc = "List"
 					$hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
 
-					; fire off adlib to get multiple selection drag details
-					AdlibRegister("_ListGetSelections", 10)
+					; create array with list of selected listview items
+					Local $aItems = _GUICtrlListView_GetSelectedIndices($tNMHDR.hwndFrom, True)
+					For $i = 1 To $aItems[0]
+						$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($tNMHDR.hwndFrom, $aItems[$i])
+					Next
+					_ArrayDelete($aItems, 0)
+
+					Local $pDataObj, $pDropSource
+					$pDataObj = GetDataObjectOfFile_B($aItems)
+					;Create an IDropSource to handle our end of the drag/drop operation.
+					$pDropSource = CreateDropSource()
+
+					_SHDoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_COPY, $DROPEFFECT_LINK))
+
+					DestroyDropSource($pDropSource)
+					_Release($pDataObj)
 
 					; there is not supposed to be a Return value on LVN_BEGINDRAG
 					; however it fixes an issue with built-in drag-drop mechanism (now that we use DoDragDrop)
@@ -863,17 +873,11 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 		Case $g_hTreeView
 			Switch $iCode
 				Case $TVN_BEGINDRAGA, $TVN_BEGINDRAGW
-					$aDragSource = ""
 					Local $tTree = DllStructCreate($tagNMTREEVIEW, $lParam)
 					Local $hDragItem = DllStructGetData($tTree, "NewhItem")
-					;$sTreeDragItem = TreeItemToPath($g_hTreeView, $hDragItem)
-					$aDragSource = TreeItemToPath($g_hTreeView, $hDragItem, True)
-					$bDragTreeList = True
-					$sDragSrc = "Tree"
-
 					$hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
 
-					$sItemText = TreeItemToPath($g_hTreeView, $hDragItem)
+					Local $sItemText = TreeItemToPath($g_hTreeView, $hDragItem)
 
 					Local $pDataObj, $pDropSource
 
@@ -1854,18 +1858,6 @@ Func _EventsGUI()
 	EndSwitch
 EndFunc   ;==>_EventsGUI
 
-Func _MsgExample($aDragSource, $sDestination)
-	Local $sMsg
-	$sMsg = "Source Files: " & @CRLF
-	For $i = 1 To $aDragSource[0]
-		$sMsg &= $aDragSource[$i] & @CRLF
-	Next
-	$sMsg &= @CRLF
-	$sMsg &= "Destination: " & @CRLF
-	$sMsg &= $sDestination
-	MsgBox(0, "Example", $sMsg)
-EndFunc   ;==>_MsgExample
-
 Func TreeItemFromPoint($hWnd)
 	Local $tMPos = _WinAPI_GetMousePos(True, $hWnd)
 	Return _GUICtrlTreeView_HitTestItem($hWnd, DllStructGetData($tMPos, 1), DllStructGetData($tMPos, 2))
@@ -1978,60 +1970,6 @@ Func WM_WINDOWPOSCHANGED_Handler($hWnd, $iMsg, $wParam, $lParam)
 	_drawUAHMenuNCBottomLine($hWnd)
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_WINDOWPOSCHANGED_Handler
-
-Func _ListGetSelections()
-	$sListDragItems = ""
-	$aDragSource = ""
-	$aDragSource = _GUICtrlListView_GetSelectedIndices($g_hListview, True)
-	If $aDragSource[0] = 1 Then
-		$iListDragIndex = $aDragSource[1]
-	Else
-		$iListDragIndex = $aDragSource[1]
-	EndIf
-	For $i = 1 To $aDragSource[0]
-		$aDragSource[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $aDragSource[$i], 0)
-		$sListDragItems &= $aDragSource[$i] & " + "
-	Next
-	$sListDragItems = StringTrimRight($sListDragItems, 3)
-
-	_ArrayDelete($aDragSource, 0)
-
-	Local $pDataObj, $pDropSource
-	$pDataObj = GetDataObjectOfFile_B($aDragSource)
-	;Create an IDropSource to handle our end of the drag/drop operation.
-	$pDropSource = CreateDropSource()
-
-	_SHDoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_COPY, $DROPEFFECT_LINK))
-
-	DestroyDropSource($pDropSource)
-	_Release($pDataObj)
-
-	#cs ; old method
-	; drag drop
-	Local $pDataObj, $pDropSource
-
-	;Get an IDataObject representing the file to copy
-	$pDataObj = GetDataObjectOfFile($g_hGUI, $aDragSource[1])
-	If Not @error Then
-
-		;Create an IDropSource to handle our end of the drag/drop operation.
-		$pDropSource = CreateDropSource()
-		If Not @error Then
-			;We allow DROPEFFECT_COPY and DROPEFFECT_LINK. We don't want to DROPEFFECT_MOVE the file!!
-			;DoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_COPY, $DROPEFFECT_LINK))
-			_SHDoDragDrop_old($g_hGUI, $pDataObj, $pDropSource,  BitOR($DROPEFFECT_COPY,$DROPEFFECT_LINK))
-
-			;Operation done, destroy our drop source. (Can't just IUnknown_Release() this one!)
-			DestroyDropSource($pDropSource)
-		EndIf
-
-		;Relase the data object so the system can destroy it (prevent memory leaks)
-		_Release($pDataObj)
-	EndIf
-	#ce
-
-	AdlibUnRegister("_ListGetSelections")
-EndFunc   ;==>_ListGetSelections
 
 Func TreeItemToPath($hTree, $hItem, $bArray = False)
 	Local $sPath = StringReplace(_GUICtrlTreeView_GetTree($hTree, $hItem), "|", "\")
