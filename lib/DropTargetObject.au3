@@ -18,6 +18,7 @@ Global $tagTargetObjIntData = "hwnd hTarget;bool bAcceptDrop;ptr pDataObject;ptr
 Global Const $__g_iTargetObjDataOffset = $PTR_LEN * 2 + 4
 
 Global $hTreeOrig
+Global $iPreviousHot
 
 Func CreateDropTarget($hTarget = 0)
 	$__g_iDropTargetCount += 1
@@ -147,6 +148,7 @@ Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
 	#forceref $pThis, $iKeyState, $iPoint, $piEffect
 
 	Local $sDirText = ""
+	Local $bIsFolder
 
 	Local $tPoint = DllStructCreate($tagPoint)
 	$tPoint.X = _WinAPI_LoDWord($iPoint)
@@ -161,9 +163,10 @@ Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
 		Case $WC_LISTVIEW
 			Local $aListItem = _GUICtrlListView_HitTest($tData.hTarget, $tPoint.X, $tPoint.Y)
 			Local $sItemText = _GUICtrlListView_GetItemText($tData.hTarget, $aListItem[0])
-			Local $sDirPath = __TreeListExplorer_GetPath(1) & $sItemText
-			If StringInStr(FileGetAttrib($sDirPath), "D") Then
+			Local $sFullPath = __TreeListExplorer_GetPath(1) & $sItemText
+			If StringInStr(FileGetAttrib($sFullPath), "D") Then
 				$sDirText = $sItemText
+				$bIsFolder = True
 			Else
 				; get the currently selected path
 				$sDirPath = __TreeListExplorer_GetPath(1)
@@ -179,12 +182,21 @@ Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
 				Local $aPath = _StringBetween($sDirPath, "\", "\")
 				$sDirText = $aPath[UBound($aPath) - 1]
 			EndIf
-			;Local $sDirText = _GUICtrlListView_GetItemText($tData.hTarget, _GUICtrlListView_GetHotItem($tData.hTarget), 0)
-			;$aListItem[0]
+
+			; clear previously DROPHILITED listview item
+			_GUICtrlListView_SetItemState($tData.hTarget, $iPreviousHot, 0, $LVIS_DROPHILITED)
+
 			If $aListItem[0] >= 0 Then
+				$iPreviousHot = $aListItem[0]
 				; bring focus to listview to show hot item (needed for listview to listview drag)
 				_WinAPI_SetFocus($tData.hTarget)
-				_GUICtrlListView_SetHotItem($tData.hTarget, $aListItem[0])
+				;_GUICtrlListView_SetHotItem($tData.hTarget, $aListItem[0])
+				If $bIsFolder Then
+					_GUICtrlListView_SetItemState($tData.hTarget, $aListItem[0], $LVIS_DROPHILITED, $LVIS_DROPHILITED)
+				EndIf
+			Else
+				; clear previously DROPHILITED listview item
+				_GUICtrlListView_SetItemState($tData.hTarget, $iPreviousHot, 0, $LVIS_DROPHILITED)
 			EndIf
 		Case $WC_TREEVIEW
 			;Local $tMPos = _WinAPI_GetMousePos(True, $tData.hTarget)
@@ -223,7 +235,8 @@ Func __Mthd_DragLeave($pThis)
 
 	Switch _WinAPI_GetClassName($tData.hTarget)
 		Case $WC_LISTVIEW
-			;_GUICtrlListView_SetInsertMark($tData.hTarget, -1)
+			; clear previously DROPHILITED listview item
+			_GUICtrlListView_SetItemState($tData.hTarget, $iPreviousHot, 0, $LVIS_DROPHILITED)
 		Case $WC_TREEVIEW
 			; restore original treeview selection if cursor leaves treeview
 			_GUICtrlTreeView_SelectItem($tData.hTarget, $hTreeOrig)
@@ -271,6 +284,8 @@ Func __Mthd_Drop($pThis, $pDataOject, $iKeyState, $iPoint, $piEffect)
 
 		Switch _WinAPI_GetClassName($tData.hTarget)
 			Case $WC_LISTVIEW
+				; clear previously DROPHILITED listview item
+				_GUICtrlListView_SetItemState($tData.hTarget, $iPreviousHot, 0, $LVIS_DROPHILITED)
 				For $i = 1 To $asFilenames[0]
 					;_GUICtrlListView_InsertItem($tData.hTarget, $asFilenames[$i], $vItem)
 					$vItem += 1
