@@ -293,6 +293,8 @@ Func __Mthd_Drop($pThis, $pDataOject, $iKeyState, $iPoint, $piEffect)
 				;_GUICtrlListView_SetInsertMark($tData.hTarget, -1)
 
 			Case $WC_TREEVIEW
+				; restore original treeview selection if cursor leaves treeview
+				_GUICtrlTreeView_SelectItem($tData.hTarget, $hTreeOrig)
 				Local $hInsAfter = _GUICtrlTreeView_GetPrev($tData.hTarget, $vItem)
 				If Not $hInsAfter Then $hInsAfter = $TVI_FIRST
 				For $i = 1 To $asFilenames[0]

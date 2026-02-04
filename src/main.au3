@@ -323,7 +323,6 @@ Func _FilesAu3()
 	; Set resizing flag for all created frames
 	_GUIFrame_ResizeSet(0)
 
-	GUIRegisterMsg($WM_DROPFILES, "WM_DROPFILES")
 	GUIRegisterMsg($WM_COMMAND, "WM_COMMAND2")
 	GUIRegisterMsg($WM_NOTIFY, "WM_NOTIFY2")
 
@@ -802,10 +801,9 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					For $i = 1 To $aItems[0]
 						$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($tNMHDR.hwndFrom, $aItems[$i])
 					Next
-					_ArrayDelete($aItems, 0)
 
 					Local $pDataObj, $pDropSource
-					$pDataObj = GetDataObjectOfFile_B($aItems)
+					$pDataObj = GetDataObjectOfFiles($hWnd, $aItems)
 					;Create an IDropSource to handle our end of the drag/drop operation.
 					$pDropSource = CreateDropSource()
 
@@ -882,7 +880,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					Local $pDataObj, $pDropSource
 
 					;Get an IDataObject representing the file to copy
-					$pDataObj = GetDataObjectOfFile($g_hGUI, $sItemText)
+					$pDataObj = GetDataObjectOfFile($hWnd, $sItemText)
 					If Not @error Then
 
 						;Create an IDropSource to handle our end of the drag/drop operation.
@@ -1983,45 +1981,6 @@ Func TreeItemToPath($hTree, $hItem, $bArray = False)
 	Return $sPath
 EndFunc   ;==>TreeItemToPath
 
-Func WM_DROPFILES($hWnd, $iMsg, $wParam, $lParam)
-	#forceref $hWnd, $iMsg, $wParam, $lParam
-	;First call with 0xFFFFFFFF, get number of files dropped
-    Local $aCall = DllCall($hShell32, "uint", "DragQueryFileW", "hwnd", $wParam, "uint", 0xFFFFFFFF, "ptr", 0, "int", 0)
-	If @error Then Return
-	Local $iFileCount = $aCall[0]
-
-	Local $iBuffSize, $tBuffer, $sAttrib
-    For $i = 0 To $iFileCount - 1
-		;Second call call with 0 for buff size, retrieves required buff size for filename.
-        $aCall = DllCall($hShell32, "uint", "DragQueryFileW", "hwnd", $wParam, "uint", $i, "ptr", 0, "int", 0)
-		If @error Then ContinueLoop
-		$iBuffSize = $aCall[0] + 1
-
-		;Create name buffer and fill.
-		$tBuffer = DllStructCreate(StringFormat("wchar fileName[%d]", $iBuffSize))
-		$aCall = DllCall($hShell32, "uint", "DragQueryFileW", "hwnd", $wParam, "uint", $i, "struct*", $tBuffer, "int", $iBuffSize)
-		If @error Then ContinueLoop
-
-		ConsoleWrite("file name: " & $tBuffer.fileName & @CRLF)
-		ConsoleWrite("handle: " & $hWnd & @CRLF)
-		If $hWnd = _GUIFrame_GetHandle($iFrame_A, 1) Then ConsoleWrite("dropped on treeview" & @CRLF)
-		If $hWnd = _GUIFrame_GetHandle($iFrame_A, 2) Then ConsoleWrite("dropped on listview" & @CRLF)
-		#cs
-		;Only add file if is not hidden, not a dir, not already in the list!
-		If _GUICtrlListView_FindText($hListView, $tBuffer.fileName) = -1 Then
-			$sAttrib = FileGetAttrib($tBuffer.fileName)
-			If StringRegExp($sAttrib, "D|H") Then ContinueLoop
-			_GUICtrlListView_AddItem($hListView, $tBuffer.fileName)
-		EndIf
-		#ce
-    Next
-
-	; restore proper state back to original treeview selection
-	_GUICtrlTreeView_SelectItem($g_hTreeView, $hTreeItemOrig)
-
-	Return
-EndFunc
-
 ;Convert @error codes from DllCall into win32 codes.
 Func TranslateDllError($iError = @error)
 	Switch $iError
@@ -2038,22 +1997,6 @@ Func CoTaskMemFree($pMemBlock)
 	DllCall("Ole32.dll", "none", "CoTaskMemFree", "ptr", $pMemBlock)
 EndFunc   ;==>CoTaskMemFree
 
-Func DoDragDrop($pDataObj, $pDropSource, $iOKEffects)
-	;We must pass a IID_IDropSource ptr.
-	$pDropSource = _QueryInterface($pDropSource, $sIID_IDropSource)
-	_Release($pDropSource)
-
-	Local $aCall = DllCall("ole32.dll", "long", "DoDragDrop", "ptr", $pDataObj, "ptr", $pDropSource, "dword", $iOKEffects, "ptr*", 0)
-	If @error Then Return SetError(@error, @extended, $aCall)
-	Return SetError($aCall[0], 0, $aCall[4])
-EndFunc   ;==>DoDragDrop
-
-; DoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_COPY, $DROPEFFECT_LINK))
-; _SHDoDragDrop($hGUI, $pDataObj, $pDropSource,  BitOR($DROPEFFECT_COPY,$DROPEFFECT_LINK))
-Func _SHDoDragDrop_old($hWnd, ByRef $pDataObj, ByRef $pDropSource, $dwDropEffects)
-    DllCall($hShell32,"lresult","SHDoDragDrop", "hwnd", Null, "ptr", $pDataObj,"ptr", Null, "dword", BitOR($DROPEFFECT_COPY,$DROPEFFECT_LINK), "dword*", 0)
-EndFunc
-
 Func _SHDoDragDrop($pDataObj, $pDropSource, $iOKEffects)
     ;We must pass a IID_IDropSource ptr.
     $pDropSource = _QueryInterface($pDropSource, $sIID_IDropSource)
@@ -2067,122 +2010,6 @@ Func _SHDoDragDrop($pDataObj, $pDropSource, $iOKEffects)
     If @error Then Return SetError(@error, @extended, $aCall)
     Return SetError($aCall[0], 0, $aCall[4])
 EndFunc   ;==>_SHDoDragDrop
-
-Func GetDataObjectOfFile_B(ByRef $sPath)
-    Local $iCount = UBound($sPath)
-    If $iCount = 0 Then Return 0
-
-    Local $sParentPath = StringLeft($sPath[0], StringInStr($sPath[0], "\", 0, -1) - 1)
-    Local $pParentPidl = _WinAPI_ShellILCreateFromPath($sParentPath)
-
-    Local $tPidls = DllStructCreate("ptr[" & $iCount & "]")
-
-    Local $pFullPidl, $pRelativePidl, $last_SHITEMID
-    For $i = 0 To $iCount - 1
-        $pFullPidl = _WinAPI_ShellILCreateFromPath($sPath[$i])
-        $last_SHITEMID = DllCall($hShell32, "ptr", "ILFindLastID", "ptr", $pFullPidl)[0]
-        $pRelativePidl = DllCall($hShell32, "ptr", "ILClone", "ptr", $last_SHITEMID)[0]
-        DllStructSetData($tPidls, 1, $pRelativePidl, $i + 1)
-        DllCall($hShell32, "none", "ILFree", "ptr", $pFullPidl)
-    Next
-
-    Local $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
-    Local $pIDataObject = __SHCreateDataObject($tIID_IDataObject, $pParentPidl, $iCount, DllStructGetPtr($tPidls), 0)
-
-    DllCall($hShell32, "none", "ILFree", "ptr", $pParentPidl)
-    For $i = 1 To $iCount
-        DllCall($hShell32, "none", "ILFree", "ptr", DllStructGetData($tPidls, 1, $i))
-    Next
-
-    If Not $pIDataObject Then Return 0
-    Return $pIDataObject
-EndFunc
-
-Func GetDataObjectOfFile_C(ByRef $sPath)
-    If UBound($sPath) = 0 Then Return 0
-
-    Local $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
-    Local $pIDataObject = __SHCreateDataObject($tIID_IDataObject, 0, 0, 0, 0)
-    If Not $pIDataObject Then Return 0
-
-    Local Const $tag_IDataObject = _
-                        "GetData hresult(ptr;ptr*);" & _
-                        "GetDataHere hresult(ptr;ptr*);" & _
-                        "QueryGetData hresult(ptr);" & _
-                        "GetCanonicalFormatEtc hresult(ptr;ptr*);" & _
-                        "SetData hresult(ptr;ptr;bool);" & _
-                        "EnumFormatEtc hresult(dword;ptr*);" & _
-                        "DAdvise hresult(ptr;dword;ptr;dword*);" & _
-                        "DUnadvise hresult(dword);" & _
-                        "EnumDAdvise hresult(ptr*);"
-    Local $oIDataObject = ObjCreateInterface($pIDataObject, $sIID_IDataObject, $tag_IDataObject)
-    If Not IsObj($oIDataObject) Then
-        _Release($pIDataObject)
-        Return 0
-    Endif
-
-    Local $tFORMATETC, $tSTGMEDIUM
-    __Fill_tag_FORMATETC($tFORMATETC)
-    __Fill_tag_STGMEDIUM($tSTGMEDIUM, $sPath)
-
-    $oIDataObject.SetData(DllStructGetPtr($tFORMATETC), DllStructGetPtr($tSTGMEDIUM), 1)
-    _AddRef($pIDataObject)
-
-    Return $pIDataObject
-EndFunc
-
-Func __Fill_tag_FORMATETC(Byref $tFORMATETC)
-    Local Const $CF_HDROP = 15
-    Local Const $TYMED_HGLOBAL = 1
-
-    $tFORMATETC = DllStructCreate("ushort cfFormat; ptr ptd; uint dwAspect; int lindex; uint tymed")
-    DllStructSetData($tFORMATETC, "cfFormat", $CF_HDROP)
-    DllStructSetData($tFORMATETC, "dwAspect", 1)
-    DllStructSetData($tFORMATETC, "lindex", -1)
-    DllStructSetData($tFORMATETC, "tymed", $TYMED_HGLOBAL)
-EndFunc
-
-Func __Fill_tag_STGMEDIUM(Byref $tSTGMEDIUM, Byref $aFiles)
-    Local Const $CF_HDROP = 15
-    Local Const $TYMED_HGLOBAL = 1
-
-    Local $sFileList = ""
-    For $i = 0 To UBound($aFiles) - 1
-        $sFileList &= $aFiles[$i] & Chr(0)
-    Next
-    $sFileList &= Chr(0)
-
-    Local $iSize = 20 + (StringLen($sFileList) * 2)
-
-    Local $hGlobal = DllCall($hKernel32, "ptr", "GlobalAlloc", "uint", 0x2042, "ulong_ptr", $iSize)[0]
-    Local $pLock = DllCall($hKernel32, "ptr", "GlobalLock", "ptr", $hGlobal)[0]
-
-    Local $tDROPFILES = DllStructCreate("dword pFiles; int x; int y; bool fNC; bool fWide", $pLock)
-    DllStructSetData($tDROPFILES, "pFiles", 20) 
-    DllStructSetData($tDROPFILES, "fWide", True)
-
-    Local $tPaths = DllStructCreate("wchar[" & StringLen($sFileList) & "]", $pLock + 20)
-    DllStructSetData($tPaths, 1, $sFileList)
-
-    DllCall($hKernel32, "bool", "GlobalUnlock", "ptr", $hGlobal)
-
-    $tSTGMEDIUM = DllStructCreate("uint tymed; ptr hGlobal; ptr pUnkForRelease")
-    DllStructSetData($tSTGMEDIUM, "tymed", $TYMED_HGLOBAL)
-    DllStructSetData($tSTGMEDIUM, "hGlobal", $hGlobal)
-    DllStructSetData($tSTGMEDIUM, "pUnkForRelease", 0)
-EndFunc
-
-Func __SHCreateDataObject($tIID_IDataObject, $ppidlFolder = 0, $cidl = 0, $papidl = 0, $pdtInner = 0)
-    Local $aRes = DllCall($hShell32, "long", "SHCreateDataObject", _
-                                         "ptr", $ppidlFolder, _          
-                                         "uint", $cidl, _
-                                         "ptr", $papidl, _ 
-                                         "ptr", $pdtInner, _
-                                         "struct*", $tIID_IDataObject, _
-                                         "ptr*", 0)
-    If @error Then Return SetError(1, 0, $aRes[0])
-    Return $aRes[6]
-EndFunc
 
 Func GetDataObjectOfFile($hWnd, $sPath)
 	;Get the path as an idList. This is allocated memory that we should free later on.
@@ -2214,14 +2041,46 @@ Func GetDataObjectOfFile($hWnd, $sPath)
 	Return SetError($iError, 0, Ptr($pDataObject))
 EndFunc   ;==>GetDataObjectOfFile
 
+Func GetDataObjectOfFiles($hWnd, $asPaths)
+	;If we use the DesktopFolder object as the parent, children can all be defined by normal file paths.
+	;So we don't need to worry about sibling folders to the root etc...
+
+	Local $aCall = DllCall("Shell32.dll", "long", "SHGetDesktopFolder", "ptr*", 0)
+	Local $iError = @error ? TranslateDllError() : $aCall[0]
+	If $iError Then Return SetError($iError, 0, False)
+
+	Local $pShellFolder = $aCall[1]
+	Local $tChildren = DllStructCreate(StringFormat("ptr pIdls[%d]", UBound($asPaths)))
+
+	Local $iEaten, $pChildIDL, $iAttributes
+	Local $oShellFolder = ObjCreateInterface($pShellFolder, $sIID_IShellFolder, $tagIShellFolder)
+
+	For $i = 1 To $asPaths[0]
+		$oShellFolder.ParseDisplayName($hWnd, 0, $asPaths[$i], $iEaten, $pChildIDL, $iAttributes)
+		$tChildren.pIdls(($i)) = $pChildIDL
+	Next
+
+	;We have an interface tag for IShellFolder, so we can use ObjCreateInterface to "convert" it into an object datatype.
+	;$oShellFolder will automatically release when it goes out of scope, so we don't need to manually _Release($pShellFolder).
+	Local $pDataObject, $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
+	$iError = $oShellFolder.GetUIObjectOf($hWnd,  $asPaths[0], DllStructGetPtr($tChildren), $tIID_IDataObject, 0, $pDataObject)
+
+	;Free the IDLs now we have a data object.
+	For $i = 1 To $asPaths[0]
+		CoTaskMemFree($tChildren.pIdls(($i)) & @CRLF)
+	Next
+
+	Return SetError($iError, 0, Ptr($pDataObject))
+EndFunc   ;==>GetDataObjectOfFiles
+
 Func RegisterDragDrop($hWnd, $pDropTarget)
 	Local $aCall = DllCall("ole32.dll", "long", "RegisterDragDrop", "hwnd", $hWnd, "ptr", $pDropTarget)
 	If @error Then Return SetError(TranslateDllError(), 0, False)
 	Return SetError($aCall[0], 0, $aCall[0] = $S_OK)
-EndFunc
+EndFunc   ;==>RegisterDragDrop
 
 Func RevokeDragDrop($hWnd)
 	Local $aCall = DllCall("ole32.dll", "long", "RevokeDragDrop", "hwnd", $hWnd)
 	If @error Then Return SetError(TranslateDllError(), 0, False)
 	Return SetError($aCall[0], 0, $aCall[0] = $S_OK)
-EndFunc
+EndFunc   ;==>RevokeDragDrop
