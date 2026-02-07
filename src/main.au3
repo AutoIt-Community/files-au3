@@ -11,12 +11,20 @@
 #include <WindowsNotifsConstants.au3>
 #include <WindowsStylesConstants.au3>
 
+Global $hKernel32 = DllOpen('kernel32.dll')
+Global $hGdi32 = DllOpen('gdi32.dll')
+Global $hUser32 = DllOpen('user32.dll')
+Global $hShlwapi = DllOpen('shlwapi.dll')
+Global $hShell32 = DllOpen('shell32.dll')
+
+#include "../lib/SharedFunctions.au3"
 #include "../lib/GUIFrame_WBD_Mod.au3"
 #include "../lib/History.au3"
 #include "../lib/TreeListExplorer.au3"
 #include "../lib/ProjectConstants.au3"
 #include "../lib/DropSourceObject.au3"
 #include "../lib/DropTargetObject.au3"
+;#include "../lib/IFileOperation.au3"
 
 ; CREDITS:
 ; Kanashius     TreeListExplorer UDF
@@ -32,6 +40,7 @@
 ; DonChunior    Code review, bug fixes and refactoring
 ; MattyD		Drag and drop code
 ; jugador		ListView multiple item drag and drop
+; Danyfirex		IFileOperation code
 
 Global $sVersion = "0.4.0 - 2026-01-22"
 
@@ -66,12 +75,6 @@ Global $iTopSpacer = Round(12 * $iDPI)
 Global $aPosTip, $iOldaPos0, $iOldaPos1
 ; force light mode
 ;$isDarkMode = False
-
-Global $hKernel32 = DllOpen('kernel32.dll')
-Global $hGdi32 = DllOpen('gdi32.dll')
-Global $hUser32 = DllOpen('user32.dll')
-Global $hShlwapi = DllOpen('shlwapi.dll')
-Global $hShell32 = DllOpen('shell32.dll')
 
 ; get Windows build
 Global $iOSBuild = @OSBuild
@@ -803,11 +806,16 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					Next
 
 					Local $pDataObj, $pDropSource
-					$pDataObj = GetDataObjectOfFiles($hWnd, $aItems)
+					;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
+
+					_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
+					$pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+
 					;Create an IDropSource to handle our end of the drag/drop operation.
 					$pDropSource = CreateDropSource()
 
-					_SHDoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_COPY, $DROPEFFECT_LINK))
+					_SHDoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_MOVE, $DROPEFFECT_COPY, $DROPEFFECT_LINK))
+					;__TreeListExplorer_Reload($hTLESystem)
 
 					DestroyDropSource($pDropSource)
 					_Release($pDataObj)
@@ -870,7 +878,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 			EndSwitch
 		Case $g_hTreeView
 			Switch $iCode
-				Case $TVN_BEGINDRAGA, $TVN_BEGINDRAGW
+				Case $TVN_BEGINDRAGW, $TVN_BEGINRDRAGW
 					Local $tTree = DllStructCreate($tagNMTREEVIEW, $lParam)
 					Local $hDragItem = DllStructGetData($tTree, "NewhItem")
 					$hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
@@ -889,7 +897,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						If Not @error Then
 							;We allow DROPEFFECT_COPY and DROPEFFECT_LINK. We don't want to DROPEFFECT_MOVE the file!!
 							;DoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_COPY, $DROPEFFECT_LINK))
-							_SHDoDragDrop($pDataObj, $pDropSource,  BitOR($DROPEFFECT_COPY, $DROPEFFECT_LINK))
+							_SHDoDragDrop($pDataObj, $pDropSource,  BitOR($DROPEFFECT_MOVE, $DROPEFFECT_COPY, $DROPEFFECT_LINK))
+							;__TreeListExplorer_Reload($hTLESystem)
 
 							;Operation done, destroy our drop source. (Can't just IUnknown_Release() this one!)
 							DestroyDropSource($pDropSource)
@@ -1135,182 +1144,6 @@ Func _InitDarkSizebox()
 	$g_hDots = CreateDots($g_iHeight, $g_iHeight, 0x00000000 + $iBackColorDef, 0xFF000000 + 0xBFBFBF)
 EndFunc   ;==>_InitDarkSizebox
 
-Func __Timer_QueryPerformanceFrequency_mod()
-	Local $aCall = DllCall($hKernel32, "bool", "QueryPerformanceFrequency", "int64*", 0)
-	If @error Then Return SetError(@error, @extended, 0)
-	Return SetExtended($aCall[0], $aCall[1])
-EndFunc   ;==>__Timer_QueryPerformanceFrequency_mod
-
-Func __Timer_QueryPerformanceCounter_mod()
-	Local $aCall = DllCall($hKernel32, "bool", "QueryPerformanceCounter", "int64*", 0)
-	If @error Then Return SetError(@error, @extended, -1)
-	Return SetExtended($aCall[0], $aCall[1])
-EndFunc   ;==>__Timer_QueryPerformanceCounter_mod
-
-Func _Timer_Diff_mod($iTimeStamp)
-	Return 1000 * (__Timer_QueryPerformanceCounter_mod() - $iTimeStamp) / __Timer_QueryPerformanceFrequency_mod()
-EndFunc   ;==>_Timer_Diff_mod
-
-Func _Timer_Init_mod()
-	Return __Timer_QueryPerformanceCounter_mod()
-EndFunc   ;==>_Timer_Init_mod
-
-Func _WinAPI_ReleaseDC_mod($hWnd, $hDC)
-	Local $aCall = DllCall($hUser32, "int", "ReleaseDC", "hwnd", $hWnd, "handle", $hDC)
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_ReleaseDC_mod
-
-Func _WinAPI_GetDCEx_mod($hWnd, $hRgn, $iFlags)
-	Local $aCall = DllCall($hUser32, 'handle', 'GetDCEx', 'hwnd', $hWnd, 'handle', $hRgn, 'dword', $iFlags)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_GetDCEx_mod
-
-Func _WinAPI_CreateRectRgn_mod($iLeftRect, $iTopRect, $iRightRect, $iBottomRect)
-	Local $aCall = DllCall($hGdi32, "handle", "CreateRectRgn", "int", $iLeftRect, "int", $iTopRect, "int", $iRightRect, _
-			"int", $iBottomRect)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_CreateRectRgn_mod
-
-Func _WinAPI_OffsetRect_mod(ByRef $tRECT, $iDX, $iDY)
-	Local $aCall = DllCall($hUser32, 'bool', 'OffsetRect', 'struct*', $tRECT, 'int', $iDX, 'int', $iDY)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_OffsetRect_mod
-
-Func _WinAPI_GetWindowRect_mod($hWnd)
-	Local $tRECT = DllStructCreate($tagRECT)
-	Local $aCall = DllCall($hUser32, "bool", "GetWindowRect", "hwnd", $hWnd, "struct*", $tRECT)
-	If @error Or Not $aCall[0] Then Return SetError(@error + 10, @extended, 0)
-
-	Return $tRECT
-EndFunc   ;==>_WinAPI_GetWindowRect_mod
-
-Func _WinAPI_ShellGetFileInfo_mod($sFilePath, $iFlags, $iAttributes, ByRef $tSHFILEINFO)
-	Local $aCall = DllCall($hShell32, 'dword_ptr', 'SHGetFileInfoW', 'wstr', $sFilePath, 'dword', $iAttributes, _
-			'struct*', $tSHFILEINFO, 'uint', DllStructGetSize($tSHFILEINFO), 'uint', $iFlags)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_ShellGetFileInfo_mod
-
-Func _WinAPI_GetClientRect_mod($hWnd)
-	Local $tRECT = DllStructCreate($tagRECT)
-	Local $aCall = DllCall($hUser32, "bool", "GetClientRect", "hwnd", $hWnd, "struct*", $tRECT)
-	If @error Or Not $aCall[0] Then Return SetError(@error + 10, @extended, 0)
-
-	Return $tRECT
-EndFunc   ;==>_WinAPI_GetClientRect_mod
-
-Func _WinAPI_GetWindowLong_mod($hWnd, $iIndex)
-	Local $sFuncName = "GetWindowLongW"
-	If @AutoItX64 Then $sFuncName = "GetWindowLongPtrW"
-	Local $aCall = DllCall($hUser32, "long_ptr", $sFuncName, "hwnd", $hWnd, "int", $iIndex)
-	If @error Or Not $aCall[0] Then Return SetError(@error + 10, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_GetWindowLong_mod
-
-Func _WinAPI_DefWindowProc_mod($hWnd, $iMsg, $wParam, $lParam)
-	Local $aCall = DllCall($hUser32, "lresult", "DefWindowProc", "hwnd", $hWnd, "uint", $iMsg, "wparam", $wParam, _
-			"lparam", $lParam)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_DefWindowProc_mod
-
-Func _WinAPI_SetLastError_mod($iErrorCode, Const $_iCallerError = @error, Const $_iCallerExtended = @extended)
-	DllCall($hKernel32, "none", "SetLastError", "dword", $iErrorCode)
-	Return SetError($_iCallerError, $_iCallerExtended, Null)
-EndFunc   ;==>_WinAPI_SetLastError_mod
-
-Func _WinAPI_SetWindowLong_mod($hWnd, $iIndex, $iValue)
-	_WinAPI_SetLastError_mod(0) ; as suggested in MSDN
-	Local $sFuncName = "SetWindowLongW"
-	If @AutoItX64 Then $sFuncName = "SetWindowLongPtrW"
-	Local $aCall = DllCall($hUser32, "long_ptr", $sFuncName, "hwnd", $hWnd, "int", $iIndex, "long_ptr", $iValue)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_SetWindowLong_mod
-
-Func _WinAPI_SetWindowPos_mod($hWnd, $hAfter, $iX, $iY, $iCX, $iCY, $iFlags)
-	Local $aCall = DllCall($hUser32, "bool", "SetWindowPos", "hwnd", $hWnd, "hwnd", $hAfter, "int", $iX, "int", $iY, _
-			"int", $iCX, "int", $iCY, "uint", $iFlags)
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_SetWindowPos_mod
-
-Func _WinAPI_DrawText_mod($hDC, $sText, ByRef $tRECT, $iFlags)
-	Local $aCall = DllCall($hUser32, "int", "DrawTextW", "handle", $hDC, "wstr", $sText, "int", -1, "struct*", $tRECT, _
-			"uint", $iFlags)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_DrawText_mod
-
-Func _WinAPI_SetBkColor_mod($hDC, $iColor)
-	Local $aCall = DllCall($hGdi32, "INT", "SetBkColor", "handle", $hDC, "INT", $iColor)
-	If @error Then Return SetError(@error, @extended, -1)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_SetBkColor_mod
-
-Func _WinAPI_DeleteObject_mod($hObject)
-	Local $aCall = DllCall($hGdi32, "bool", "DeleteObject", "handle", $hObject)
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_DeleteObject_mod
-
-Func _WinAPI_InflateRect_mod(ByRef $tRECT, $iDX, $iDY)
-	Local $aCall = DllCall($hUser32, 'bool', 'InflateRect', 'struct*', $tRECT, 'int', $iDX, 'int', $iDY)
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_InflateRect_mod
-
-Func _WinAPI_FillRect_mod($hDC, $tRECT, $hBrush)
-	Local $aCall
-	If IsPtr($hBrush) Then
-		$aCall = DllCall($hUser32, "int", "FillRect", "handle", $hDC, "struct*", $tRECT, "handle", $hBrush)
-	Else
-		$aCall = DllCall($hUser32, "int", "FillRect", "handle", $hDC, "struct*", $tRECT, "dword_ptr", $hBrush)
-	EndIf
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_FillRect_mod
-
-Func _WinAPI_CreateSolidBrush_mod($iColor)
-	Local $aCall = DllCall($hGdi32, "handle", "CreateSolidBrush", "INT", $iColor)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_CreateSolidBrush_mod
-
-Func _WinAPI_GetClassName_mod($hWnd)
-	If Not IsHWnd($hWnd) Then $hWnd = GUICtrlGetHandle($hWnd)
-	Local $aCall = DllCall($hUser32, "int", "GetClassNameW", "hwnd", $hWnd, "wstr", "", "int", 4096)
-	If @error Or Not $aCall[0] Then Return SetError(@error, @extended, '')
-
-	Return SetExtended($aCall[0], $aCall[2])
-EndFunc   ;==>_WinAPI_GetClassName_mod
-
-Func _WinAPI_SetTextColor_mod($hDC, $iColor)
-	Local $aCall = DllCall($hGdi32, "INT", "SetTextColor", "handle", $hDC, "INT", $iColor)
-	If @error Then Return SetError(@error, @extended, -1)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_SetTextColor_mod
-
 ; Resize the status bar when GUI size changes
 Func WM_SIZE($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $hWnd, $iMsg, $wParam, $lParam
@@ -1511,13 +1344,6 @@ Func WM_DRAWITEM2($hWnd, $Msg, $wParam, $lParam)
 
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_DRAWITEM2
-
-Func _WinAPI_PathIsRoot_mod($sFilePath)
-	Local $aCall = DllCall($hShlwapi, 'bool', 'PathIsRootW', 'wstr', $sFilePath & "\")
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_PathIsRoot_mod
 
 ;==============================================
 Func ScrollbarProc($hWnd, $iMsg, $wParam, $lParam) ; Andreik
@@ -1969,18 +1795,6 @@ Func WM_WINDOWPOSCHANGED_Handler($hWnd, $iMsg, $wParam, $lParam)
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_WINDOWPOSCHANGED_Handler
 
-Func TreeItemToPath($hTree, $hItem, $bArray = False)
-	Local $sPath = StringReplace(_GUICtrlTreeView_GetTree($hTree, $hItem), "|", "\")
-	$sPath = StringTrimLeft($sPath, StringInStr($sPath, "\"))     ; remove this pc at the beginning
-	If StringInStr(FileGetAttrib($sPath), "D") Then $sPath &= "\"   ; let folders end with \
-	If $bArray Then
-		Local $aPath = _ArrayFromString($sPath)
-		_ArrayInsert($aPath, 0, 1)
-		Return $aPath
-	EndIf
-	Return $sPath
-EndFunc   ;==>TreeItemToPath
-
 ;Convert @error codes from DllCall into win32 codes.
 Func TranslateDllError($iError = @error)
 	Switch $iError
@@ -2004,8 +1818,6 @@ Func _SHDoDragDrop($pDataObj, $pDropSource, $iOKEffects)
 
 	;Local $aCall = DllCall($hShell32, "long", "SHDoDragDrop", "hwnd", $g_hGUI, "ptr", $pDataObj, "ptr", $pDropSource, "dword", $iOKEffects, "ptr*", 0)
 	Local $aCall = DllCall($hShell32, "long", "SHDoDragDrop", "hwnd", Null, "ptr", $pDataObj, "ptr", Null, "dword", $iOKEffects, "ptr*", 0)
-
-	If Hex($aCall[5], 1) = $DROPEFFECT_COPY Then ConsoleWrite("copy success" & @CRLF)
 
     If @error Then Return SetError(@error, @extended, $aCall)
     Return SetError($aCall[0], 0, $aCall[4])
@@ -2084,3 +1896,125 @@ Func RevokeDragDrop($hWnd)
 	If @error Then Return SetError(TranslateDllError(), 0, False)
 	Return SetError($aCall[0], 0, $aCall[0] = $S_OK)
 EndFunc   ;==>RevokeDragDrop
+
+
+; jugador code
+
+Func GetDataObjectOfFile_B(ByRef $sPath)
+    Local $iCount = UBound($sPath)
+    If $iCount = 0 Then Return 0
+
+    Local $sParentPath = StringLeft($sPath[0], StringInStr($sPath[0], "\", 0, -1) - 1)
+    Local $pParentPidl = _WinAPI_ShellILCreateFromPath($sParentPath)
+
+    Local $tPidls = DllStructCreate("ptr[" & $iCount & "]")
+
+    Local $pFullPidl, $pRelativePidl, $last_SHITEMID
+    For $i = 0 To $iCount - 1
+        $pFullPidl = _WinAPI_ShellILCreateFromPath($sPath[$i])
+        $last_SHITEMID = DllCall($hShell32, "ptr", "ILFindLastID", "ptr", $pFullPidl)[0]
+        $pRelativePidl = DllCall($hShell32, "ptr", "ILClone", "ptr", $last_SHITEMID)[0]
+        DllStructSetData($tPidls, 1, $pRelativePidl, $i + 1)
+        DllCall($hShell32, "none", "ILFree", "ptr", $pFullPidl)
+    Next
+
+    Local $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
+    Local $pIDataObject = __SHCreateDataObject($tIID_IDataObject, $pParentPidl, $iCount, DllStructGetPtr($tPidls), 0)
+
+    DllCall($hShell32, "none", "ILFree", "ptr", $pParentPidl)
+    For $i = 1 To $iCount
+        DllCall($hShell32, "none", "ILFree", "ptr", DllStructGetData($tPidls, 1, $i))
+    Next
+
+    If Not $pIDataObject Then Return 0
+    Return $pIDataObject
+EndFunc
+
+Func GetDataObjectOfFile_C(ByRef $sPath)
+    If UBound($sPath) = 0 Then Return 0
+
+    Local $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
+    Local $pIDataObject = __SHCreateDataObject($tIID_IDataObject, 0, 0, 0, 0)
+    If Not $pIDataObject Then Return 0
+
+    Local Const $tag_IDataObject = _
+                        "GetData hresult(ptr;ptr*);" & _
+                        "GetDataHere hresult(ptr;ptr*);" & _
+                        "QueryGetData hresult(ptr);" & _
+                        "GetCanonicalFormatEtc hresult(ptr;ptr*);" & _
+                        "SetData hresult(ptr;ptr;bool);" & _
+                        "EnumFormatEtc hresult(dword;ptr*);" & _
+                        "DAdvise hresult(ptr;dword;ptr;dword*);" & _
+                        "DUnadvise hresult(dword);" & _
+                        "EnumDAdvise hresult(ptr*);"
+    Local $oIDataObject = ObjCreateInterface($pIDataObject, $sIID_IDataObject, $tag_IDataObject)
+    If Not IsObj($oIDataObject) Then
+        _Release($pIDataObject)
+        Return 0
+    Endif
+
+    Local $tFORMATETC, $tSTGMEDIUM
+    __Fill_tag_FORMATETC($tFORMATETC)
+    __Fill_tag_STGMEDIUM($tSTGMEDIUM, $sPath)
+
+    $oIDataObject.SetData(DllStructGetPtr($tFORMATETC), DllStructGetPtr($tSTGMEDIUM), 1)
+    _AddRef($pIDataObject)
+
+    Return $pIDataObject
+EndFunc
+
+Func __Fill_tag_FORMATETC(Byref $tFORMATETC)
+    Local Const $CF_HDROP = 15
+    Local Const $TYMED_HGLOBAL = 1
+
+    $tFORMATETC = DllStructCreate("ushort cfFormat; ptr ptd; uint dwAspect; int lindex; uint tymed")
+    DllStructSetData($tFORMATETC, "cfFormat", $CF_HDROP)
+    DllStructSetData($tFORMATETC, "dwAspect", 1)
+    DllStructSetData($tFORMATETC, "lindex", -1)
+    DllStructSetData($tFORMATETC, "tymed", $TYMED_HGLOBAL)
+EndFunc
+
+Func __Fill_tag_STGMEDIUM(Byref $tSTGMEDIUM, Byref $aFiles)
+    Local Const $CF_HDROP = 15
+    Local Const $TYMED_HGLOBAL = 1
+
+    Local $sFileList = ""
+    For $i = 0 To UBound($aFiles) - 1
+        $sFileList &= $aFiles[$i] & Chr(0)
+    Next
+    $sFileList &= Chr(0)
+
+    Local $iSize = 20 + (StringLen($sFileList) * 2)
+
+    Local $hGlobal = DllCall($hKernel32, "ptr", "GlobalAlloc", "uint", 0x2042, "ulong_ptr", $iSize)[0]
+    Local $pLock = DllCall($hKernel32, "ptr", "GlobalLock", "ptr", $hGlobal)[0]
+
+    Local $tDROPFILES = DllStructCreate("dword pFiles; int x; int y; bool fNC; bool fWide", $pLock)
+    DllStructSetData($tDROPFILES, "pFiles", 20) 
+    DllStructSetData($tDROPFILES, "fWide", True)
+
+    Local $tPaths = DllStructCreate("wchar[" & StringLen($sFileList) & "]", $pLock + 20)
+    DllStructSetData($tPaths, 1, $sFileList)
+
+    DllCall($hKernel32, "bool", "GlobalUnlock", "ptr", $hGlobal)
+
+    $tSTGMEDIUM = DllStructCreate("uint tymed; ptr hGlobal; ptr pUnkForRelease")
+    DllStructSetData($tSTGMEDIUM, "tymed", $TYMED_HGLOBAL)
+    DllStructSetData($tSTGMEDIUM, "hGlobal", $hGlobal)
+    DllStructSetData($tSTGMEDIUM, "pUnkForRelease", 0)
+EndFunc
+
+Func __SHCreateDataObject($tIID_IDataObject, $ppidlFolder = 0, $cidl = 0, $papidl = 0, $pdtInner = 0)
+    Local $aRes = DllCall($hShell32, "long", "SHCreateDataObject", _
+                                         "ptr", $ppidlFolder, _          
+                                         "uint", $cidl, _
+                                         "ptr", $papidl, _ 
+                                         "ptr", $pdtInner, _
+                                         "struct*", $tIID_IDataObject, _
+                                         "ptr*", 0)
+    If @error Then Return SetError(1, 0, $aRes[0])
+    Return $aRes[6]
+EndFunc
+
+; jugador code above
+

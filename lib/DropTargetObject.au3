@@ -11,6 +11,8 @@
 
 #include <String.au3>
 #include "TreeListExplorer.au3"
+#include "IFileOperation.au3"
+#include "SharedFunctions.au3"
 
 Global $__g_iDropTargetCount
 Global $__g_hMthd_DragEnter, $__g_hMthd_DragOver, $__g_hMthd_DragLeave, $__g_hMthd_Drop
@@ -18,7 +20,8 @@ Global $tagTargetObjIntData = "hwnd hTarget;bool bAcceptDrop;ptr pDataObject;ptr
 Global Const $__g_iTargetObjDataOffset = $PTR_LEN * 2 + 4
 
 Global $hTreeOrig
-Global $iPreviousHot
+Global $iPreviousHot, $sDropTV, $iFinalEffect
+Global $sSourceDrive, $sSourcePath, $bIsSameDrive, $bIsSameFolder
 
 Func CreateDropTarget($hTarget = 0)
 	$__g_iDropTargetCount += 1
@@ -90,9 +93,9 @@ Func DestroyDropTarget($pObject)
 	EndIf
 EndFunc   ;==>DestroyDropTarget
 
-Func __Mthd_DragEnter($pThis, $pDataOject, $iKeyState, $iPoint, $piEffect)
+Func __Mthd_DragEnter($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 
-	#forceref $pThis, $pDataOject, $iKeyState, $iPoint, $piEffect
+	#forceref $pThis, $pDataObject, $iKeyState, $iPoint, $piEffect
 
 	Local $sDirText = ""
 
@@ -103,9 +106,9 @@ Func __Mthd_DragEnter($pThis, $pDataOject, $iKeyState, $iPoint, $piEffect)
 	Local $pData = DllStructGetData(DllStructCreate("ptr", Ptr($pThis + $__g_iTargetObjDataOffset)), 1)
 	Local $tData = DllStructCreate($tagTargetObjIntData, $pData)
 	$tData.bAcceptDrop = False
-	$tData.pDataObject = $pDataOject
+	$tData.pDataObject = $pDataObject
 
-	Local $oDataObject = ObjCreateInterface($pDataOject, $sIID_IDataObject, $tagIDataObject)
+	Local $oDataObject = ObjCreateInterface($pDataObject, $sIID_IDataObject, $tagIDataObject)
 	;Addref to counteract the automatic release() when $oDataObject falls out of scope.
 	$oDataObject.AddRef()
 
@@ -124,7 +127,28 @@ Func __Mthd_DragEnter($pThis, $pDataOject, $iKeyState, $iPoint, $piEffect)
 		EndIf
 	WEnd
 
-	Switch _WinAPI_GetClassName($tData.hTarget)
+	; test getting filename to compare
+	Local $tFormatEtc = DllStructCreate($tagFORMATETC)
+	$tFormatEtc.cfFormat = $CF_HDROP
+	$tFormatEtc.iIndex = -1
+	$tFormatEtc.tymed = $TYMED_HGLOBAL
+
+	Local $oDataObject = ObjCreateInterface($pDataObject, $sIID_IDataObject, $tagIDataObject)
+	Local $tStgMedium = DllStructCreate($tagSTGMEDIUM)
+	$oDataObject.AddRef()
+	$oDataObject.GetData($tFormatEtc, $tStgMedium)
+
+	Local $asFilenames = _WinAPI_DragQueryFileEx($tStgMedium.handle)
+	Local $sPathName = $asFilenames[1]
+	If StringInStr(FileGetAttrib($sPathName), "D") Then
+		$sPathName = $sPathName & "\"
+	EndIf
+	Local $aPath = _PathSplit_mod($sPathName)
+	$sSourceDrive = $aPath[$PATH_DRIVE]
+	$sSourcePath = $aPath[$PATH_DRIVE] & $aPath[$PATH_DIRECTORY]
+	; test
+
+	Switch _WinAPI_GetClassName_mod($tData.hTarget)
 		Case $WC_LISTVIEW
 			;
 		Case $WC_TREEVIEW
@@ -138,7 +162,7 @@ Func __Mthd_DragEnter($pThis, $pDataOject, $iKeyState, $iPoint, $piEffect)
 	Local $oIDropTgtHelper = ObjCreateInterface($tData.pIDropTgtHelper, $sIID_IDropTargetHelper, $tagIDropTargetHelper)
 	$oIDropTgtHelper.AddRef()
 
-	$oIDropTgtHelper.DragEnter($tData.hTarget, $pDataOject, $tPoint, $piEffect)
+	$oIDropTgtHelper.DragEnter($tData.hTarget, $pDataObject, $tPoint, $piEffect)
 
 	Return $S_OK
 EndFunc   ;==>__Mthd_DragEnter
@@ -149,6 +173,7 @@ Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
 
 	Local $sDirText = ""
 	Local $bIsFolder
+	Local $sDestDrive, $sDestPath
 
 	Local $tPoint = DllStructCreate($tagPoint)
 	$tPoint.X = _WinAPI_LoDWord($iPoint)
@@ -157,30 +182,35 @@ Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
 	Local $pData = DllStructGetData(DllStructCreate("ptr", Ptr($pThis + $__g_iTargetObjDataOffset)), 1)
 	Local $tData = DllStructCreate($tagTargetObjIntData, $pData)
 
-	_WinAPI_ScreenToClient($tData.hTarget, $tPoint)
+	_WinAPI_ScreenToClient_mod($tData.hTarget, $tPoint)
 
-	Switch _WinAPI_GetClassName($tData.hTarget)
+	Switch _WinAPI_GetClassName_mod($tData.hTarget)
 		Case $WC_LISTVIEW
 			Local $aListItem = _GUICtrlListView_HitTest($tData.hTarget, $tPoint.X, $tPoint.Y)
 			Local $sItemText = _GUICtrlListView_GetItemText($tData.hTarget, $aListItem[0])
 			Local $sFullPath = __TreeListExplorer_GetPath(1) & $sItemText
-			If StringInStr(FileGetAttrib($sFullPath), "D") Then
+			;ConsoleWrite("$sFullPath: " & $sFullPath & @CRLF)
+			If Not $sItemText Then
+				; get the currently selected path
+				$sDirPath = __TreeListExplorer_GetPath(1)
+				; obtain folder name only for drag tooltip
+				Local $aPath = _StringBetween($sDirPath, "\", "\")
+				$sDirText = $aPath[UBound($aPath) - 1]
+				; get full path for comparison
+				$sDestPath = $sDirPath
+			ElseIf StringInStr(FileGetAttrib($sFullPath), "D") Then
 				$sDirText = $sItemText
 				$bIsFolder = True
+				; get full path for comparison
+				$sDestPath = $sFullPath & "\"
 			Else
 				; get the currently selected path
 				$sDirPath = __TreeListExplorer_GetPath(1)
 				; obtain folder name only for drag tooltip
 				Local $aPath = _StringBetween($sDirPath, "\", "\")
 				$sDirText = $aPath[UBound($aPath) - 1]
-			EndIf
-			; handle case when cursor is over ListView but not on item; need to show current directory as drop dir
-			If $sDirText = "" Then
-				; get the currently selected path
-				$sDirPath = __TreeListExplorer_GetPath(1)
-				; obtain folder name only for drag tooltip
-				Local $aPath = _StringBetween($sDirPath, "\", "\")
-				$sDirText = $aPath[UBound($aPath) - 1]
+				; get full path for comparison
+				$sDestPath = $sDirPath
 			EndIf
 
 			; clear previously DROPHILITED listview item
@@ -190,7 +220,6 @@ Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
 				$iPreviousHot = $aListItem[0]
 				; bring focus to listview to show hot item (needed for listview to listview drag)
 				_WinAPI_SetFocus($tData.hTarget)
-				;_GUICtrlListView_SetHotItem($tData.hTarget, $aListItem[0])
 				If $bIsFolder Then
 					_GUICtrlListView_SetItemState($tData.hTarget, $aListItem[0], $LVIS_DROPHILITED, $LVIS_DROPHILITED)
 				EndIf
@@ -199,8 +228,6 @@ Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
 				_GUICtrlListView_SetItemState($tData.hTarget, $iPreviousHot, 0, $LVIS_DROPHILITED)
 			EndIf
 		Case $WC_TREEVIEW
-			;Local $tMPos = _WinAPI_GetMousePos(True, $tData.hTarget)
-			;Local $tMPos = _WinAPI_GetMousePos()
 			Local $hTreeItem = _GUICtrlTreeView_HitTestItem($tData.hTarget, $tPoint.X, $tPoint.Y)
 			$sDirText = _GUICtrlTreeView_GetText($tData.hTarget, $hTreeItem)
 			If $hTreeItem <> 0 Then
@@ -208,12 +235,32 @@ Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
 				_WinAPI_SetFocus($tData.hTarget)
 				_GUICtrlTreeView_SelectItem($tData.hTarget, $hTreeItem)
 				_GUICtrlTreeView_SetState($tData.hTarget, $hTreeOrig, $TVIS_SELECTED, True)
+				; get full path for comparison
+				$sDestPath = TreeItemToPath($tData.hTarget, $hTreeItem)
+				$sDropTV = $sDestPath
 			EndIf
 		Case Else
 			$sDirText = ""
 	EndSwitch
 
-	__DoDropResponse($tData, $iKeyState, $tPoint, $piEffect, $sDirText)
+	; compare source and target to determine if they are on the same drive
+	If StringInStr($sDestPath, $sSourceDrive) Then
+		$bIsSameDrive = True
+	Else
+		$bIsSameDrive = False
+	EndIf
+
+	; compare source and target to determine if they are the same
+	If $sDestPath = $sSourcePath Then
+		$bIsSameFolder = True
+	Else
+		$bIsSameFolder = False
+	EndIf
+
+	__DoDropResponse($tData, $iKeyState, $tPoint, $piEffect, $sDirText, $bIsSameDrive, $bIsSameFolder)
+
+	Local $tEffect = DllStructCreate("dword iEffect", $piEffect)
+	$iFinalEffect = $tEffect.iEffect
 
 	Local $oIDropTgtHelper = ObjCreateInterface($tData.pIDropTgtHelper, $sIID_IDropTargetHelper, $tagIDropTargetHelper)
 	$oIDropTgtHelper.AddRef()
@@ -233,7 +280,7 @@ Func __Mthd_DragLeave($pThis)
 	$oIDropTgtHelper.AddRef()
 	$oIDropTgtHelper.DragLeave()
 
-	Switch _WinAPI_GetClassName($tData.hTarget)
+	Switch _WinAPI_GetClassName_mod($tData.hTarget)
 		Case $WC_LISTVIEW
 			; clear previously DROPHILITED listview item
 			_GUICtrlListView_SetItemState($tData.hTarget, $iPreviousHot, 0, $LVIS_DROPHILITED)
@@ -248,10 +295,11 @@ Func __Mthd_DragLeave($pThis)
 	Return $S_OK
 EndFunc   ;==>__Mthd_DragLeave
 
-Func __Mthd_Drop($pThis, $pDataOject, $iKeyState, $iPoint, $piEffect)
+Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 	#forceref $pThis, $iKeyState, $iPoint, $piEffect
 
 	Local $sDirText = ""
+	Local $bIsFolder, $iFlags, $sAction
 
 	Local $tPoint = DllStructCreate($tagPoint)
 	$tPoint.X = _WinAPI_LoDWord($iPoint)
@@ -260,12 +308,13 @@ Func __Mthd_Drop($pThis, $pDataOject, $iKeyState, $iPoint, $piEffect)
 	Local $pData = DllStructGetData(DllStructCreate("ptr", Ptr($pThis + $__g_iTargetObjDataOffset)), 1)
 	Local $tData = DllStructCreate($tagTargetObjIntData, $pData)
 
-	Local $vItem = __DoDropResponse($tData, $iKeyState, $tPoint, $piEffect, $sDirText)
-	If @extended Then $vItem += 1
+	_WinAPI_ScreenToClient_mod($tData.hTarget, $tPoint)
+
+	__DoDropResponse($tData, $iKeyState, $tPoint, $piEffect, $sDirText)
 
 	Local $oIDropTgtHelper = ObjCreateInterface($tData.pIDropTgtHelper, $sIID_IDropTargetHelper, $tagIDropTargetHelper)
 	$oIDropTgtHelper.AddRef()
-	$oIDropTgtHelper.Drop($pDataOject, $tPoint, $piEffect)
+	$oIDropTgtHelper.Drop($pDataObject, $tPoint, $piEffect)
 
 	Local $tEffect = DllStructCreate("dword iEffect", $piEffect)
 	If $tEffect.iEffect <> $DROPEFFECT_NONE Then
@@ -275,72 +324,96 @@ Func __Mthd_Drop($pThis, $pDataOject, $iKeyState, $iPoint, $piEffect)
 		$tFormatEtc.iIndex = -1
 		$tFormatEtc.tymed = $TYMED_HGLOBAL
 
-		Local $oDataObject = ObjCreateInterface($pDataOject, $sIID_IDataObject, $tagIDataObject)
+		Local $oDataObject = ObjCreateInterface($pDataObject, $sIID_IDataObject, $tagIDataObject)
 		Local $tStgMedium = DllStructCreate($tagSTGMEDIUM)
 		$oDataObject.AddRef()
 		$oDataObject.GetData($tFormatEtc, $tStgMedium)
 
 		Local $asFilenames = _WinAPI_DragQueryFileEx($tStgMedium.handle)
 
-		Switch _WinAPI_GetClassName($tData.hTarget)
+		Switch _WinAPI_GetClassName_mod($tData.hTarget)
 			Case $WC_LISTVIEW
 				; clear previously DROPHILITED listview item
 				_GUICtrlListView_SetItemState($tData.hTarget, $iPreviousHot, 0, $LVIS_DROPHILITED)
-				For $i = 1 To $asFilenames[0]
-					;_GUICtrlListView_InsertItem($tData.hTarget, $asFilenames[$i], $vItem)
-					$vItem += 1
-				Next
-				;_GUICtrlListView_SetInsertMark($tData.hTarget, -1)
+
+				Local $aListItem = _GUICtrlListView_HitTest($tData.hTarget, $tPoint.X, $tPoint.Y)
+				Local $sItemText = _GUICtrlListView_GetItemText($tData.hTarget, $aListItem[0])
+				Local $sFullPath = __TreeListExplorer_GetPath(1) & $sItemText
+				If StringInStr(FileGetAttrib($sFullPath), "D") Then
+					$sDirText = $sItemText
+					$sFullPath = $sFullPath
+					$bIsFolder = True
+				Else
+					; get the currently selected path
+					$sDirPath = __TreeListExplorer_GetPath(1)
+					$sFullPath = $sDirPath
+					; obtain folder name only for drag tooltip
+					Local $aPath = _StringBetween($sDirPath, "\", "\")
+					$sDirText = $aPath[UBound($aPath) - 1]
+				EndIf
+				; handle case when cursor is over ListView but not on item; current directory becomes drop dir
+				If $sDirText = "" Then
+					; get the currently selected path
+					$sDirPath = __TreeListExplorer_GetPath(1)
+					$sFullPath = $sDirPath
+					; obtain folder name only for drag tooltip
+					Local $aPath = _StringBetween($sDirPath, "\", "\")
+					$sDirText = $aPath[UBound($aPath) - 1]
+				EndIf
+
+				; determine if IFileOperation needs to copy or move files
+				Switch $iFinalEffect
+					Case $DROPEFFECT_COPY
+						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+						$sAction = "CopyItems"
+						ConsoleWrite("copy took place on listview" & @CRLF)
+						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						__TreeListExplorer_Reload(1)
+					Case $DROPEFFECT_MOVE
+						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+						$sAction = "MoveItems"
+						ConsoleWrite("move took place on listview" & @CRLF)
+						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						; send response back to source to indicate that file move has been handled
+						$tEffect.iEffect = $DROPEFFECT_NONE
+						__SetPerformedDropEffect($pDataObject, $DROPEFFECT_NONE)
+						__TreeListExplorer_Reload(1)
+				EndSwitch
 
 			Case $WC_TREEVIEW
-				; restore original treeview selection if cursor leaves treeview
+				; restore original treeview selection
 				_GUICtrlTreeView_SelectItem($tData.hTarget, $hTreeOrig)
-				Local $hInsAfter = _GUICtrlTreeView_GetPrev($tData.hTarget, $vItem)
-				If Not $hInsAfter Then $hInsAfter = $TVI_FIRST
-				For $i = 1 To $asFilenames[0]
-					;$hInsAfter = _GUICtrlTreeView_InsertItem($tData.hTarget, $asFilenames[$i], 0, $hInsAfter)
-				Next
-				;_GUICtrlTreeView_SetInsertMark($tData.hTarget, 0)
+
+				; full treeview drop path is most recently DROPHILITED item
+				Local $sFullPath =$sDropTV
+
+				; determine if IFileOperation needs to copy or move files
+				Switch $iFinalEffect
+					Case $DROPEFFECT_COPY
+						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+						$sAction = "CopyItems"
+						ConsoleWrite("copy took place on treeview" & @CRLF)
+						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						__TreeListExplorer_Reload(1)
+					Case $DROPEFFECT_MOVE
+						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+						$sAction = "MoveItems"
+						ConsoleWrite("move took place on treeview" & @CRLF)
+						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						; send response back to source to indicate that file move has been handled
+						$tEffect.iEffect = $DROPEFFECT_NONE
+						__SetPerformedDropEffect($pDataObject, $DROPEFFECT_NONE)
+						__TreeListExplorer_Reload(1)
+				EndSwitch
+
 		EndSwitch
 	EndIf
-
-	;__SetPerformedDropEffect($pDataOject, $piEffect)
 
 	$tData.bAcceptDrop = False
 	$tData.pDataObject = 0
 
 	Return $S_OK
 EndFunc   ;==>__Mthd_Drop
-
-Func __DoInsertMark($hTarget, $tPoint)
-	Return
-EndFunc
-
-Func __DoInsertMark_orig($hTarget, $tPoint)
-	Local $vItem = -1, $bAfter = False
-	_WinAPI_ScreenToClient($hTarget, $tPoint)
-
-	Switch _WinAPI_GetClassName($hTarget)
-		Case $WC_LISTVIEW
-			Local $tLVINSERTMARK = DllStructCreate($tagLVINSERTMARK)
-			$tLVINSERTMARK.Size = DllStructGetSize($tLVINSERTMARK)
-			If _SendMessage($hTarget, $LVM_INSERTMARKHITTEST, $tPoint, $tLVINSERTMARK, 0, "struct*", "struct*") Then
-				If _SendMessage($hTarget, $LVM_SETINSERTMARK, 0, $tLVINSERTMARK, 0, "wparam", "struct*") Then $vItem = $tLVINSERTMARK.Item
-				$bAfter = BitAND($tLVINSERTMARK.Flags, $LVIM_AFTER)
-			EndIf
-
-		Case $WC_TREEVIEW
-			Local $tTVHITTESTINFO = DllStructCreate($tagTVHITTESTINFO)
-			$tTVHITTESTINFO.X = $tPoint.X
-			$tTVHITTESTINFO.Y = $tPoint.Y
-			If _SendMessage($hTarget, $TVM_HITTEST, $tPoint, $tTVHITTESTINFO, 0, "struct*", "struct*") Then
-				If _SendMessage($hTarget, $TVM_SETINSERTMARK, 0, $tTVHITTESTINFO.Item, 0, "wparam", "handle") Then $vItem = $tTVHITTESTINFO.Item
-			EndIf
-
-	EndSwitch
-
-	Return SetExtended($bAfter, $vItem)
-EndFunc
 
 Func __SetDropDescription($pDataObject, $iType, $sMessage = "", $sInsert = "")
 	Local $tFormatEtc = DllStructCreate($tagFORMATETC)
@@ -367,52 +440,45 @@ Func __SetDropDescription($pDataObject, $iType, $sMessage = "", $sInsert = "")
 	Local $oDataObj = ObjCreateInterface($pDataObject, $sIID_IDataObject, $tagIDataObject)
 	$oDataObj.AddRef()
 	$oDataObj.SetData($tFormatEtc, $tStgMedium, 1)
-EndFunc
+EndFunc   ;==>__SetDropDescription
 
-Func __DoDropResponse($tData, $iKeyState, $tPoint, $piEffect, $sDirText)
+Func __DoDropResponse($tData, $iKeyState, $tPoint, $piEffect, $sDirText, $bIsSameDrive = False, $bIsSameFolder = False)
 
 	#forceref $tData, $iKeyState, $tPoint, $piEffect
 
-	Local $vItem, $bAfter
-	Local $iRetEffect = $DROPEFFECT_NONE
-	Local $tEffect = DllStructCreate("dword iEffect", $piEffect)
+	Local $iRetEffect = $DROPEFFECT_NONE, $iReqOp
+    Local $tEffect = DllStructCreate("dword iEffect", $piEffect)
 
-	;Only Accept copy ops (will expand this at some point!)
+    ;See what the user is asking for based on key modifiers.
+    If $tData.bAcceptDrop Then
+        Switch BitAND($iKeyState, BitOR($MK_CONTROL, $MK_ALT, $MK_SHIFT))
+            Case BitOr($MK_CONTROL, $MK_ALT), 0
+                $iReqOp = $DROPEFFECT_MOVE
+            Case $MK_CONTROL
+                $iReqOp = $DROPEFFECT_COPY
+            Case BitOR($MK_CONTROL, $MK_SHIFT), $MK_ALT
+                $iReqOp = $DROPEFFECT_LINK
+        EndSwitch
 
-	If $tData.bAcceptDrop Then
-		If BitAND($tEffect.iEffect, $DROPEFFECT_MOVE) Then $iRetEffect = $DROPEFFECT_MOVE
-		If BitAND($tEffect.iEffect, $DROPEFFECT_COPY) Then
-			If BitAND($iKeyState, $MK_CONTROL) Or $iRetEffect = $DROPEFFECT_NONE Then
-				$iRetEffect = $DROPEFFECT_COPY
-			EndIf
-		EndIf
-		If BitAND($tEffect.iEffect, $DROPEFFECT_LINK) Then
-			If BitAND($iKeyState, $MK_ALT) Or $iRetEffect = $DROPEFFECT_NONE Then
-				$iRetEffect = $DROPEFFECT_LINK
-			EndIf
-		EndIf
-	EndIf
-
-	$tEffect.iEffect = $iRetEffect
-	If $tEffect.iEffect <> $DROPEFFECT_NONE Then
-		;$vItem = __DoInsertMark($tData.hTarget, $tPoint)
-		$bAfter = @extended
-	Else
-		Switch _WinAPI_GetClassName($tData.hTarget)
-			Case $WC_LISTVIEW
-				;_GUICtrlListView_SetInsertMark($tData.hTarget, -1)
-				$vItem = -1
-
-			Case $WC_TREEVIEW
-				;_GUICtrlTreeView_SetInsertMark($tData.hTarget, 0)
-				$vItem = 0
-
-		EndSwitch
-	EndIf
+        ;If move is legally an option
+        If BitAND($tEffect.iEffect, $DROPEFFECT_MOVE) Then 
+            If $iReqOp = $DROPEFFECT_MOVE And $bIsSameDrive Then $iRetEffect = $DROPEFFECT_MOVE
+        EndIf
+		;If copy is legally an option
+        If BitAND($tEffect.iEffect, $DROPEFFECT_COPY) Then 
+            If $iReqOp = $DROPEFFECT_COPY Or $iRetEffect = $DROPEFFECT_NONE Then $iRetEffect = $DROPEFFECT_COPY
+        EndIf
+        ;If link is legally an option
+        If BitAND($tEffect.iEffect, $DROPEFFECT_LINK) Then 
+            If $iReqOp = $DROPEFFECT_LINK Or $iRetEffect = $DROPEFFECT_NONE Then $iRetEffect = $DROPEFFECT_LINK
+        EndIf
+        If $bIsSameFolder Then $iRetEffect = $DROPEFFECT_NONE
+    EndIf
+    $tEffect.iEffect = $iRetEffect
 
 	Switch $tEffect.iEffect
 		Case $DROPEFFECT_NONE
-			__SetDropDescription($tData.pDataObject, $DROPIMAGE_NONE, "No Op %1", $sDirText)
+			__SetDropDescription($tData.pDataObject, $DROPIMAGE_NOIMAGE, "", "")
 
 		Case $DROPEFFECT_LINK
 			__SetDropDescription($tData.pDataObject, $DROPIMAGE_LINK, "Link to %1", $sDirText)
@@ -422,11 +488,10 @@ Func __DoDropResponse($tData, $iKeyState, $tPoint, $piEffect, $sDirText)
 
 		Case $DROPEFFECT_MOVE
 			__SetDropDescription($tData.pDataObject, $DROPIMAGE_MOVE, "Move to %1", $sDirText)
-
 	EndSwitch
 
-	Return SetExtended($bAfter, $vItem)
-EndFunc
+	Return
+EndFunc   ;==>__DoDropResponse
 
 Func __SetPerformedDropEffect($pDataObject, $iDropEffect)
     Local $tFormatEtc = DllStructCreate($tagFORMATETC)
@@ -450,4 +515,4 @@ Func __SetPerformedDropEffect($pDataObject, $iDropEffect)
     Local $oDataObj = ObjCreateInterface($pDataObject, $sIID_IDataObject, $tagIDataObject)
     $oDataObj.AddRef()
     $oDataObj.SetData($tFormatEtc, $tStgMedium, 1)
-EndFunc
+EndFunc   ;==>__SetPerformedDropEffect
