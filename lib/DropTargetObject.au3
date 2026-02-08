@@ -366,13 +366,11 @@ Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 					Case $DROPEFFECT_COPY
 						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
 						$sAction = "CopyItems"
-						ConsoleWrite("copy took place on listview" & @CRLF)
 						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
 						__TreeListExplorer_Reload(1)
 					Case $DROPEFFECT_MOVE
 						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
 						$sAction = "MoveItems"
-						ConsoleWrite("move took place on listview" & @CRLF)
 						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
 						; send response back to source to indicate that file move has been handled
 						$tEffect.iEffect = $DROPEFFECT_NONE
@@ -392,13 +390,11 @@ Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 					Case $DROPEFFECT_COPY
 						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
 						$sAction = "CopyItems"
-						ConsoleWrite("copy took place on treeview" & @CRLF)
 						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
 						__TreeListExplorer_Reload(1)
 					Case $DROPEFFECT_MOVE
 						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
 						$sAction = "MoveItems"
-						ConsoleWrite("move took place on treeview" & @CRLF)
 						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
 						; send response back to source to indicate that file move has been handled
 						$tEffect.iEffect = $DROPEFFECT_NONE

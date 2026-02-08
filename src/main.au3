@@ -417,6 +417,11 @@ Func _FilesAu3()
 	$i_ExStyle_Old = _WinAPI_GetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 2), $GWL_EXSTYLE)
 	_WinAPI_SetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 2), $GWL_EXSTYLE, BitOR($i_ExStyle_Old, $WS_EX_ACCEPTFILES))
 
+	Local $sMsg = "Attention: The drag and drop code is new and caution is advised." & @CRLF & @CRLF
+	$sMsg &= "Please consider testing drag and drop in less important areas of your file system." & @CRLF & @CRLF
+	$sMsg &= "To Undo the last drag and drop operation, open File Explorer and press Ctrl+Z."
+	MsgBox($MB_ICONWARNING, "Files Au3", $sMsg)
+
 	While True
 		If $bTooltipActive Then
 			; check if cursor is still over listview
@@ -1677,8 +1682,6 @@ Func _EventsGUI()
 			_resizeLVCols2()
 		Case $GUI_EVENT_RESIZED
 			_resizeLVCols2()
-		Case $GUI_EVENT_DROPPED
-			ConsoleWrite("drop detected" & @CRLF)
 	EndSwitch
 EndFunc   ;==>_EventsGUI
 
