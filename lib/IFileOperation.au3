@@ -73,6 +73,23 @@ Global Const $dtagIFileOperation = "Advise hresult(ptr;dword*);" & _
 
 ;_IFileOperationFile($pDataObj, $sPathTo, $sAction, $iFlags)
 
+Func _IFileOperationDelete($pDataObj, $iFlags = 0)
+
+    Local $tIIDIShellItem = CLSIDFromString($IID_IShellItem)
+    Local $tIIDIShellItemArray = CLSIDFromString($IID_IShellItemArray)
+
+
+    Local $oIFileOperation = ObjCreateInterface($CLSID_IFileOperation, $IID_IFileOperation, $dtagIFileOperation)
+    If Not IsObj($oIFileOperation) Then Return SetError(2, 0, False)
+
+    $oIFileOperation.SetOperationFlags($iFlags)
+
+    $oIFileOperation.DeleteItems($pDataObj)
+
+    Return $oIFileOperation.PerformOperations() = 0
+
+EndFunc   ;==>_IFileOperationDelete
+
 Func _IFileOperationFile($pDataObj, $sPathTo, $sAction, $iFlags = 0)
 
     If Not FileExists($sPathTo) Then

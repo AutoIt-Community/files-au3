@@ -5,9 +5,11 @@
 #include <GUIConstantsEx.au3>
 #include <GuiToolTip.au3>
 #include <GuiTreeView.au3>
+#include <GuiListView.au3>
 #include <String.au3>
 #include <WinAPITheme.au3>
 #include <WindowsConstants.au3>
+;#include <ListViewConstants.au3>
 #include <WindowsNotifsConstants.au3>
 #include <WindowsStylesConstants.au3>
 
@@ -73,6 +75,7 @@ Global $hFolderHistory = __History_Create("_doUnReDo", 100, "_historyChange"), $
 Global $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, 0x000000)
 Global $iTopSpacer = Round(12 * $iDPI)
 Global $aPosTip, $iOldaPos0, $iOldaPos1
+Global $sRenameFrom
 ; force light mode
 ;$isDarkMode = False
 
@@ -253,7 +256,7 @@ Func _FilesAu3()
 	$aWinSize1 = WinGetClientSize(_GUIFrame_GetHandle($iFrame_A, 1))
 
 	; create treeview
-	Local $iStyle = BitOR($TVS_HASBUTTONS, $TVS_HASLINES, $TVS_LINESATROOT, $TVS_SHOWSELALWAYS, $TVS_TRACKSELECT)
+	Local $iStyle = BitOR($TVS_HASBUTTONS, $TVS_HASLINES, $TVS_LINESATROOT, $TVS_SHOWSELALWAYS, $TVS_TRACKSELECT, $TVS_EDITLABELS)
 	$idTreeView = GUICtrlCreateTreeView(0, 0, $aWinSize1[0], $iFrameHeight, $iStyle)
 	GUICtrlSetState(-1, $GUI_DROPACCEPTED)
 	GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
@@ -292,7 +295,7 @@ Func _FilesAu3()
 
 	; create listview control
 	Local $iExStyles = BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_DOUBLEBUFFER, $LVS_EX_TRACKSELECT)
-	$idListview = GUICtrlCreateListView("Name|Size|Date Modified|Type", 0, $iHeaderHeight, $aWinSize2[0], $iFrameHeight - $iHeaderHeight, BitOR($LVS_SHOWSELALWAYS, $LVS_NOCOLUMNHEADER), $iExStyles)
+	$idListview = GUICtrlCreateListView("Name|Size|Date Modified|Type", 0, $iHeaderHeight, $aWinSize2[0], $iFrameHeight - $iHeaderHeight, BitOR($LVS_SHOWSELALWAYS, $LVS_NOCOLUMNHEADER, $LVS_EDITLABELS), $iExStyles)
 	GUICtrlSetState(-1, $GUI_DROPACCEPTED)
 	GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
 
@@ -420,7 +423,7 @@ Func _FilesAu3()
 	Local $sMsg = "Attention: The drag and drop code is new and caution is advised." & @CRLF & @CRLF
 	$sMsg &= "Please consider testing drag and drop in less important areas of your file system." & @CRLF & @CRLF
 	$sMsg &= "To Undo the last drag and drop operation, open File Explorer and press Ctrl+Z."
-	MsgBox($MB_ICONWARNING, "Files Au3", $sMsg)
+	;MsgBox($MB_ICONWARNING, "Files Au3", $sMsg)
 
 	While True
 		If $bTooltipActive Then
@@ -709,6 +712,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 	Local Static $iItemPrev
 	Local $iItemRow
 
+	Local $tText
+
 	; header and listview combined functionality
 	Local $hWndFrom = HWnd(DllStructGetData($tNMHDR, "hWndFrom"))
 	Local $iCode = DllStructGetData($tNMHDR, "Code")
@@ -798,6 +803,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						_GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
 					EndIf
 				Case $LVN_ITEMCHANGED
+					;ConsoleWrite("lv item changed" & @CRLF)
 					; item selection(s) have changed
 					_selectionChangedLV()
 				Case $LVN_BEGINDRAG, $LVN_BEGINRDRAG
@@ -880,6 +886,81 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						$bTooltipActive = True
 					EndIf
 					Return 1                     ; prevent the hover from being processed
+				Case $LVN_KEYDOWN
+					Local $tLVKeyDown = DllStructCreate($tagNMLVKEYDOWN, $lParam)
+					Local $iVKey = DllStructGetData($tLVKeyDown, "VKey")
+					If $iVKey = 46 Then
+						; create array with list of selected listview items
+						Local $aItems = _GUICtrlListView_GetSelectedIndices($tNMHDR.hwndFrom, True)
+						For $i = 1 To $aItems[0]
+							$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($tNMHDR.hwndFrom, $aItems[$i])
+						Next
+
+						;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
+
+						_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
+						Local $pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+
+						Local $iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+						_IFileOperationDelete($pDataObj, $iFlags)
+
+						__TreeListExplorer_Reload($hTLESystem)
+
+						_Release($pDataObj)
+					EndIf
+				Case $LVN_BEGINLABELEDITA, $LVN_BEGINLABELEDITW
+					Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
+					; there should only be one selected item during a rename
+					Local $iItemLV = $aSelectedLV[1]
+					Local $sRenameItem = _GUICtrlListView_GetItemText($idListview, $iItemLV, 0)
+					$sRenameFrom = __TreeListExplorer_GetPath($hTLESystem) & $sRenameItem
+					Return False
+				Case $LVN_ENDLABELEDITA, $LVN_ENDLABELEDITW
+					Local $sRenameTo
+                    $tText = DllStructCreate($tagNMLVDISPINFO, $lParam)
+                    Local $tBuffer = DllStructCreate("wchar Text[" & DllStructGetData($tText, "TextMax") & "]", DllStructGetData($tText, "Text"))
+					Local $sTextRet = DllStructGetData($tBuffer, "Text")
+                    Local $sIllegal = "A file name can't contain any of the following characters:" & @CRLF & @CRLF
+                    $sIllegal &= '\ / : * ? " < > |'
+                    ;   A file name can't contain any of the following characters:
+                    ;   \/:*?"<>|
+                    Select
+                        Case StringInStr($sTextRet, '\', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal) ; MsgBox causing GUI lockup
+                            Return False
+                        Case StringInStr($sTextRet, '/', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+                            Return False
+                        Case StringInStr($sTextRet, ':', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+                            Return False
+                        Case StringInStr($sTextRet, '*', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+                            Return False
+                        Case StringInStr($sTextRet, '?', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+                            Return False
+                        Case StringInStr($sTextRet, '"', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+                            Return False
+                        Case StringInStr($sTextRet, '<', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+                            Return False
+                        Case StringInStr($sTextRet, '>', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+                            Return False
+                        Case StringInStr($sTextRet, '|', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+                            Return False
+                        Case Not $sTextRet
+                            Return False
+                        Case Else
+							$sRenameTo = __TreeListExplorer_GetPath($hTLESystem) & $sTextRet
+							_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
+							; refresh TLE system to pick up any folder changes, file type changes, etc.
+							__TreeListExplorer_Reload($hTLESystem)
+                            Return True     ; allow rename to occur
+                    EndSelect
 			EndSwitch
 		Case $g_hTreeView
 			Switch $iCode
@@ -900,10 +981,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						$pDropSource = CreateDropSource()
 
 						If Not @error Then
-							;We allow DROPEFFECT_COPY and DROPEFFECT_LINK. We don't want to DROPEFFECT_MOVE the file!!
-							;DoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_COPY, $DROPEFFECT_LINK))
 							_SHDoDragDrop($pDataObj, $pDropSource,  BitOR($DROPEFFECT_MOVE, $DROPEFFECT_COPY, $DROPEFFECT_LINK))
-							;__TreeListExplorer_Reload($hTLESystem)
 
 							;Operation done, destroy our drop source. (Can't just IUnknown_Release() this one!)
 							DestroyDropSource($pDropSource)
@@ -912,7 +990,81 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						;Relase the data object so the system can destroy it (prevent memory leaks)
 						_Release($pDataObj)
 					EndIf
+				Case $TVN_KEYDOWN
+					Local $tTVKeyDown = DllStructCreate($tagNMTVKEYDOWN, $lParam)
+					Local $iVKey = DllStructGetData($tTVKeyDown, "VKey")
+					If $iVKey = 46 Then
+						Local $hTreeItemSel = _GUICtrlTreeView_GetSelection($g_hTreeView)
+						Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItemSel)
 
+						Local $pDataObj, $pDropSource
+
+						;Get an IDataObject representing the file to copy
+						$pDataObj = GetDataObjectOfFile($hWnd, $sItemText)
+						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+						_IFileOperationDelete($pDataObj, $iFlags)
+
+						__TreeListExplorer_Reload($hTLESystem)
+
+							;Relase the data object so the system can destroy it (prevent memory leaks)
+						_Release($pDataObj)
+					EndIf
+				Case $TVN_BEGINLABELEDITA, $TVN_BEGINLABELEDITW
+					HotKeySet("{Enter}", "_EndEditTV")
+					HotKeySet("{Esc}", "_EndEditTV")
+					$hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
+					$sRenameFrom = TreeItemToPath($g_hTreeView, $hTreeItemOrig)
+					Return False
+				Case $TVN_ENDLABELEDITA, $TVN_ENDLABELEDITW
+					Local $sRenameTo
+					HotKeySet("{Enter}")
+					HotKeySet("{Esc}")
+					$tText = DllStructCreate($tagNMTVDISPINFO, $lParam)
+                    Local $tBuffer = DllStructCreate("wchar Text[" & DllStructGetData($tText, "TextMax") & "]", DllStructGetData($tText, "Text"))
+					Local $sTextRet = DllStructGetData($tBuffer, "Text")
+					Local $sIllegal = "A file name can't contain any of the following characters:" & @CRLF & @CRLF
+                    $sIllegal &= '\ / : * ? " < > |'
+                    ;   A file name can't contain any of the following characters:
+                    ;   \/:*?"<>|
+                    Select
+                        Case StringInStr($sTextRet, '\', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal) ; MsgBox causing GUI lockup
+							; TODO: maybe consider tooltip for these
+							Return False
+                        Case StringInStr($sTextRet, '/', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+							Return False
+                        Case StringInStr($sTextRet, ':', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+							Return False
+                        Case StringInStr($sTextRet, '*', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+							Return False
+                        Case StringInStr($sTextRet, '?', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+							Return False
+                        Case StringInStr($sTextRet, '"', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+							Return False
+                        Case StringInStr($sTextRet, '<', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+							Return False
+                        Case StringInStr($sTextRet, '>', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+							Return False
+                        Case StringInStr($sTextRet, '|', 2)
+                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
+							Return False
+                        Case Not $sTextRet
+                            Return False
+                        Case Else
+							Local $aPath = _StringBetween($sRenameFrom, "\", "\")
+							Local $sRenameItem = $aPath[UBound($aPath) - 1]
+							$sRenameTo = StringReplace($sRenameFrom, $sRenameItem, $sTextRet)
+							_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
+							;__TreeListExplorer_Reload($hTLESystem)
+                            Return True     ; allow rename to occur
+                    EndSelect
 			EndSwitch
 	EndSwitch
 
@@ -973,6 +1125,10 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_NOTIFY2
+
+Func _EndEditTV()
+	_GUICtrlTreeView_EndEdit($g_hTreeView)
+EndFunc
 
 Func _removeExStyles()
 	; remove WS_EX_COMPOSITED from GUI
