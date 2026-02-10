@@ -9,7 +9,6 @@
 #include <String.au3>
 #include <WinAPITheme.au3>
 #include <WindowsConstants.au3>
-;#include <ListViewConstants.au3>
 #include <WindowsNotifsConstants.au3>
 #include <WindowsStylesConstants.au3>
 
@@ -26,7 +25,6 @@ Global $hShell32 = DllOpen('shell32.dll')
 #include "../lib/ProjectConstants.au3"
 #include "../lib/DropSourceObject.au3"
 #include "../lib/DropTargetObject.au3"
-;#include "../lib/IFileOperation.au3"
 
 ; CREDITS:
 ; Kanashius     TreeListExplorer UDF
@@ -66,7 +64,7 @@ Global $sBack, $sForward, $sUpLevel, $sRefresh
 Global $sTreeDragItem, $sListDragItems, $bDragToolActive = False
 Global $pLVDropTarget, $pTVDropTarget
 Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
-Global $idExitItem, $idAboutItem
+Global $idExitItem, $idAboutItem, $idDeleteItem, $idRenameItem, $idCopyItem, $idPasteItem
 Global $hCursor, $hProc
 Global $sSelectedItems, $g_aText, $gText
 Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $bTooltipActive
@@ -75,7 +73,7 @@ Global $hFolderHistory = __History_Create("_doUnReDo", 100, "_historyChange"), $
 Global $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, 0x000000)
 Global $iTopSpacer = Round(12 * $iDPI)
 Global $aPosTip, $iOldaPos0, $iOldaPos1
-Global $sRenameFrom
+Global $sRenameFrom, $sControlFocus, $bFocusChanged = False, $bSaveEdit = False
 ; force light mode
 ;$isDarkMode = False
 
@@ -207,25 +205,32 @@ Func _FilesAu3()
 	; reset GUI font
 	GUISetFont(10, $FW_NORMAL, $GUI_FONTNORMAL, "Segoe UI")
 
-	; Menu
-	If $isDarkMode Then
-		Local $idFileMenu = _GUICtrlCreateODTopMenu("& File", $g_hGUI)
-		Local $idViewMenu = _GUICtrlCreateODTopMenu("& View", $g_hGUI)
-		Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
-	Else
-		Local $idFileMenu = _GUICtrlCreateODTopMenu("& File", $g_hGUI)
-		Local $idViewMenu = _GUICtrlCreateODTopMenu("& View", $g_hGUI)
-		Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
-	EndIf
+	; Menubar
+	Local $idFileMenu = _GUICtrlCreateODTopMenu("& File", $g_hGUI)
+	Local $idEditMenu = _GUICtrlCreateODTopMenu("& Edit", $g_hGUI)
+	Local $idViewMenu = _GUICtrlCreateODTopMenu("& View", $g_hGUI)
+	Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
 
+	; File menu
+	$idDeleteItem = GUICtrlCreateMenuItem("&Delete", $idFileMenu)
+	GUICtrlSetState($idDeleteItem, $GUI_DISABLE)
+	$idRenameItem = GUICtrlCreateMenuItem("&Rename", $idFileMenu)
+	GUICtrlSetState($idRenameItem, $GUI_DISABLE)
 	$idPropertiesItem = GUICtrlCreateMenuItem("&Properties", $idFileMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
 	GUICtrlCreateMenuItem("", $idFileMenu)
 	$idExitItem = GUICtrlCreateMenuItem("&Exit", $idFileMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	; Edit menu
+	$idCopyItem = GUICtrlCreateMenuItem("&Copy", $idEditMenu)
+	GUICtrlSetState($idCopyItem, $GUI_DISABLE)
+	$idPasteItem = GUICtrlCreateMenuItem("&Paste", $idEditMenu)
+	GUICtrlSetState($idPasteItem, $GUI_DISABLE)
+	; View menu
 	$idThemeItem = GUICtrlCreateMenuItem("&Dark Mode", $idViewMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	; Help menu
 	$idAboutItem = GUICtrlCreateMenuItem("&About", $idHelpMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 
@@ -425,6 +430,9 @@ Func _FilesAu3()
 	$sMsg &= "To Undo the last drag and drop operation, open File Explorer and press Ctrl+Z."
 	;MsgBox($MB_ICONWARNING, "Files Au3", $sMsg)
 
+	$sControlFocus = 'Tree'
+	$bFocusChanged = True
+
 	While True
 		If $bTooltipActive Then
 			; check if cursor is still over listview
@@ -437,6 +445,22 @@ Func _FilesAu3()
 				_GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
 				$bTooltipActive = False
 			EndIf
+		EndIf
+
+		If $bFocusChanged Then
+			$bFocusChanged = False
+			Select
+				Case $sControlFocus = 'List'
+					ConsoleWrite("ListView currently has focus." & @CRLF)
+					; need to ensure it has a selection
+					; figure out which menu options to enable/disable
+				Case $sControlFocus = 'Tree'
+					ConsoleWrite("TreeView currently has focus." & @CRLF)
+					; treeview always has a selection
+				Case Not $sControlFocus
+					ConsoleWrite("Neither the ListView or TreeView has focus right now." & @CRLF)
+					; in this case likely disable menu options
+			EndSelect
 		EndIf
 
 		Sleep(200)
@@ -803,7 +827,6 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						_GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
 					EndIf
 				Case $LVN_ITEMCHANGED
-					;ConsoleWrite("lv item changed" & @CRLF)
 					; item selection(s) have changed
 					_selectionChangedLV()
 				Case $LVN_BEGINDRAG, $LVN_BEGINRDRAG
@@ -914,8 +937,29 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					Local $iItemLV = $aSelectedLV[1]
 					Local $sRenameItem = _GUICtrlListView_GetItemText($idListview, $iItemLV, 0)
 					$sRenameFrom = __TreeListExplorer_GetPath($hTLESystem) & $sRenameItem
+					; set hotkeys to ensure that file name cannot contain illegal characters
+					; \ / : * ? " < > |
+					HotKeySet ('{\}', "_RenameCheckLV")
+					HotKeySet ('{/}', "_RenameCheckLV")
+					HotKeySet ('{:}', "_RenameCheckLV")
+					HotKeySet ('{*}', "_RenameCheckLV")
+					HotKeySet ('{?}', "_RenameCheckLV")
+					HotKeySet ('{"}', "_RenameCheckLV")
+					HotKeySet ('{<}', "_RenameCheckLV")
+					HotKeySet ('{>}', "_RenameCheckLV")
+					HotKeySet ('{|}', "_RenameCheckLV")
 					Return False
 				Case $LVN_ENDLABELEDITA, $LVN_ENDLABELEDITW
+					; unset hotkeys that block illegal characters from being set
+					HotKeySet ('{\}')
+					HotKeySet ('{/}')
+					HotKeySet ('{:}')
+					HotKeySet ('{*}')
+					HotKeySet ('{?}')
+					HotKeySet ('{"}')
+					HotKeySet ('{<}')
+					HotKeySet ('{>}')
+					HotKeySet ('{|}')
 					Local $sRenameTo
                     $tText = DllStructCreate($tagNMLVDISPINFO, $lParam)
                     Local $tBuffer = DllStructCreate("wchar Text[" & DllStructGetData($tText, "TextMax") & "]", DllStructGetData($tText, "Text"))
@@ -926,31 +970,22 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                     ;   \/:*?"<>|
                     Select
                         Case StringInStr($sTextRet, '\', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal) ; MsgBox causing GUI lockup
                             Return False
                         Case StringInStr($sTextRet, '/', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
                             Return False
                         Case StringInStr($sTextRet, ':', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
                             Return False
                         Case StringInStr($sTextRet, '*', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
                             Return False
                         Case StringInStr($sTextRet, '?', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
                             Return False
                         Case StringInStr($sTextRet, '"', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
                             Return False
                         Case StringInStr($sTextRet, '<', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
                             Return False
                         Case StringInStr($sTextRet, '>', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
                             Return False
                         Case StringInStr($sTextRet, '|', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
                             Return False
                         Case Not $sTextRet
                             Return False
@@ -961,6 +996,12 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 							__TreeListExplorer_Reload($hTLESystem)
                             Return True     ; allow rename to occur
                     EndSelect
+				Case $NM_SETFOCUS
+					$sControlFocus = 'List'
+					$bFocusChanged = True
+				Case $NM_KILLFOCUS
+					$sControlFocus = ''
+					$bFocusChanged = True
 			EndSwitch
 		Case $g_hTreeView
 			Switch $iCode
@@ -1010,61 +1051,82 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						_Release($pDataObj)
 					EndIf
 				Case $TVN_BEGINLABELEDITA, $TVN_BEGINLABELEDITW
-					HotKeySet("{Enter}", "_EndEditTV")
-					HotKeySet("{Esc}", "_EndEditTV")
+					HotKeySet("{Enter}", "_SaveEditTV")
+					HotKeySet("{Esc}", "_CancelEditTV")
 					$hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
 					$sRenameFrom = TreeItemToPath($g_hTreeView, $hTreeItemOrig)
+					; set hotkeys to ensure that file name cannot contain illegal characters
+					; \ / : * ? " < > |
+					HotKeySet ('{\}', "_RenameCheckTV")
+					HotKeySet ('{/}', "_RenameCheckTV")
+					HotKeySet ('{:}', "_RenameCheckTV")
+					HotKeySet ('{*}', "_RenameCheckTV")
+					HotKeySet ('{?}', "_RenameCheckTV")
+					HotKeySet ('{"}', "_RenameCheckTV")
+					HotKeySet ('{<}', "_RenameCheckTV")
+					HotKeySet ('{>}', "_RenameCheckTV")
+					HotKeySet ('{|}', "_RenameCheckTV")
 					Return False
 				Case $TVN_ENDLABELEDITA, $TVN_ENDLABELEDITW
 					Local $sRenameTo
 					HotKeySet("{Enter}")
 					HotKeySet("{Esc}")
-					$tText = DllStructCreate($tagNMTVDISPINFO, $lParam)
-                    Local $tBuffer = DllStructCreate("wchar Text[" & DllStructGetData($tText, "TextMax") & "]", DllStructGetData($tText, "Text"))
-					Local $sTextRet = DllStructGetData($tBuffer, "Text")
-					Local $sIllegal = "A file name can't contain any of the following characters:" & @CRLF & @CRLF
-                    $sIllegal &= '\ / : * ? " < > |'
-                    ;   A file name can't contain any of the following characters:
-                    ;   \/:*?"<>|
-                    Select
-                        Case StringInStr($sTextRet, '\', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal) ; MsgBox causing GUI lockup
-							; TODO: maybe consider tooltip for these
-							Return False
-                        Case StringInStr($sTextRet, '/', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
-							Return False
-                        Case StringInStr($sTextRet, ':', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
-							Return False
-                        Case StringInStr($sTextRet, '*', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
-							Return False
-                        Case StringInStr($sTextRet, '?', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
-							Return False
-                        Case StringInStr($sTextRet, '"', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
-							Return False
-                        Case StringInStr($sTextRet, '<', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
-							Return False
-                        Case StringInStr($sTextRet, '>', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
-							Return False
-                        Case StringInStr($sTextRet, '|', 2)
-                            ;MsgBox($MB_ICONERROR, "Error", $sIllegal)
-							Return False
-                        Case Not $sTextRet
-                            Return False
-                        Case Else
-							Local $aPath = _StringBetween($sRenameFrom, "\", "\")
-							Local $sRenameItem = $aPath[UBound($aPath) - 1]
-							$sRenameTo = StringReplace($sRenameFrom, $sRenameItem, $sTextRet)
-							_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
-							;__TreeListExplorer_Reload($hTLESystem)
-                            Return True     ; allow rename to occur
-                    EndSelect
+					; unset hotkeys that block illegal characters from being set
+					HotKeySet ('{\}')
+					HotKeySet ('{/}')
+					HotKeySet ('{:}')
+					HotKeySet ('{*}')
+					HotKeySet ('{?}')
+					HotKeySet ('{"}')
+					HotKeySet ('{<}')
+					HotKeySet ('{>}')
+					HotKeySet ('{|}')
+					If $bSaveEdit Then
+						$bSaveEdit = False
+						$tText = DllStructCreate($tagNMTVDISPINFO, $lParam)
+						Local $tBuffer = DllStructCreate("wchar Text[" & DllStructGetData($tText, "TextMax") & "]", DllStructGetData($tText, "Text"))
+						Local $sTextRet = DllStructGetData($tBuffer, "Text")
+						;   A file name can't contain any of the following characters:
+						;   \/:*?"<>|
+						Select
+							Case StringInStr($sTextRet, '\', 2)
+								Return False
+							Case StringInStr($sTextRet, '/', 2)
+								Return False
+							Case StringInStr($sTextRet, ':', 2)
+								Return False
+							Case StringInStr($sTextRet, '*', 2)
+								Return False
+							Case StringInStr($sTextRet, '?', 2)
+								Return False
+							Case StringInStr($sTextRet, '"', 2)
+								Return False
+							Case StringInStr($sTextRet, '<', 2)
+								Return False
+							Case StringInStr($sTextRet, '>', 2)
+								Return False
+							Case StringInStr($sTextRet, '|', 2)
+								Return False
+							Case Not $sTextRet
+								Return False
+							Case Else
+								Local $aPath = _StringBetween($sRenameFrom, "\", "\")
+								Local $sRenameItem = $aPath[UBound($aPath) - 1]
+								$sRenameTo = StringReplace($sRenameFrom, $sRenameItem, $sTextRet)
+								_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
+								;__TreeListExplorer_Reload($hTLESystem)
+								Return True     ; allow rename to occur
+                    	EndSelect
+					EndIf
+				Case $NM_SETFOCUS
+					$sControlFocus = 'Tree'
+					$bFocusChanged = True
+				Case $NM_KILLFOCUS
+					$sControlFocus = ''
+					$bFocusChanged = True
+				Case $TVN_SELCHANGINGA, $TVN_SELCHANGINGW
+					;ConsoleWrite("treeview selection changing" & @CRLF)
+					; TODO: maybe follow up in While loop
 			EndSwitch
 	EndSwitch
 
@@ -1126,7 +1188,27 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_NOTIFY2
 
-Func _EndEditTV()
+Func _RenameCheckLV()
+	Local $sIllegal = "A file name can't contain any of the following characters:" & @CRLF & @CRLF
+    $sIllegal &= '\ / : * ? " < > |'
+	Local $hEdit = _GUICtrlListView_GetEditControl($g_hListview)
+	_GUICtrlEdit_ShowBalloonTip($hEdit, '', $sIllegal, $TTI_INFO)
+EndFunc
+
+Func _RenameCheckTV()
+	Local $sIllegal = "A file name can't contain any of the following characters:" & @CRLF & @CRLF
+    $sIllegal &= '\ / : * ? " < > |'
+	Local $hEdit = _GUICtrlTreeView_GetEditControl($g_hTreeView)
+	_GUICtrlEdit_ShowBalloonTip($hEdit, '', $sIllegal, $TTI_INFO)
+EndFunc
+
+Func _SaveEditTV()
+	$bSaveEdit = True
+	_GUICtrlTreeView_EndEdit($g_hTreeView)
+EndFunc
+
+Func _CancelEditTV()
+	$bSaveEdit = False
 	_GUICtrlTreeView_EndEdit($g_hTreeView)
 EndFunc
 
@@ -1256,7 +1338,8 @@ EndFunc   ;==>WM_COMMAND2
 
 Func _About()
 	Local $sMsg
-	$sMsg = "Version: " & @TAB & @TAB & $sVersion & @CRLF & @CRLF
+	$sMsg = "Program Version: " & @TAB & $sVersion & @CRLF & @CRLF
+	$sMsg &= "TreeListExplorer: " & @TAB & _VersionToString(_UDFGetVersion("../lib/TreeListExplorer.au3")) & @CRLF & @CRLF
 	$sMsg &= "Made by: " & @TAB & "AutoIt Community"
 	MsgBox(0, "Files Au3", $sMsg)
 EndFunc   ;==>_About
@@ -2177,3 +2260,64 @@ EndFunc
 
 ; jugador code above
 
+Func _VersionToString($arVersion, $sSep = " ")
+    If Not IsArray($arVersion) Or UBound($arVersion, 0)<2 Or UBound($arVersion, 1)<2 Then Return SetError(1, 1, "Version not parsed.")
+    Local $sVersion = ""
+    If $arVersion[1][0]>0 Then
+        $sVersion &= $arVersion[1][1]
+    EndIf
+    If $sVersion = "" Then Return "Version unknown"
+    Return $sVersion
+EndFunc
+
+Func _UDFGetVersion($sFile)
+    Local $sCode = FileRead($sFile)
+    If @error Then Return SetError(@error, @extended, 0)
+    Local $arVersion = _GetVersion($sCode)
+    If @error Then Return SetError(@error, @extended, -1)
+    Return $arVersion
+EndFunc
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: _GetVersion
+; Description ...: Get the AutoIt Version as well as the UDF Version.
+; Syntax ........: _GetVersion($sUdfCode)
+; Parameters ....: $sUdfCode               - the sourcecode of the udf
+; Return values .: Array with version information.
+; Author ........: Kanashius
+; Modified ......:
+; Remarks .......: @extended (1 - Only AutoIt Version found, 2 - Only UDF Version found, 3 - Both found)
+;                  Resurns a 2D-Array with:
+;                  [0][0] being the amount of version parts found for the AutoIt Version + 1
+;                  [0][1] If [0][0]>0 then this is the full autoit version as string
+;                  [0][2] The first part of the autoit version (index 2-5 is a number)
+;                  ...
+;                  [0][6] The last part of the autoit version (last part is a/b/rc)
+;                  [1][0] being the amount of version parts found for the UDF Version + 1
+;                  [1][1] If [1][0]>0 then this is the full udf version as string
+;                  [1][2] The first part of the udf version (index 2-5 is a number)
+;                  ...
+;                  [1][6] The last part of the udf version (last part is a/b/rc)
+; Related .......:
+; Link ..........:
+; Example .......: No
+; ===============================================================================================================================
+Func _GetVersion($sUdfCode)
+    Local $iExtended = 0
+    Local $arAutoItVersion = StringRegExp($sUdfCode, "(?m)(?s)^;\s*#INDEX#\s*=*.*?;\s*AutoIt\s*Version\s*\.*:\s((\d+)(?:\.(\d+)(?:\.(\d+)(?:\.(\d+))?)?)?(a|b|rc)?)\s*$", 1)
+    If Not @error Then $iExtended = 1
+    Local $arUDFVersion =  StringRegExp($sUdfCode, "(?m)(?s)^;\s*#INDEX#\s*=*.*?;\s*Version\s*\.*:\s((\d+)(?:\.(\d+)(?:\.(\d+))?)?(a|b|rc)?)\s*$", 1)
+    If Not @error Then $iExtended += 2
+    Local $iVerNumbers = UBound($arAutoItVersion)
+    If UBound($arUDFVersion)>$iVerNumbers Then $iVerNumbers = UBound($arUDFVersion)
+    Local $arResult[2][$iVerNumbers+1]
+    $arResult[0][0] = UBound($arAutoItVersion)
+    For $i=0 to UBound($arAutoItVersion)-1 Step 1
+        $arResult[0][$i+1] = $arAutoItVersion[$i]
+    Next
+    $arResult[1][0] = UBound($arUDFVersion)
+    For $i=0 to UBound($arUDFVersion)-1 Step 1
+        $arResult[1][$i+1] = $arUDFVersion[$i]
+    Next
+    Return SetExtended($iExtended, $arResult)
+EndFunc
