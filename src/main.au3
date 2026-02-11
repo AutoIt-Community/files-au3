@@ -64,7 +64,7 @@ Global $sBack, $sForward, $sUpLevel, $sRefresh
 Global $sTreeDragItem, $sListDragItems, $bDragToolActive = False
 Global $pLVDropTarget, $pTVDropTarget
 Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
-Global $idExitItem, $idAboutItem, $idDeleteItem, $idRenameItem, $idCopyItem, $idPasteItem
+Global $idExitItem, $idAboutItem, $idDeleteItem, $idRenameItem, $idCopyItem, $idPasteItem, $idUndoItem
 Global $hCursor, $hProc
 Global $sSelectedItems, $g_aText, $gText
 Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $bTooltipActive
@@ -73,7 +73,8 @@ Global $hFolderHistory = __History_Create("_doUnReDo", 100, "_historyChange"), $
 Global $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, 0x000000)
 Global $iTopSpacer = Round(12 * $iDPI)
 Global $aPosTip, $iOldaPos0, $iOldaPos1
-Global $sRenameFrom, $sControlFocus, $bFocusChanged = False, $bSaveEdit = False
+Global $sRenameFrom, $sControlFocus, $bFocusChanged = False, $bSelectChanged = False, $bSaveEdit = False
+Global $bCopy = False, $pCopyObj, $bUndo = False
 ; force light mode
 ;$isDarkMode = False
 
@@ -212,20 +213,28 @@ Func _FilesAu3()
 	Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
 
 	; File menu
-	$idDeleteItem = GUICtrlCreateMenuItem("&Delete", $idFileMenu)
+	$idDeleteItem = GUICtrlCreateMenuItem("&Delete" & @TAB & "Delete", $idFileMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idDeleteItem, $GUI_DISABLE)
 	$idRenameItem = GUICtrlCreateMenuItem("&Rename", $idFileMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idRenameItem, $GUI_DISABLE)
-	$idPropertiesItem = GUICtrlCreateMenuItem("&Properties", $idFileMenu)
+	$idPropertiesItem = GUICtrlCreateMenuItem("&Properties" & @TAB & "Shift+P", $idFileMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
 	GUICtrlCreateMenuItem("", $idFileMenu)
 	$idExitItem = GUICtrlCreateMenuItem("&Exit", $idFileMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	; Edit menu
-	$idCopyItem = GUICtrlCreateMenuItem("&Copy", $idEditMenu)
+	$idUndoItem = GUICtrlCreateMenuItem("&Undo" & @TAB & "Ctrl+Z", $idEditMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlSetState($idUndoItem, $GUI_DISABLE)
+	GUICtrlCreateMenuItem("", $idEditMenu)
+	$idCopyItem = GUICtrlCreateMenuItem("&Copy" & @TAB & "Ctrl+C", $idEditMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idCopyItem, $GUI_DISABLE)
-	$idPasteItem = GUICtrlCreateMenuItem("&Paste", $idEditMenu)
+	$idPasteItem = GUICtrlCreateMenuItem("&Paste" & @TAB & "Ctrl+V", $idEditMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idPasteItem, $GUI_DISABLE)
 	; View menu
 	$idThemeItem = GUICtrlCreateMenuItem("&Dark Mode", $idViewMenu)
@@ -425,10 +434,13 @@ Func _FilesAu3()
 	$i_ExStyle_Old = _WinAPI_GetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 2), $GWL_EXSTYLE)
 	_WinAPI_SetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 2), $GWL_EXSTYLE, BitOR($i_ExStyle_Old, $WS_EX_ACCEPTFILES))
 
-	Local $sMsg = "Attention: The drag and drop code is new and caution is advised." & @CRLF & @CRLF
-	$sMsg &= "Please consider testing drag and drop in less important areas of your file system." & @CRLF & @CRLF
-	$sMsg &= "To Undo the last drag and drop operation, open File Explorer and press Ctrl+Z."
-	;MsgBox($MB_ICONWARNING, "Files Au3", $sMsg)
+	Local $sMsg = "Attention: The file operation code is new and caution is advised." & @CRLF & @CRLF
+	$sMsg &= "Please consider testing any file operations in less important areas of your file system. Creating an area "
+	$sMsg &= "on your file system with test folders and test files would be a good idea for testing purposes." & @CRLF & @CRLF
+	$sMsg &= "At the moment, Files Au3 allows you to Undo the most recent drag and drop, copy, move, delete, rename, etc. "
+	$sMsg &= "by pressing Ctrl+Z or Undo from the Edit menu. Future versions will expand to allow more than just the most "
+	$sMsg &= "recent Undo operation."
+	MsgBox($MB_ICONWARNING, "Files Au3", $sMsg)
 
 	$sControlFocus = 'Tree'
 	$bFocusChanged = True
@@ -447,21 +459,97 @@ Func _FilesAu3()
 			EndIf
 		EndIf
 
-		If $bFocusChanged Then
+		If $bFocusChanged Or $bSelectChanged Then
+			; keep track of which control currently has focus to determine which menu items to enable/disable
 			$bFocusChanged = False
+			$bSelectChanged = False
 			Select
 				Case $sControlFocus = 'List'
-					ConsoleWrite("ListView currently has focus." & @CRLF)
+					; ListView currently has focus
 					; need to ensure it has a selection
 					; figure out which menu options to enable/disable
+					; get selected indices
+					; if 1 selected, show Rename and Delete
+					; if more than 1 don't show Rename, but show Delete, Copy
+					; TODO: need to destroy Copy object after Paste; or maybe not
+					; TODO: Paste can only be enabled if valid target dir and copy object exists
+					; TODO: Move Properties enable/disable here as well
+					; TODO: set/unset related hotkeys here too
+					; TODO: for most file management functions, need to check if path is only root of drive (caution)
+					Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
+					If $aSelectedLV[0] = 0 Then
+						; no selections in ListView currently
+						GUICtrlSetState($idRenameItem, $GUI_DISABLE)
+						GUICtrlSetState($idCopyItem, $GUI_DISABLE)
+						HotKeySet("^c")
+						GUICtrlSetState($idDeleteItem, $GUI_DISABLE)
+						HotKeySet("{DELETE}")
+						GUICtrlSetState($idPasteItem, $bCopy ? $GUI_ENABLE : $GUI_DISABLE)
+						HotKeySet("^v", $bCopy ? "_PasteItems" : "")
+						GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
+						HotKeySet("+p", "_Properties")
+					ElseIf $aSelectedLV[0] = 1 Then
+						; 1 item selection in ListView
+						GUICtrlSetState($idRenameItem, $GUI_ENABLE)
+						GUICtrlSetState($idCopyItem, $GUI_ENABLE)
+						HotKeySet("^c", "_CopyItems")
+						GUICtrlSetState($idDeleteItem, $GUI_ENABLE)
+						HotKeySet("{DELETE}", "_DeleteItems")
+						Local $sSelectedItem = _GUICtrlListView_GetItemText($idListview, $aSelectedLV[1], 0)
+						Local $sSelectedLV = __TreeListExplorer_GetPath($hTLESystem) & $sSelectedItem
+						; is selected path a folder
+						If StringInStr(FileGetAttrib($sSelectedLV), "D") Then
+							GUICtrlSetState($idPasteItem, $bCopy ? $GUI_ENABLE : $GUI_DISABLE)
+							HotKeySet("^v", $bCopy ? "_PasteItems" : "")
+						Else
+							GUICtrlSetState($idPasteItem, $GUI_DISABLE)
+							HotKeySet("^v")
+						EndIf
+						GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
+						HotKeySet("+p", "_Properties")
+					Else
+						; multiple items selected in ListView
+						GUICtrlSetState($idRenameItem, $GUI_DISABLE) ; not supporting multiple file Rename right now
+						GUICtrlSetState($idCopyItem, $GUI_ENABLE)
+						HotKeySet("^c", "_CopyItems")
+						GUICtrlSetState($idDeleteItem, $GUI_ENABLE)
+						HotKeySet("{DELETE}", "_DeleteItems")
+						GUICtrlSetState($idPasteItem, $GUI_DISABLE)
+						HotKeySet("^v")
+						GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
+						HotKeySet("+p", "_Properties")
+					EndIf
 				Case $sControlFocus = 'Tree'
-					ConsoleWrite("TreeView currently has focus." & @CRLF)
+					; TreeView currently has focus
 					; treeview always has a selection
+					GUICtrlSetState($idRenameItem, $GUI_ENABLE)
+					GUICtrlSetState($idCopyItem, $GUI_ENABLE)
+					HotKeySet("^c", "_CopyItems")
+					GUICtrlSetState($idDeleteItem, $GUI_ENABLE)
+					HotKeySet("{DELETE}", "_DeleteItems")
+					GUICtrlSetState($idPasteItem, $bCopy ? $GUI_ENABLE : $GUI_DISABLE)
+					HotKeySet("^v", $bCopy ? "_PasteItems" : "")
+					GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
+					HotKeySet("+p", "_Properties")
 				Case Not $sControlFocus
-					ConsoleWrite("Neither the ListView or TreeView has focus right now." & @CRLF)
+					; Neither the ListView or TreeView has focus right now
 					; in this case likely disable menu options
+					GUICtrlSetState($idRenameItem, $GUI_DISABLE)
+					GUICtrlSetState($idCopyItem, $GUI_DISABLE)
+					HotKeySet("^c")
+					GUICtrlSetState($idDeleteItem, $GUI_DISABLE)
+					HotKeySet("{DELETE}")
+					GUICtrlSetState($idPasteItem, $GUI_DISABLE)
+					HotKeySet("^v")
+					GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
+					HotKeySet("+p")
 			EndSelect
 		EndIf
+
+		;If $bUndo Then
+		;	GUICtrlSetState($idUndoItem, $GUI_ENABLE)
+		;	HotKeySet("^z", "_UndoOp")
+		;EndIf
 
 		Sleep(200)
 	WEnd
@@ -827,6 +915,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						_GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
 					EndIf
 				Case $LVN_ITEMCHANGED
+					; follow up in main While loop
+					$bSelectChanged = True
 					; item selection(s) have changed
 					_selectionChangedLV()
 				Case $LVN_BEGINDRAG, $LVN_BEGINRDRAG
@@ -853,6 +943,11 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 
 					DestroyDropSource($pDropSource)
 					_Release($pDataObj)
+
+					; track Undo availability
+					$bUndo = True
+					; TODO: need to confirm if drop was successful or cancelled
+					_AllowUndo()
 
 					; there is not supposed to be a Return value on LVN_BEGINDRAG
 					; however it fixes an issue with built-in drag-drop mechanism (now that we use DoDragDrop)
@@ -930,6 +1025,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						__TreeListExplorer_Reload($hTLESystem)
 
 						_Release($pDataObj)
+						_AllowUndo()
 					EndIf
 				Case $LVN_BEGINLABELEDITA, $LVN_BEGINLABELEDITW
 					Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
@@ -994,6 +1090,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 							_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
 							; refresh TLE system to pick up any folder changes, file type changes, etc.
 							__TreeListExplorer_Reload($hTLESystem)
+							_AllowUndo()
                             Return True     ; allow rename to occur
                     EndSelect
 				Case $NM_SETFOCUS
@@ -1030,6 +1127,11 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 
 						;Relase the data object so the system can destroy it (prevent memory leaks)
 						_Release($pDataObj)
+
+						; track Undo availability
+						$bUndo = True
+						; TODO: need to confirm if drop was successful or cancelled
+						_AllowUndo()
 					EndIf
 				Case $TVN_KEYDOWN
 					Local $tTVKeyDown = DllStructCreate($tagNMTVKEYDOWN, $lParam)
@@ -1049,6 +1151,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 
 							;Relase the data object so the system can destroy it (prevent memory leaks)
 						_Release($pDataObj)
+						_AllowUndo()
 					EndIf
 				Case $TVN_BEGINLABELEDITA, $TVN_BEGINLABELEDITW
 					HotKeySet("{Enter}", "_SaveEditTV")
@@ -1115,6 +1218,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 								$sRenameTo = StringReplace($sRenameFrom, $sRenameItem, $sTextRet)
 								_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
 								;__TreeListExplorer_Reload($hTLESystem)
+								_AllowUndo()
 								Return True     ; allow rename to occur
                     	EndSelect
 					EndIf
@@ -1125,8 +1229,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					$sControlFocus = ''
 					$bFocusChanged = True
 				Case $TVN_SELCHANGINGA, $TVN_SELCHANGINGW
-					;ConsoleWrite("treeview selection changing" & @CRLF)
-					; TODO: maybe follow up in While loop
+					; follow up in main While loop
+					$bSelectChanged = True
 			EndSwitch
 	EndSwitch
 
@@ -1416,18 +1520,25 @@ Func WM_SIZE($hWnd, $iMsg, $wParam, $lParam)
 EndFunc   ;==>WM_SIZE
 
 Func _Properties()
-	Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
-	If $aSelectedLV[0] = 1 Then
-		_WinAPI_ShellObjectProperties($sCurrentPath)
-	ElseIf $aSelectedLV[0] = 0 Then
-		_WinAPI_ShellObjectProperties(__TreeListExplorer_GetPath($hTLESystem))
-	Else
-		;$sSelectedItems
-		Local $aFiles = StringSplit($sSelectedItems, "|")
-		_ArrayDelete($aFiles, $aFiles[0])
-		_ArrayDelete($aFiles, 0)
-		_WinAPI_SHMultiFileProperties(__TreeListExplorer_GetPath($hTLESystem), $aFiles)
-	EndIf
+	Select
+		Case $sControlFocus = 'List'
+			Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
+			If $aSelectedLV[0] = 1 Then
+				_WinAPI_ShellObjectProperties($sCurrentPath)
+			ElseIf $aSelectedLV[0] = 0 Then
+				_WinAPI_ShellObjectProperties(__TreeListExplorer_GetPath($hTLESystem))
+			Else
+				;$sSelectedItems
+				Local $aFiles = StringSplit($sSelectedItems, "|")
+				_ArrayDelete($aFiles, $aFiles[0])
+				_ArrayDelete($aFiles, 0)
+				_WinAPI_SHMultiFileProperties(__TreeListExplorer_GetPath($hTLESystem), $aFiles)
+			EndIf
+		Case $sControlFocus = 'Tree'
+			Local $hTreeItem = _GUICtrlTreeView_GetSelection($g_hTreeView)
+			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItem)
+			_WinAPI_ShellObjectProperties($sItemText)
+	EndSelect
 EndFunc   ;==>_Properties
 
 ; #FUNCTION# ====================================================================================================================
@@ -1959,8 +2070,184 @@ Func _MenuFunctions()
 			_Properties()
 		Case $idAboutItem
 			_About()
+		Case $idDeleteItem
+			_DeleteItems()
+			; track Undo availability
+			$bUndo = True
+			_AllowUndo()
+		Case $idRenameItem
+			_RenameItem()
+			; track Undo availability
+			$bUndo = True
+			_AllowUndo()
+		Case $idCopyItem
+			_CopyItems()
+			; track Undo availability
+			$bUndo = True
+		Case $idPasteItem
+			_PasteItems()
+			; track Undo availability
+			$bUndo = True
+			_AllowUndo()
+		Case $idUndoItem
+			_UndoOp()
 	EndSwitch
 EndFunc   ;==>_MenuFunctions
+
+Func _UndoOp()
+	ConsoleWrite("Undo from menu not available yet." & @CRLF)
+	; TODO: need to keep track of how many times Undo, may limit to 1 right now to be safe
+	; reset Undo availability
+    Local Const $hProgman = WinGetHandle("[CLASS:Progman]")
+    Local Const $hCurrent = WinGetHandle("[ACTIVE]")
+
+    Local Const $hSHELLDLL_DefView = _WinAPI_FindWindowEx($hProgman, 0, "SHELLDLL_DefView", "")
+    Local Const $hSysListView32    = _WinAPI_FindWindowEx($hSHELLDLL_DefView, 0, "SysListView32", "FolderView")
+
+    _WinAPI_SetForegroundWindow($hSysListView32)
+    _WinAPI_SetFocus($hSysListView32)
+
+    ControlSend($hSysListView32, "", "", "^z")
+    WinActivate($hCurrent)
+
+	__TreeListExplorer_Reload($hTLESystem)
+
+	$bUndo = False
+	GUICtrlSetState($idUndoItem, $GUI_DISABLE)
+	HotKeySet("^z")
+EndFunc
+
+Func _AllowUndo()
+	GUICtrlSetState($idUndoItem, $GUI_ENABLE)
+	HotKeySet("^z", "_UndoOp")
+EndFunc
+
+Func _PasteItems()
+	Local $sFullPath
+	Select
+		Case $sControlFocus = 'List'
+			Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
+			If $aSelectedLV[0] = 0 Then
+				; no selections in ListView currently, current path is Paste directory
+				Local $sSelectedLV = __TreeListExplorer_GetPath($hTLESystem)
+				$sFullPath = $sSelectedLV
+			ElseIf $aSelectedLV[0] = 1 Then
+				; 1 item selection in ListView
+				Local $sSelectedItem = _GUICtrlListView_GetItemText($idListview, $aSelectedLV[1], 0)
+				Local $sSelectedLV = __TreeListExplorer_GetPath($hTLESystem) & $sSelectedItem
+				; is selected path a folder
+				If StringInStr(FileGetAttrib($sSelectedLV), "D") Then
+					$sSelectedLV = $sSelectedLV
+				Else
+					Return
+				EndIf
+			EndIf
+			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+			$sAction = "CopyItems"
+			_IFileOperationFile($pCopyObj, $sFullPath, $sAction, $iFlags)
+			__TreeListExplorer_Reload($hTLESystem)
+		Case $sControlFocus = 'Tree'
+			Local $hTreeItem = _GUICtrlTreeView_GetSelection($g_hTreeView)
+			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItem)
+			$sFullPath = $sItemText
+			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+			$sAction = "CopyItems"
+			_IFileOperationFile($pCopyObj, $sFullPath, $sAction, $iFlags)
+			__TreeListExplorer_Reload($hTLESystem)
+	EndSelect
+EndFunc
+
+Func _CopyItems()
+	Select
+		Case $sControlFocus = 'List'
+			; if previous copy object exists and user initiates new copy, release previous object
+			If $bCopy Then _Release($pCopyObj)
+
+			; create array with list of selected listview items
+			Local $aItems = _GUICtrlListView_GetSelectedIndices($g_hListView, True)
+			For $i = 1 To $aItems[0]
+				$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListView, $aItems[$i])
+			Next
+
+			; TODO: $pCopyObj will probably need to be Global
+			;Local $pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
+
+			_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
+			$pCopyObj = GetDataObjectOfFile_B($aItems) ; jugador function
+
+			; we don't want to release this until after Paste
+			;_Release($pCopyObj)
+
+			; keep track of copy status for menu
+			$bCopy = True
+		Case $sControlFocus = 'Tree'
+			; if previous copy object exists and user initiates new copy, release previous object
+			If $bCopy Then _Release($pCopyObj)
+
+			Local $hTreeItem = _GUICtrlTreeView_GetSelection($g_hTreeView)
+			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItem)
+
+			;Get an IDataObject representing the file to copy
+			$pCopyObj = GetDataObjectOfFile(_GUIFrame_GetHandle($iFrame_A, 1), $sItemText)
+
+			; we don't want to release this until after Paste
+			;_Release($pCopyObj)
+
+			; keep track of copy status for menu
+			$bCopy = True
+	EndSelect
+EndFunc
+
+Func _RenameItem()
+	Select
+		Case $sControlFocus = 'List'
+			Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
+			; there should only be one selected item during a rename
+			Local $iItemLV = $aSelectedLV[1]
+			Local $hEditLabel = _GUICtrlListView_EditLabel($g_hListView, $iItemLV)
+		Case $sControlFocus = 'Tree'
+			Local $hTreeItem = _GUICtrlTreeView_GetSelection($g_hTreeView)
+			_GUICtrlTreeView_EditText($g_hTreeView, $hTreeItem)
+	EndSelect
+EndFunc
+
+Func _DeleteItems()
+	Select
+		Case $sControlFocus = 'List'
+			; create array with list of selected listview items
+			Local $aItems = _GUICtrlListView_GetSelectedIndices($g_hListview, True)
+			For $i = 1 To $aItems[0]
+				$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListview, $aItems[$i])
+			Next
+
+			;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
+
+			_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
+			Local $pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+
+			Local $iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+			_IFileOperationDelete($pDataObj, $iFlags)
+
+			__TreeListExplorer_Reload($hTLESystem)
+
+			_Release($pDataObj)
+		Case $sControlFocus = 'Tree'
+			Local $hTreeItemSel = _GUICtrlTreeView_GetSelection($g_hTreeView)
+			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItemSel)
+
+			Local $pDataObj, $pDropSource
+
+			;Get an IDataObject representing the file to copy
+			$pDataObj = GetDataObjectOfFile(_GUIFrame_GetHandle($iFrame_A, 1), $sItemText)
+			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+			_IFileOperationDelete($pDataObj, $iFlags)
+
+			__TreeListExplorer_Reload($hTLESystem)
+
+				;Relase the data object so the system can destroy it (prevent memory leaks)
+			_Release($pDataObj)
+	EndSelect
+EndFunc
 
 Func _EndDrag()
 	; reorder columns after header drag and drop

@@ -227,3 +227,9 @@ Func _PathSplit_mod($sFilePath)
 
 	Return $aArray
 EndFunc   ;==>_PathSplit_mod
+
+Func _WinAPI_FindWindowEx($hParent, $hAfter, $sClass, $sTitle = "")
+    Local $ret = DllCall($hUser32, "hwnd", "FindWindowExW", "hwnd", $hParent, "hwnd", $hAfter, "wstr", $sClass, "wstr", $sTitle)
+    If @error Or Not IsArray($ret) Then Return 0
+    Return $ret[0]
+EndFunc
