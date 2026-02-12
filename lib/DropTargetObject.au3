@@ -189,7 +189,6 @@ Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
 			Local $aListItem = _GUICtrlListView_HitTest($tData.hTarget, $tPoint.X, $tPoint.Y)
 			Local $sItemText = _GUICtrlListView_GetItemText($tData.hTarget, $aListItem[0])
 			Local $sFullPath = __TreeListExplorer_GetPath(1) & $sItemText
-			;ConsoleWrite("$sFullPath: " & $sFullPath & @CRLF)
 			If Not $sItemText Then
 				; get the currently selected path
 				$sDirPath = __TreeListExplorer_GetPath(1)

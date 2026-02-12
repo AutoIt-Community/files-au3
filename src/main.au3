@@ -74,7 +74,7 @@ Global $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, 0x000000)
 Global $iTopSpacer = Round(12 * $iDPI)
 Global $aPosTip, $iOldaPos0, $iOldaPos1
 Global $sRenameFrom, $sControlFocus, $bFocusChanged = False, $bSelectChanged = False, $bSaveEdit = False
-Global $bCopy = False, $pCopyObj, $bUndo = False
+Global $bCopy = False, $pCopyObj
 ; force light mode
 ;$isDarkMode = False
 
@@ -442,6 +442,7 @@ Func _FilesAu3()
 	$sMsg &= "recent Undo operation."
 	MsgBox($MB_ICONWARNING, "Files Au3", $sMsg)
 
+	; TreeView has initial focus
 	$sControlFocus = 'Tree'
 	$bFocusChanged = True
 
@@ -466,16 +467,6 @@ Func _FilesAu3()
 			Select
 				Case $sControlFocus = 'List'
 					; ListView currently has focus
-					; need to ensure it has a selection
-					; figure out which menu options to enable/disable
-					; get selected indices
-					; if 1 selected, show Rename and Delete
-					; if more than 1 don't show Rename, but show Delete, Copy
-					; TODO: need to destroy Copy object after Paste; or maybe not
-					; TODO: Paste can only be enabled if valid target dir and copy object exists
-					; TODO: Move Properties enable/disable here as well
-					; TODO: set/unset related hotkeys here too
-					; TODO: for most file management functions, need to check if path is only root of drive (caution)
 					Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
 					If $aSelectedLV[0] = 0 Then
 						; no selections in ListView currently
@@ -488,6 +479,7 @@ Func _FilesAu3()
 						HotKeySet("^v", $bCopy ? "_PasteItems" : "")
 						GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
 						HotKeySet("+p", "_Properties")
+						GUICtrlSetState($idPropertiesLV, $GUI_ENABLE)
 					ElseIf $aSelectedLV[0] = 1 Then
 						; 1 item selection in ListView
 						GUICtrlSetState($idRenameItem, $GUI_ENABLE)
@@ -507,6 +499,7 @@ Func _FilesAu3()
 						EndIf
 						GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
 						HotKeySet("+p", "_Properties")
+						GUICtrlSetState($idPropertiesLV, $GUI_ENABLE)
 					Else
 						; multiple items selected in ListView
 						GUICtrlSetState($idRenameItem, $GUI_DISABLE) ; not supporting multiple file Rename right now
@@ -518,6 +511,7 @@ Func _FilesAu3()
 						HotKeySet("^v")
 						GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
 						HotKeySet("+p", "_Properties")
+						GUICtrlSetState($idPropertiesLV, $GUI_ENABLE)
 					EndIf
 				Case $sControlFocus = 'Tree'
 					; TreeView currently has focus
@@ -531,6 +525,7 @@ Func _FilesAu3()
 					HotKeySet("^v", $bCopy ? "_PasteItems" : "")
 					GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
 					HotKeySet("+p", "_Properties")
+					GUICtrlSetState($idPropertiesLV, $GUI_DISABLE)
 				Case Not $sControlFocus
 					; Neither the ListView or TreeView has focus right now
 					; in this case likely disable menu options
@@ -543,13 +538,9 @@ Func _FilesAu3()
 					HotKeySet("^v")
 					GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
 					HotKeySet("+p")
+					GUICtrlSetState($idPropertiesLV, $GUI_DISABLE)
 			EndSelect
 		EndIf
-
-		;If $bUndo Then
-		;	GUICtrlSetState($idUndoItem, $GUI_ENABLE)
-		;	HotKeySet("^z", "_UndoOp")
-		;EndIf
 
 		Sleep(200)
 	WEnd
@@ -681,21 +672,6 @@ Func _selectionChangedLV()
 	Next
 
 	Local $iItemCount = $iFileCount + $iDirCount
-
-	; Properties dialog
-	If $iItemCount = 1 Then
-		$sCurrentPath = $sSelectedLV
-		GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
-		GUICtrlSetState($idPropertiesLV, $GUI_ENABLE)
-	ElseIf $iItemCount <> 1 And $iItemCount <> 0 Then
-		; multi-properties
-		; need number of selected items to declare array
-		GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
-		GUICtrlSetState($idPropertiesLV, $GUI_ENABLE)
-	Else
-		GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
-		GUICtrlSetState($idPropertiesLV, $GUI_DISABLE)
-	EndIf
 
 	If $iItemCount > 1 Then
 		$g_aText[1] = "  " & $iItemCount & " items selected"
@@ -938,19 +914,17 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					;Create an IDropSource to handle our end of the drag/drop operation.
 					$pDropSource = CreateDropSource()
 
-					_SHDoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_MOVE, $DROPEFFECT_COPY, $DROPEFFECT_LINK))
+					Local $iResult = _SHDoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_MOVE, $DROPEFFECT_COPY, $DROPEFFECT_LINK))
 					;__TreeListExplorer_Reload($hTLESystem)
 
 					DestroyDropSource($pDropSource)
 					_Release($pDataObj)
 
-					; track Undo availability
-					$bUndo = True
-					; TODO: need to confirm if drop was successful or cancelled
-					_AllowUndo()
+					; allow Undo if drop returns successful
+					If $iResult = $DRAGDROP_S_DROP Then _AllowUndo()
 
 					; there is not supposed to be a Return value on LVN_BEGINDRAG
-					; however it fixes an issue with built-in drag-drop mechanism (now that we use DoDragDrop)
+					; however it fixes an issue with built-in drag-drop mechanism
 					Return 0
 				Case $LVN_HOTTRACK                ; Sent by a list-view control When the user moves the mouse over an item
 					Local $tInfo2 = DllStructCreate($tagNMLISTVIEW, $lParam)
@@ -1119,7 +1093,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						$pDropSource = CreateDropSource()
 
 						If Not @error Then
-							_SHDoDragDrop($pDataObj, $pDropSource,  BitOR($DROPEFFECT_MOVE, $DROPEFFECT_COPY, $DROPEFFECT_LINK))
+							Local $iResult = _SHDoDragDrop($pDataObj, $pDropSource,  BitOR($DROPEFFECT_MOVE, $DROPEFFECT_COPY, $DROPEFFECT_LINK))
 
 							;Operation done, destroy our drop source. (Can't just IUnknown_Release() this one!)
 							DestroyDropSource($pDropSource)
@@ -1128,10 +1102,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						;Relase the data object so the system can destroy it (prevent memory leaks)
 						_Release($pDataObj)
 
-						; track Undo availability
-						$bUndo = True
-						; TODO: need to confirm if drop was successful or cancelled
-						_AllowUndo()
+						; allow Undo if drop returns successful
+						If $iResult = $DRAGDROP_S_DROP Then _AllowUndo()
 					EndIf
 				Case $TVN_KEYDOWN
 					Local $tTVKeyDown = DllStructCreate($tagNMTVKEYDOWN, $lParam)
@@ -2072,22 +2044,14 @@ Func _MenuFunctions()
 			_About()
 		Case $idDeleteItem
 			_DeleteItems()
-			; track Undo availability
-			$bUndo = True
 			_AllowUndo()
 		Case $idRenameItem
 			_RenameItem()
-			; track Undo availability
-			$bUndo = True
 			_AllowUndo()
 		Case $idCopyItem
 			_CopyItems()
-			; track Undo availability
-			$bUndo = True
 		Case $idPasteItem
 			_PasteItems()
-			; track Undo availability
-			$bUndo = True
 			_AllowUndo()
 		Case $idUndoItem
 			_UndoOp()
@@ -2095,9 +2059,7 @@ Func _MenuFunctions()
 EndFunc   ;==>_MenuFunctions
 
 Func _UndoOp()
-	ConsoleWrite("Undo from menu not available yet." & @CRLF)
-	; TODO: need to keep track of how many times Undo, may limit to 1 right now to be safe
-	; reset Undo availability
+	; perform Undo by sending Ctrl+Z to the Desktop (Progman class, SysListView32 class)
     Local Const $hProgman = WinGetHandle("[CLASS:Progman]")
     Local Const $hCurrent = WinGetHandle("[ACTIVE]")
 
@@ -2112,7 +2074,6 @@ Func _UndoOp()
 
 	__TreeListExplorer_Reload($hTLESystem)
 
-	$bUndo = False
 	GUICtrlSetState($idUndoItem, $GUI_DISABLE)
 	HotKeySet("^z")
 EndFunc
@@ -2169,7 +2130,6 @@ Func _CopyItems()
 				$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListView, $aItems[$i])
 			Next
 
-			; TODO: $pCopyObj will probably need to be Global
 			;Local $pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
 
 			_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
@@ -2349,7 +2309,7 @@ Func _SHDoDragDrop($pDataObj, $pDropSource, $iOKEffects)
 	Local $aCall = DllCall($hShell32, "long", "SHDoDragDrop", "hwnd", Null, "ptr", $pDataObj, "ptr", Null, "dword", $iOKEffects, "ptr*", 0)
 
     If @error Then Return SetError(@error, @extended, $aCall)
-    Return SetError($aCall[0], 0, $aCall[4])
+    Return '0x' & Hex($aCall[0])
 EndFunc   ;==>_SHDoDragDrop
 
 Func GetDataObjectOfFile($hWnd, $sPath)
