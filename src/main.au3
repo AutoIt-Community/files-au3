@@ -1496,7 +1496,9 @@ Func _Properties()
 		Case $sControlFocus = 'List'
 			Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
 			If $aSelectedLV[0] = 1 Then
-				_WinAPI_ShellObjectProperties($sCurrentPath)
+				Local $sSelectedItem = _GUICtrlListView_GetItemText($idListview, $aSelectedLV[1], 0)
+				Local $sSelectedLV = __TreeListExplorer_GetPath($hTLESystem) & $sSelectedItem
+				_WinAPI_ShellObjectProperties($sSelectedLV)
 			ElseIf $aSelectedLV[0] = 0 Then
 				_WinAPI_ShellObjectProperties(__TreeListExplorer_GetPath($hTLESystem))
 			Else
