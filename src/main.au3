@@ -1,3 +1,4 @@
+#NoTrayIcon
 #AutoIt3Wrapper_UseX64=Y
 ;#AutoIt3Wrapper_Au3Check_Parameters=-d -w 1 -w 2 -w 3 -w 4 -w 5 -w 6 -w 7
 
@@ -388,6 +389,9 @@ Func _FilesAu3()
 
 	GUISetState(@SW_SHOW, $g_hGUI)
 	_drawUAHMenuNCBottomLine($g_hGUI)
+
+	; set GUI icon
+	_WinSetIcon($g_hGUI, @ScriptDir & "\app.ico")
 
 	_removeExStyles()
 
@@ -2099,3 +2103,10 @@ Func TreeItemToPath($hTree, $hItem, $bArray = False)
 	_ArrayInsert($aPath, 0, 1)
 	Return $aPath
 EndFunc   ;==>TreeItemToPath
+
+Func _WinSetIcon($hWnd, $sFile, $iIndex = 0, $bSmall = False) ; https://www.autoitscript.com/forum/topic/168698-changing-a-windows-icon/#findComment-1461109
+  Local $WM_SETICON = 128, $ICON_SMALL = 0, $ICON_BIG = 1, $hIcon = _WinAPI_ExtractIcon($sFile, $iIndex, $bSmall)
+  If Not $hIcon Then Return SetError(1, 0, 1) ; https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-seticon
+  _SendMessage($hWnd, $WM_SETICON, Int(Not $bSmall), $hIcon)
+  _WinAPI_DestroyIcon($hIcon)
+EndFunc   ;==>_WinSetIcon
