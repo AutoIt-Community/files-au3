@@ -626,13 +626,15 @@ Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $b
 
 	If $bLoading Then
 		; add delay before changing cursor and clearing status item count
-		AdlibRegister("_ClearStatus", 250)
+		AdlibRegister("_ListViewLoadWait", 250)
 		Return
 	EndIf
 
 	If $bCursorOverride Then
 		; reset GUI cursor if it has been overridden
 		GUISetCursor($MCID_ARROW, 0, $g_hGUI)
+		GUISetCursor($MCID_ARROW, 0, _GUIFrame_GetHandle($iFrame_A, 2))
+		GUICtrlSetState($idListview, $GUI_SHOW)
 		$bCursorOverride = False
 	EndIf
 
@@ -640,17 +642,19 @@ Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $b
 	$bPathInputChanged = False
 EndFunc   ;==>_loadingCallback
 
-Func _ClearStatus()
+Func _ListViewLoadWait()
 	If $bLoadStatus Then
 		; override GUI with loading/waiting cursor on directories that are slower to load
 		$bCursorOverride = True
 		GUISetCursor($MCID_WAIT, 1, $g_hGUI)
+		GUISetCursor($MCID_WAIT, 1, _GUIFrame_GetHandle($iFrame_A, 2))
+		GUICtrlSetState($idListview, $GUI_HIDE)
 		; clear statusbar item count
 		$g_aText[0] = ""
 		_WinAPI_RedrawWindow($g_hStatus)
 	EndIf
-	AdlibUnRegister("_ClearStatus")
-EndFunc   ;==>_ClearStatus
+	AdlibUnRegister("_ListViewLoadWait")
+EndFunc   ;==>_ListViewLoadWait
 
 Func _folderCallback($hSystem, $sRoot, $sFolder, $sSelected)
 	Local Static $sFolderPrev = ""
