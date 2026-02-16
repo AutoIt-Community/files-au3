@@ -64,7 +64,8 @@ Global $sBack, $sForward, $sUpLevel, $sRefresh
 Global $sTreeDragItem, $sListDragItems, $bDragToolActive = False
 Global $pLVDropTarget, $pTVDropTarget
 Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
-Global $idExitItem, $idAboutItem, $idDeleteItem, $idRenameItem, $idCopyItem, $idPasteItem, $idUndoItem
+Global $idExitItem, $idAboutItem, $idDeleteItem, $idRenameItem, $idCopyItem, $idPasteItem, $idUndoItem, $idHiddenItem, $idSystemItem
+Global $bHideHidden = False, $bHideSystem = False
 Global $hCursor, $hProc
 Global $sSelectedItems, $g_aText, $gText
 Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $bTooltipActive
@@ -239,6 +240,15 @@ Func _FilesAu3()
 	; View menu
 	$idThemeItem = GUICtrlCreateMenuItem("&Dark Mode", $idViewMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlCreateMenuItem("", $idViewMenu)
+	$idHiddenItem = GUICtrlCreateMenuItem("&Show Hidden Files", $idViewMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlSetState($idHiddenItem, $GUI_CHECKED)
+	$bHideHidden = False
+	$idSystemItem = GUICtrlCreateMenuItem("&Hide Protected System Files", $idViewMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlSetState($idSystemItem, $GUI_CHECKED)
+	$bHideSystem = True
 	; Help menu
 	$idAboutItem = GUICtrlCreateMenuItem("&About", $idHelpMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
@@ -283,6 +293,9 @@ Func _FilesAu3()
 	__TreeListExplorer_AddView($hTLESystem, $idInputPath)
 	__TreeListExplorer_AddView($hTLESystem, $idTreeView)
 	__TreeListExplorer_SetViewIconSize($idTreeView, $iTreeListIconSize)
+
+	; set callback to allow filtering of hidden and/or protected system files
+	__TreeListExplorer_SetCallback($idTreeView, $__TreeListExplorer_Callback_Filter, "_filterCallback")
 
 	; Create listview frame
 	_GUIFrame_Switch($iFrame_A, 2)
@@ -339,6 +352,9 @@ Func _FilesAu3()
 	__TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_DoubleClick, "_doubleClickCallback")
 	__TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_ListViewPaths, "_handleListViewData")
 	__TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_ListViewItemCreated, "_handleListViewItemCreated")
+
+	; set callback to allow filtering of hidden and/or protected system files
+	__TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_Filter, "_filterCallback")
 
 	; Set resizing flag for all created frames
 	_GUIFrame_ResizeSet(0)
@@ -2057,6 +2073,28 @@ Func _MenuFunctions()
 			_AllowUndo()
 		Case $idUndoItem
 			_UndoOp()
+		Case $idHiddenItem
+			If BitAND(GUICtrlRead($idHiddenItem), $GUI_CHECKED) = $GUI_CHECKED Then
+				GUICtrlSetState($idHiddenItem, $GUI_UNCHECKED)
+				$bHideHidden = True
+			Else
+				GUICtrlSetState($idHiddenItem, $GUI_CHECKED)
+				$bHideHidden = False
+			EndIf
+
+			__TreeListExplorer_ReloadView($idListView, True)
+			__TreeListExplorer_ReloadView($idTreeView, True)
+		Case $idSystemItem
+			If BitAND(GUICtrlRead($idSystemItem), $GUI_CHECKED) = $GUI_CHECKED Then
+				GUICtrlSetState($idSystemItem, $GUI_UNCHECKED)
+				$bHideSystem = False
+			Else
+				GUICtrlSetState($idSystemItem, $GUI_CHECKED)
+				$bHideSystem = True
+			EndIf
+
+			__TreeListExplorer_ReloadView($idListView, True)
+			__TreeListExplorer_ReloadView($idTreeView, True)
 	EndSwitch
 EndFunc   ;==>_MenuFunctions
 
@@ -2569,4 +2607,29 @@ Func _GetVersion($sUdfCode)
         $arResult[1][$i+1] = $arUDFVersion[$i]
     Next
     Return SetExtended($iExtended, $arResult)
+EndFunc
+
+Func _filterCallback($hSystem, $hView, $bIsFolder, $sPath, $sName, $sExt)
+	If $bHideHidden Or $bHideSystem Then
+		; ensure that root drive letters do not get hidden
+		If _WinAPI_PathIsRoot_mod($sPath&$sName&$sExt) Then Return True
+
+		Switch $sName
+			Case "$RECYCLE.BIN"
+				Return False
+			Case "System Volume Information"
+				Return False
+		EndSwitch
+	EndIf
+
+	Select
+		Case $bHideSystem
+			; filter out files and folders with System attribute
+			If StringInStr(FileGetAttrib($sPath&$sName&$sExt), "S", 2)>0 Then Return False
+		Case $bHideHidden
+			; filter out files and folders with Hidden attribute
+			If StringInStr(FileGetAttrib($sPath&$sName&$sExt), "H", 2)>0 Then Return False
+	EndSelect
+
+	Return True
 EndFunc
