@@ -365,12 +365,32 @@ Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 					Case $DROPEFFECT_COPY
 						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
 						$sAction = "CopyItems"
-						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						; TODO: IPC: needs to start sub-process here
+						; TODO: IPC: sub-process to receive $iFlags, $sAction, $sFullPath (destination) and $pDataObject
+						; TODO: IPC: if we cannot send $pDataObject we can use _WinAPI_DragQueryFileEx to obtain array
+						; TODO: IPC: we can send that array to sub-process and recreate $pDataObject in sub-process
+						; TODO: IPC: $pDataObj = GetDataObjectOfFile_B($aItems) ; to recreate data object from array
+						; TODO: IPC: the _IFileOperationFile line (below) needs to run from the sub-process
+						Local $iResult = _IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						; TODO: IPC: _IFileOperationFile will return True when file operation is complete
+						; TODO: IPC: we will need to release object after file operation: _Release($pDataObj)
+						; TODO: IPC: sub-process need to return True back to main process
+						; TODO: IPC: main process will continue below
 						__TreeListExplorer_Reload(1)
 					Case $DROPEFFECT_MOVE
 						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
 						$sAction = "MoveItems"
-						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						; TODO: IPC: needs to start sub-process here
+						; TODO: IPC: sub-process to receive $iFlags, $sAction, $sFullPath (destination) and $pDataObject
+						; TODO: IPC: if we cannot send $pDataObject we can use _WinAPI_DragQueryFileEx to obtain array
+						; TODO: IPC: we can send that array to sub-process and recreate $pDataObject in sub-process
+						; TODO: IPC: $pDataObj = GetDataObjectOfFile_B($aItems) ; to recreate data object from array
+						; TODO: IPC: the _IFileOperationFile line (below) needs to run from the sub-process
+						Local $iResult = _IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						; TODO: IPC: _IFileOperationFile will return True when file operation is complete
+						; TODO: IPC: we will need to release object after file operation: _Release($pDataObj)
+						; TODO: IPC: sub-process need to return True back to main process
+						; TODO: IPC: main process will continue below
 						; send response back to source to indicate that file move has been handled
 						$tEffect.iEffect = $DROPEFFECT_NONE
 						__SetPerformedDropEffect($pDataObject, $DROPEFFECT_NONE)
@@ -389,12 +409,32 @@ Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 					Case $DROPEFFECT_COPY
 						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
 						$sAction = "CopyItems"
-						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						; TODO: IPC: needs to start sub-process here
+						; TODO: IPC: sub-process to receive $iFlags, $sAction, $sFullPath (destination) and $pDataObject
+						; TODO: IPC: if we cannot send $pDataObject we can use _WinAPI_DragQueryFileEx to obtain array
+						; TODO: IPC: we can send that array to sub-process and recreate $pDataObject in sub-process
+						; TODO: IPC: $pDataObj = GetDataObjectOfFile_B($aItems) ; to recreate data object from array
+						; TODO: IPC: the _IFileOperationFile line (below) needs to run from the sub-process
+						Local $iResult = _IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						; TODO: IPC: _IFileOperationFile will return True when file operation is complete
+						; TODO: IPC: we will need to release object after file operation: _Release($pDataObj)
+						; TODO: IPC: sub-process need to return True back to main process
+						; TODO: IPC: main process will continue below
 						__TreeListExplorer_Reload(1)
 					Case $DROPEFFECT_MOVE
 						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
 						$sAction = "MoveItems"
-						_IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						; TODO: IPC: needs to start sub-process here
+						; TODO: IPC: sub-process to receive $iFlags, $sAction, $sFullPath (destination) and $pDataObject
+						; TODO: IPC: if we cannot send $pDataObject we can use _WinAPI_DragQueryFileEx to obtain array
+						; TODO: IPC: we can send that array to sub-process and recreate $pDataObject in sub-process
+						; TODO: IPC: $pDataObj = GetDataObjectOfFile_B($aItems) ; to recreate data object from array
+						; TODO: IPC: the _IFileOperationFile line (below) needs to run from the sub-process
+						Local $iResult = _IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
+						; TODO: IPC: _IFileOperationFile will return True when file operation is complete
+						; TODO: IPC: we will need to release object after file operation: _Release($pDataObj)
+						; TODO: IPC: sub-process need to return True back to main process
+						; TODO: IPC: main process will continue below
 						; send response back to source to indicate that file move has been handled
 						$tEffect.iEffect = $DROPEFFECT_NONE
 						__SetPerformedDropEffect($pDataObject, $DROPEFFECT_NONE)
