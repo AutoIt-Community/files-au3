@@ -13,6 +13,7 @@
 #include "TreeListExplorer.au3"
 #include "IFileOperation.au3"
 #include "SharedFunctions.au3"
+#include "../lib/SubFileOperations.au3"
 
 Global $__g_iDropTargetCount
 Global $__g_hMthd_DragEnter, $__g_hMthd_DragOver, $__g_hMthd_DragLeave, $__g_hMthd_Drop
@@ -329,6 +330,13 @@ Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 		$oDataObject.GetData($tFormatEtc, $tStgMedium)
 
 		Local $asFilenames = _WinAPI_DragQueryFileEx($tStgMedium.handle)
+		; remove amount of items at [0]
+		Local $arPaths[UBound($asFilenames)-1]
+		For $i=0 To UBound($arPaths)-1
+			$arPaths[$i] = $asFilenames[$i+1]
+		Next
+
+		Local $sTargetPathAbs = Default
 
 		Switch _WinAPI_GetClassName_mod($tData.hTarget)
 			Case $WC_LISTVIEW
@@ -337,15 +345,15 @@ Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 
 				Local $aListItem = _GUICtrlListView_HitTest($tData.hTarget, $tPoint.X, $tPoint.Y)
 				Local $sItemText = _GUICtrlListView_GetItemText($tData.hTarget, $aListItem[0])
-				Local $sFullPath = __TreeListExplorer_GetPath(1) & $sItemText
-				If StringInStr(FileGetAttrib($sFullPath), "D") Then
+				$sTargetPathAbs = __TreeListExplorer_GetPath(1) & $sItemText
+				If StringInStr(FileGetAttrib($sTargetPathAbs), "D") Then
 					$sDirText = $sItemText
-					$sFullPath = $sFullPath
+					$sTargetPathAbs = $sTargetPathAbs
 					$bIsFolder = True
 				Else
 					; get the currently selected path
 					$sDirPath = __TreeListExplorer_GetPath(1)
-					$sFullPath = $sDirPath
+					$sTargetPathAbs = $sDirPath
 					; obtain folder name only for drag tooltip
 					Local $aPath = _StringBetween($sDirPath, "\", "\")
 					$sDirText = $aPath[UBound($aPath) - 1]
@@ -359,89 +367,24 @@ Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 					Local $aPath = _StringBetween($sDirPath, "\", "\")
 					$sDirText = $aPath[UBound($aPath) - 1]
 				EndIf
-
-				; determine if IFileOperation needs to copy or move files
-				Switch $iFinalEffect
-					Case $DROPEFFECT_COPY
-						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-						$sAction = "CopyItems"
-						; TODO: IPC: needs to start sub-process here
-						; TODO: IPC: sub-process to receive $iFlags, $sAction, $sFullPath (destination) and $pDataObject
-						; TODO: IPC: if we cannot send $pDataObject we can use _WinAPI_DragQueryFileEx to obtain array
-						; TODO: IPC: we can send that array to sub-process and recreate $pDataObject in sub-process
-						; TODO: IPC: $pDataObj = GetDataObjectOfFile_B($aItems) ; to recreate data object from array
-						; TODO: IPC: the _IFileOperationFile line (below) needs to run from the sub-process
-						Local $iResult = _IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
-						; TODO: IPC: _IFileOperationFile will return True when file operation is complete
-						; TODO: IPC: we will need to release object after file operation: _Release($pDataObj)
-						; TODO: IPC: sub-process need to return True back to main process
-						; TODO: IPC: main process will continue below
-						__TreeListExplorer_Reload(1)
-					Case $DROPEFFECT_MOVE
-						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-						$sAction = "MoveItems"
-						; TODO: IPC: needs to start sub-process here
-						; TODO: IPC: sub-process to receive $iFlags, $sAction, $sFullPath (destination) and $pDataObject
-						; TODO: IPC: if we cannot send $pDataObject we can use _WinAPI_DragQueryFileEx to obtain array
-						; TODO: IPC: we can send that array to sub-process and recreate $pDataObject in sub-process
-						; TODO: IPC: $pDataObj = GetDataObjectOfFile_B($aItems) ; to recreate data object from array
-						; TODO: IPC: the _IFileOperationFile line (below) needs to run from the sub-process
-						Local $iResult = _IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
-						; TODO: IPC: _IFileOperationFile will return True when file operation is complete
-						; TODO: IPC: we will need to release object after file operation: _Release($pDataObj)
-						; TODO: IPC: sub-process need to return True back to main process
-						; TODO: IPC: main process will continue below
-						; send response back to source to indicate that file move has been handled
-						$tEffect.iEffect = $DROPEFFECT_NONE
-						__SetPerformedDropEffect($pDataObject, $DROPEFFECT_NONE)
-						__TreeListExplorer_Reload(1)
-				EndSwitch
-
 			Case $WC_TREEVIEW
 				; restore original treeview selection
 				_GUICtrlTreeView_SelectItem($tData.hTarget, $hTreeOrig)
 
 				; full treeview drop path is most recently DROPHILITED item
-				Local $sFullPath =$sDropTV
-
-				; determine if IFileOperation needs to copy or move files
-				Switch $iFinalEffect
-					Case $DROPEFFECT_COPY
-						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-						$sAction = "CopyItems"
-						; TODO: IPC: needs to start sub-process here
-						; TODO: IPC: sub-process to receive $iFlags, $sAction, $sFullPath (destination) and $pDataObject
-						; TODO: IPC: if we cannot send $pDataObject we can use _WinAPI_DragQueryFileEx to obtain array
-						; TODO: IPC: we can send that array to sub-process and recreate $pDataObject in sub-process
-						; TODO: IPC: $pDataObj = GetDataObjectOfFile_B($aItems) ; to recreate data object from array
-						; TODO: IPC: the _IFileOperationFile line (below) needs to run from the sub-process
-						Local $iResult = _IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
-						; TODO: IPC: _IFileOperationFile will return True when file operation is complete
-						; TODO: IPC: we will need to release object after file operation: _Release($pDataObj)
-						; TODO: IPC: sub-process need to return True back to main process
-						; TODO: IPC: main process will continue below
-						__TreeListExplorer_Reload(1)
-					Case $DROPEFFECT_MOVE
-						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-						$sAction = "MoveItems"
-						; TODO: IPC: needs to start sub-process here
-						; TODO: IPC: sub-process to receive $iFlags, $sAction, $sFullPath (destination) and $pDataObject
-						; TODO: IPC: if we cannot send $pDataObject we can use _WinAPI_DragQueryFileEx to obtain array
-						; TODO: IPC: we can send that array to sub-process and recreate $pDataObject in sub-process
-						; TODO: IPC: $pDataObj = GetDataObjectOfFile_B($aItems) ; to recreate data object from array
-						; TODO: IPC: the _IFileOperationFile line (below) needs to run from the sub-process
-						Local $iResult = _IFileOperationFile($pDataObject, $sFullPath, $sAction, $iFlags)
-						; TODO: IPC: _IFileOperationFile will return True when file operation is complete
-						; TODO: IPC: we will need to release object after file operation: _Release($pDataObj)
-						; TODO: IPC: sub-process need to return True back to main process
-						; TODO: IPC: main process will continue below
-						; send response back to source to indicate that file move has been handled
-						$tEffect.iEffect = $DROPEFFECT_NONE
-						__SetPerformedDropEffect($pDataObject, $DROPEFFECT_NONE)
-						__TreeListExplorer_Reload(1)
-				EndSwitch
-
+				$sTargetPathAbs = $sDropTV
 		EndSwitch
+		If $sTargetPathAbs<>Default Then
+			; determine if IFileOperation needs to copy or move files
+			Switch $iFinalEffect
+				Case $DROPEFFECT_COPY
+					__FilesOperation_DoInSub($__FileOperation_Copy, $sTargetPathAbs, $arPaths)
+				Case $DROPEFFECT_MOVE
+					__FilesOperation_DoInSub($__FileOperation_Move, $sTargetPathAbs, $arPaths)
+					$tEffect.iEffect = $DROPEFFECT_NONE
+					__SetPerformedDropEffect($pDataObject, $DROPEFFECT_NONE)
+			EndSwitch
+		EndIf
 	EndIf
 
 	$tData.bAcceptDrop = False
@@ -496,15 +439,15 @@ Func __DoDropResponse($tData, $iKeyState, $tPoint, $piEffect, $sDirText, $bIsSam
         EndSwitch
 
         ;If move is legally an option
-        If BitAND($tEffect.iEffect, $DROPEFFECT_MOVE) Then 
+        If BitAND($tEffect.iEffect, $DROPEFFECT_MOVE) Then
             If $iReqOp = $DROPEFFECT_MOVE And $bIsSameDrive Then $iRetEffect = $DROPEFFECT_MOVE
         EndIf
 		;If copy is legally an option
-        If BitAND($tEffect.iEffect, $DROPEFFECT_COPY) Then 
+        If BitAND($tEffect.iEffect, $DROPEFFECT_COPY) Then
             If $iReqOp = $DROPEFFECT_COPY Or $iRetEffect = $DROPEFFECT_NONE Then $iRetEffect = $DROPEFFECT_COPY
         EndIf
         ;If link is legally an option
-        If BitAND($tEffect.iEffect, $DROPEFFECT_LINK) Then 
+        If BitAND($tEffect.iEffect, $DROPEFFECT_LINK) Then
             If $iReqOp = $DROPEFFECT_LINK Or $iRetEffect = $DROPEFFECT_NONE Then $iRetEffect = $DROPEFFECT_LINK
         EndIf
         If $bIsSameFolder Then $iRetEffect = $DROPEFFECT_NONE

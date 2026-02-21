@@ -22,9 +22,11 @@ Global $hShell32 = DllOpen('shell32.dll')
 #include "../lib/GUIFrame_WBD_Mod.au3"
 #include "../lib/History.au3"
 #include "../lib/TreeListExplorer.au3"
+#include "../lib/IPC.au3"
 #include "../lib/ProjectConstants.au3"
 #include "../lib/DropSourceObject.au3"
 #include "../lib/DropTargetObject.au3"
+#include "../lib/SubFileOperations.au3"
 
 ; CREDITS:
 ; Kanashius     TreeListExplorer UDF
@@ -82,6 +84,12 @@ Global $bCopy = False, $pCopyObj
 ; get Windows build
 Global $iOSBuild = @OSBuild
 Global $iRevision = RegRead("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "UBR")
+
+; initialize IPC
+__IPC_StartUp($__IPC_LOG_INFO) ; maybe change to $__IPC_LOG_WARN
+If @error Then __IPC_Log($__IPC_LOG_INFO, "__IPC_StartUp failed", @error, @extended)
+
+__IPC_SubCheck("__FileOperations_Sub", Default, "__FileOperations_SubReceive", "__FileOperations_SubExit")
 
 ; button colors
 If $isDarkMode Then
@@ -1447,6 +1455,7 @@ Func _CleanExit()
 	DestroyDropTarget($pTVDropTarget)
 	GUIDelete($g_hGUI)
 	_ClearDarkSizebox()
+	__IPC_Shutdown()
 
 	DllClose($hKernel32)
 	DllClose($hGdi32)
@@ -2519,7 +2528,7 @@ Func __Fill_tag_STGMEDIUM(Byref $tSTGMEDIUM, Byref $aFiles)
     Local $pLock = DllCall($hKernel32, "ptr", "GlobalLock", "ptr", $hGlobal)[0]
 
     Local $tDROPFILES = DllStructCreate("dword pFiles; int x; int y; bool fNC; bool fWide", $pLock)
-    DllStructSetData($tDROPFILES, "pFiles", 20) 
+    DllStructSetData($tDROPFILES, "pFiles", 20)
     DllStructSetData($tDROPFILES, "fWide", True)
 
     Local $tPaths = DllStructCreate("wchar[" & StringLen($sFileList) & "]", $pLock + 20)
@@ -2535,9 +2544,9 @@ EndFunc
 
 Func __SHCreateDataObject($tIID_IDataObject, $ppidlFolder = 0, $cidl = 0, $papidl = 0, $pdtInner = 0)
     Local $aRes = DllCall($hShell32, "long", "SHCreateDataObject", _
-                                         "ptr", $ppidlFolder, _          
+                                         "ptr", $ppidlFolder, _
                                          "uint", $cidl, _
-                                         "ptr", $papidl, _ 
+                                         "ptr", $papidl, _
                                          "ptr", $pdtInner, _
                                          "struct*", $tIID_IDataObject, _
                                          "ptr*", 0)
