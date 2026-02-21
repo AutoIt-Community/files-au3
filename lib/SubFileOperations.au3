@@ -61,12 +61,14 @@ EndFunc
 
 ; ====================== main process ======================
 
-Func __FilesOperation_DoInSub($iOperation, $sTarget, ByRef $arPaths)
+Func __FilesOperation_DoInSub($iOperation, $sTarget, ByRef $arPaths, $pDataObject = Default, $piEffect = Default)
 	Local $mOperationElem[]
 	$mOperationElem.iType = $iOperation
 	$mOperationElem.sTarget = $sTarget
 	$mOperationElem.arPaths = $arPaths
 	$mOperationElem.iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+	$mOperationElem.pDataObject = $pDataObject
+	$mOperationElem.piEffect = $piEffect
 	Local $hSubProcess = __IPC_StartProcess("__FileOperations_Receive", Default, "__FilesOperation_RemoveSub")
 	If @error Then __IPC_Log($__IPC_LOG_ERROR, "Error starting subprocess: "&@error&":"&@extended)
 	; should be fine here, but maybe cause problems, when $__FileOperation_ProcessReady is received, before this was done...
@@ -91,6 +93,12 @@ Func __FileOperations_Receive($hSubProcess, $iCmd, $arData)
 			__IPC_MainSendCmd($hSubProcess, $mOperationElem.iType, $mOperationElem.sTarget, $mOperationElem.arPaths, $mOperationElem.iFlags)
 		Case $__FileOperation_Successful
 			__IPC_Log($__IPC_LOG_INFO, "Operation successfull")
+			If MapExists($__FileOperation_mData, $hSubProcess) Then
+				Local $mOperationElem = $__FileOperation_mData[$hSubProcess]
+				Local $tEffect = DllStructCreate("dword iEffect", $mOperationElem.piEffect)
+				$tEffect.iEffect = $DROPEFFECT_NONE
+				__SetPerformedDropEffect($mOperationElem.pDataObject, $DROPEFFECT_NONE)
+			EndIf
 			__TreeListExplorer_Reload(1)
 		Case $__FileOperation_Failed
 			__IPC_Log($__IPC_LOG_ERROR, "Operation failed")

@@ -380,9 +380,7 @@ Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 				Case $DROPEFFECT_COPY
 					__FilesOperation_DoInSub($__FileOperation_Copy, $sTargetPathAbs, $arPaths)
 				Case $DROPEFFECT_MOVE
-					__FilesOperation_DoInSub($__FileOperation_Move, $sTargetPathAbs, $arPaths)
-					$tEffect.iEffect = $DROPEFFECT_NONE
-					__SetPerformedDropEffect($pDataObject, $DROPEFFECT_NONE)
+					__FilesOperation_DoInSub($__FileOperation_Move, $sTargetPathAbs, $arPaths, $pDataObject, $piEffect)
 			EndSwitch
 		EndIf
 	EndIf
