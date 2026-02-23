@@ -2519,7 +2519,7 @@ Func __Fill_tag_STGMEDIUM(Byref $tSTGMEDIUM, Byref $aFiles)
     Local $pLock = DllCall($hKernel32, "ptr", "GlobalLock", "ptr", $hGlobal)[0]
 
     Local $tDROPFILES = DllStructCreate("dword pFiles; int x; int y; bool fNC; bool fWide", $pLock)
-    DllStructSetData($tDROPFILES, "pFiles", 20) 
+    DllStructSetData($tDROPFILES, "pFiles", 20)
     DllStructSetData($tDROPFILES, "fWide", True)
 
     Local $tPaths = DllStructCreate("wchar[" & StringLen($sFileList) & "]", $pLock + 20)
@@ -2535,9 +2535,9 @@ EndFunc
 
 Func __SHCreateDataObject($tIID_IDataObject, $ppidlFolder = 0, $cidl = 0, $papidl = 0, $pdtInner = 0)
     Local $aRes = DllCall($hShell32, "long", "SHCreateDataObject", _
-                                         "ptr", $ppidlFolder, _          
+                                         "ptr", $ppidlFolder, _
                                          "uint", $cidl, _
-                                         "ptr", $papidl, _ 
+                                         "ptr", $papidl, _
                                          "ptr", $pdtInner, _
                                          "struct*", $tIID_IDataObject, _
                                          "ptr*", 0)
@@ -2612,22 +2612,24 @@ EndFunc
 Func _filterCallback($hSystem, $hView, $bIsFolder, $sPath, $sName, $sExt)
 	#forceref $hSystem, $hView, $bIsFolder
 
-		Switch $sName
-			Case "$RECYCLE.BIN"
-				Return False
-			Case "System Volume Information"
-				Return False
-		EndSwitch
-	EndIf
+	; nothing to filter
+	If Not $bHideHidden And Not $bHideSystem Then Return True
 
-	Select
-		Case $bHideSystem
-			; filter out files and folders with System attribute
-			If StringInStr(FileGetAttrib($sPath&$sName&$sExt), "S", 2)>0 Then Return False
-		Case $bHideHidden
-			; filter out files and folders with Hidden attribute
-			If StringInStr(FileGetAttrib($sPath&$sName&$sExt), "H", 2)>0 Then Return False
-	EndSelect
+	; always show root drive letters
+	Local $sFullPath = $sPath & $sName & $sExt
+	If _WinAPI_PathIsRoot_mod($sFullPath) Then Return True
+
+	Switch $sName
+		Case "$RECYCLE.BIN"
+			Return False
+		Case "System Volume Information"
+			Return False
+	EndSwitch
+
+	; fetch attributes and apply both filters (System and Hidden) independently
+	Local $sAttrib = FileGetAttrib($sFullPath)
+	If $bHideSystem And StringInStr($sAttrib, "S", 2) > 0 Then Return False
+	If $bHideHidden And StringInStr($sAttrib, "H", 2) > 0 Then Return False
 
 	Return True
 EndFunc
