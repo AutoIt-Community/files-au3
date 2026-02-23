@@ -199,13 +199,18 @@ EndFunc   ;==>_WinAPI_ScreenToClient_mod
 Func TreeItemToPath($hTree, $hItem, $bArray = False)
 	Local $sPath = StringReplace(_GUICtrlTreeView_GetTree($hTree, $hItem), "|", "\")
 	$sPath = StringTrimLeft($sPath, StringInStr($sPath, "\"))     ; remove this pc at the beginning
-	If StringInStr(FileGetAttrib($sPath), "D") Then $sPath &= "\"   ; let folders end with \
-	If $bArray Then
-		Local $aPath = _ArrayFromString($sPath)
-		_ArrayInsert($aPath, 0, 1)
-		Return $aPath
+
+	If StringInStr(FileGetAttrib($sPath), "D") Then
+		$sPath &= "\"   ; let folders end with \
 	EndIf
-	Return $sPath
+
+	If Not $bArray Then
+		Return $sPath
+	EndIf
+
+	Local $aPath = _ArrayFromString($sPath)
+	_ArrayInsert($aPath, 0, 1)
+	Return $aPath
 EndFunc   ;==>TreeItemToPath
 
 Func _PathSplit_mod($sFilePath)
