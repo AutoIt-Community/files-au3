@@ -94,9 +94,6 @@ Func DestroyDropTarget($pObject)
 EndFunc   ;==>DestroyDropTarget
 
 Func __Mthd_DragEnter($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
-
-	#forceref $pThis, $pDataObject, $iKeyState, $iPoint, $piEffect
-
 	Local $sDirText = ""
 
 	Local $tPoint = DllStructCreate($tagPoint)
@@ -269,7 +266,6 @@ Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
 EndFunc   ;==>__Mthd_DragOver
 
 Func __Mthd_DragLeave($pThis)
-	#forceref $pThis
 	Local $pData = DllStructGetData(DllStructCreate("ptr", Ptr($pThis + $__g_iTargetObjDataOffset)), 1)
 	Local $tData = DllStructCreate($tagTargetObjIntData, $pData)
 
@@ -295,8 +291,6 @@ Func __Mthd_DragLeave($pThis)
 EndFunc   ;==>__Mthd_DragLeave
 
 Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
-	#forceref $pThis, $iKeyState, $iPoint, $piEffect
-
 	Local $sDirText = ""
 	Local $bIsFolder, $iFlags, $sAction
 
@@ -438,8 +432,7 @@ Func __SetDropDescription($pDataObject, $iType, $sMessage = "", $sInsert = "")
 EndFunc   ;==>__SetDropDescription
 
 Func __DoDropResponse($tData, $iKeyState, $tPoint, $piEffect, $sDirText, $bIsSameDrive = False, $bIsSameFolder = False)
-
-	#forceref $tData, $iKeyState, $tPoint, $piEffect
+	#forceref $tPoint
 
 	Local $iRetEffect = $DROPEFFECT_NONE, $iReqOp
     Local $tEffect = DllStructCreate("dword iEffect", $piEffect)

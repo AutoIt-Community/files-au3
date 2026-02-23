@@ -584,8 +584,6 @@ EndFunc   ;==>_GUIFrame_ResizeReg
 ; Example........: Yes
 ;=====================================================================================================================
 Func _GUIFrame_SIZE_Handler($hWnd, $iMsg, $wParam, $lParam)
-
-    #forceref $iMsg, $wParam, $lParam
     Local $iIndex
 
     ; Get index of base frame GUI

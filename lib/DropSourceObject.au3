@@ -80,7 +80,7 @@ EndFunc   ;==>DestroyDropSource
 
 
 Func __Mthd_QueryContinueDrag($pThis, $bEscapePressed, $iKeyState)
-	#forceref $pThis, $bEscapePressed, $iKeyState
+	#forceref $pThis
 
 	Local $iReturn = $S_OK
 	If $bEscapePressed Then

@@ -814,7 +814,6 @@ Func _historyChange($hHistory)
 EndFunc   ;==>_historyChange
 
 Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
-	#forceref $hWnd, $iMsg, $wParam
 	__TreeListExplorer__WinProc($hWnd, $iMsg, $wParam, $lParam)
 
 	; used for dark mode header text color and header and listview combined functionality
@@ -1490,7 +1489,6 @@ EndFunc   ;==>_InitDarkSizebox
 
 ; Resize the status bar when GUI size changes
 Func WM_SIZE($hWnd, $iMsg, $wParam, $lParam)
-	#forceref $hWnd, $iMsg, $wParam, $lParam
 	; GUIFrame resizing
 	_GUIFrame_SIZE_Handler($hWnd, $iMsg, $wParam, $lParam)
 	; resize statusbar parts
@@ -1666,8 +1664,6 @@ Func _GUICtrl_SetFont($hWnd, $iHeight = 15, $iWeight = 400, $iFontAtrributes = 0
 EndFunc   ;==>_GUICtrl_SetFont
 
 Func WM_DRAWITEM2($hWnd, $Msg, $wParam, $lParam)
-	#forceref $Msg, $wParam, $lParam
-
 	; modernmenuraw
 	WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 
@@ -2618,9 +2614,7 @@ Func _GetVersion($sUdfCode)
 EndFunc
 
 Func _filterCallback($hSystem, $hView, $bIsFolder, $sPath, $sName, $sExt)
-	If $bHideHidden Or $bHideSystem Then
-		; ensure that root drive letters do not get hidden
-		If _WinAPI_PathIsRoot_mod($sPath&$sName&$sExt) Then Return True
+	#forceref $hSystem, $hView, $bIsFolder
 
 		Switch $sName
 			Case "$RECYCLE.BIN"
