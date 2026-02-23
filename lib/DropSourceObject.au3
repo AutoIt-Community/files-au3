@@ -96,10 +96,6 @@ EndFunc   ;==>__Mthd_QueryContinueDrag
 Func __Mthd_GiveFeedback($pThis, $iEffect)
 	#forceref $pThis, $iEffect
 
-;~ 	Local Const $iDataOffset = $PTR_LEN * 3 + 4
-;~ 	Local $pData = DllStructGetData(DllStructCreate("ptr", Ptr($pThis + $iDataOffset)), 1)
-;~ 	Local $tData = DllStructCreate($tagSourceObjIntData, $pData)
-
 	Return $DRAGDROP_S_USEDEFAULTCURSORS
 EndFunc   ;==>__Mthd_GiveFeedback
 

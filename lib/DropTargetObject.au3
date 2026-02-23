@@ -334,7 +334,6 @@ Func __Mthd_Drop($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 				Local $sFullPath = __TreeListExplorer_GetPath(1) & $sItemText
 				If StringInStr(FileGetAttrib($sFullPath), "D") Then
 					$sDirText = $sItemText
-					$sFullPath = $sFullPath
 					$bIsFolder = True
 				Else
 					; get the currently selected path
