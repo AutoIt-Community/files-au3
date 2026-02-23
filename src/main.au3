@@ -2344,10 +2344,9 @@ EndFunc   ;==>CoTaskMemFree
 Func _SHDoDragDrop($pDataObj, $pDropSource, $iOKEffects)
     ;We must pass a IID_IDropSource ptr.
     $pDropSource = _QueryInterface($pDropSource, $sIID_IDropSource)
-    _Release($pDropSource)
 
-	;Local $aCall = DllCall($hShell32, "long", "SHDoDragDrop", "hwnd", $g_hGUI, "ptr", $pDataObj, "ptr", $pDropSource, "dword", $iOKEffects, "ptr*", 0)
-	Local $aCall = DllCall($hShell32, "long", "SHDoDragDrop", "hwnd", Null, "ptr", $pDataObj, "ptr", Null, "dword", $iOKEffects, "ptr*", 0)
+	Local $aCall = DllCall($hShell32, "long", "SHDoDragDrop", "hwnd", $g_hGUI, "ptr", $pDataObj, "ptr", $pDropSource, "dword", $iOKEffects, "ptr*", 0)
+    _Release($pDropSource)
 
     If @error Then Return SetError(@error, @extended, $aCall)
     Return '0x' & Hex($aCall[0])
