@@ -2215,6 +2215,8 @@ Func _RenameItem()
 EndFunc
 
 Func _DeleteItems()
+	Local $pDataObj, $iFlags
+
 	Select
 		Case $sControlFocus = 'List'
 			; create array with list of selected listview items
@@ -2226,9 +2228,9 @@ Func _DeleteItems()
 			;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
 
 			_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
-			Local $pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
 
-			Local $iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+			$pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
 			_IFileOperationDelete($pDataObj, $iFlags)
 
 			__TreeListExplorer_Reload($hTLESystem)
@@ -2237,8 +2239,6 @@ Func _DeleteItems()
 		Case $sControlFocus = 'Tree'
 			Local $hTreeItemSel = _GUICtrlTreeView_GetSelection($g_hTreeView)
 			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItemSel)
-
-			Local $pDataObj, $pDropSource
 
 			;Get an IDataObject representing the file to copy
 			$pDataObj = GetDataObjectOfFile(_GUIFrame_GetHandle($iFrame_A, 1), $sItemText)

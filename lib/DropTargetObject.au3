@@ -165,12 +165,10 @@ Func __Mthd_DragEnter($pThis, $pDataObject, $iKeyState, $iPoint, $piEffect)
 EndFunc   ;==>__Mthd_DragEnter
 
 Func __Mthd_DragOver($pThis, $iKeyState, $iPoint, $piEffect)
-
-	#forceref $pThis, $iKeyState, $iPoint, $piEffect
-
+	Local $sDirPath
 	Local $sDirText = ""
 	Local $bIsFolder
-	Local $sDestDrive, $sDestPath
+	Local $sDestPath
 
 	Local $tPoint = DllStructCreate($tagPoint)
 	$tPoint.X = _WinAPI_LoDWord($iPoint)
@@ -448,15 +446,15 @@ Func __DoDropResponse($tData, $iKeyState, $tPoint, $piEffect, $sDirText, $bIsSam
         EndSwitch
 
         ;If move is legally an option
-        If BitAND($tEffect.iEffect, $DROPEFFECT_MOVE) Then 
+        If BitAND($tEffect.iEffect, $DROPEFFECT_MOVE) Then
             If $iReqOp = $DROPEFFECT_MOVE And $bIsSameDrive Then $iRetEffect = $DROPEFFECT_MOVE
         EndIf
 		;If copy is legally an option
-        If BitAND($tEffect.iEffect, $DROPEFFECT_COPY) Then 
+        If BitAND($tEffect.iEffect, $DROPEFFECT_COPY) Then
             If $iReqOp = $DROPEFFECT_COPY Or $iRetEffect = $DROPEFFECT_NONE Then $iRetEffect = $DROPEFFECT_COPY
         EndIf
         ;If link is legally an option
-        If BitAND($tEffect.iEffect, $DROPEFFECT_LINK) Then 
+        If BitAND($tEffect.iEffect, $DROPEFFECT_LINK) Then
             If $iReqOp = $DROPEFFECT_LINK Or $iRetEffect = $DROPEFFECT_NONE Then $iRetEffect = $DROPEFFECT_LINK
         EndIf
         If $bIsSameFolder Then $iRetEffect = $DROPEFFECT_NONE
