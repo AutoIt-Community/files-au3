@@ -6,15 +6,26 @@
 #include <GUIConstantsEx.au3>
 #include <GuiToolTip.au3>
 #include <GuiTreeView.au3>
+#include <GuiListView.au3>
 #include <String.au3>
 #include <WinAPITheme.au3>
 #include <WindowsConstants.au3>
 #include <WindowsNotifsConstants.au3>
 #include <WindowsStylesConstants.au3>
 
+Global $hKernel32 = DllOpen('kernel32.dll')
+Global $hGdi32 = DllOpen('gdi32.dll')
+Global $hUser32 = DllOpen('user32.dll')
+Global $hShlwapi = DllOpen('shlwapi.dll')
+Global $hShell32 = DllOpen('shell32.dll')
+
+#include "../lib/SharedFunctions.au3"
 #include "../lib/GUIFrame_WBD_Mod.au3"
 #include "../lib/History.au3"
 #include "../lib/TreeListExplorer.au3"
+#include "../lib/ProjectConstants.au3"
+#include "../lib/DropSourceObject.au3"
+#include "../lib/DropTargetObject.au3"
 
 ; CREDITS:
 ; Kanashius     TreeListExplorer UDF
@@ -25,9 +36,12 @@
 ; argumentum    Dark Mode functions
 ; NoNameCode    Dark Mode functions
 ; Melba23       GUIFrame UDF
-; ahmet         Non-client painting of white line in dark mode
+; ahmet         Non-client painting of white menubar line in dark mode
 ; UEZ           Lots and lots and lots
 ; DonChunior    Code review, bug fixes and refactoring
+; MattyD		Drag and drop code
+; jugador		ListView multiple item drag and drop
+; Danyfirex		IFileOperation code
 
 Global $sVersion = "0.4.0 - 2026-01-22"
 
@@ -40,34 +54,31 @@ $iDPI = ApplyDPI()
 #include "../lib/ModernMenuRaw.au3"
 
 Opt("GUIOnEventMode", 1)
+Opt("GUICloseOnESC", 0)
 
 Global $hTLESystem, $iFrame_A, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus, $idTreeView
 Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hParentFrame, $g_iIconWidth, $g_hTreeView
 Global $g_hSizebox, $g_hOldProc, $g_iHeight, $g_hDots
 Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
-Global $hListImgList, $iListDragIndex, $aDragSource
+Global $hListImgList, $iListDragIndex, $sTargetCtrl, $hTreeItemOrig, $hIcon
 Global $sBack, $sForward, $sUpLevel, $sRefresh
-Global $bDragTreeList = False, $sDragSrc, $sTreeDragItem, $sListDragItems, $bDragToolActive = False
+Global $sTreeDragItem, $sListDragItems, $bDragToolActive = False
+Global $pLVDropTarget, $pTVDropTarget
 Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
-Global $idExitItem, $idAboutItem
+Global $idExitItem, $idAboutItem, $idDeleteItem, $idRenameItem, $idCopyItem, $idPasteItem, $idUndoItem, $idHiddenItem, $idSystemItem
+Global $bHideHidden = False, $bHideSystem = False
 Global $hCursor, $hProc
-Global $sSelectedItems, $g_aText
-Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $hToolTip3, $bTooltipActive
+Global $sSelectedItems, $g_aText, $gText
+Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $bTooltipActive
 Global $isDarkMode = _WinAPI_ShouldAppsUseDarkMode()
 Global $hFolderHistory = __History_Create("_doUnReDo", 100, "_historyChange"), $bFolderHistoryChanging = False
 Global $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, 0x000000)
 Global $iTopSpacer = Round(12 * $iDPI)
 Global $aPosTip, $iOldaPos0, $iOldaPos1
+Global $sRenameFrom, $sControlFocus, $bFocusChanged = False, $bSelectChanged = False, $bSaveEdit = False
+Global $bCopy = False, $pCopyObj
 ; force light mode
 ;$isDarkMode = False
-
-Global $gText
-
-Global $hKernel32 = DllOpen('kernel32.dll')
-Global $hGdi32 = DllOpen('gdi32.dll')
-Global $hUser32 = DllOpen('user32.dll')
-Global $hShlwapi = DllOpen('shlwapi.dll')
-Global $hShell32 = DllOpen('shell32.dll')
 
 ; get Windows build
 Global $iOSBuild = @OSBuild
@@ -132,15 +143,14 @@ Func _FilesAu3()
 	EndIf
 
 	; Startup of the TreeListExplorer
-	__TreeListExplorer_StartUp($__TreeListExplorer_Lang_EN, $iTreeListIconSize)
+	__TreeListExplorer_StartUp($__TreeListExplorer_Lang_EN)
 
 	; Create GUI and register events
 	$g_hGUI = GUICreate("Files Au3", @DesktopWidth - 600, @DesktopHeight - 400, -1, -1, $WS_OVERLAPPEDWINDOW)
 	GUISetOnEvent($GUI_EVENT_CLOSE, "_EventsGUI")
 	GUISetOnEvent($GUI_EVENT_MAXIMIZE, "_EventsGUI")
 	GUISetOnEvent($GUI_EVENT_RESIZED, "_EventsGUI")
-	GUISetOnEvent($GUI_EVENT_PRIMARYUP, "_EventsGUI")
-	GUISetOnEvent($GUI_EVENT_MOUSEMOVE, "_EventsGUI")
+	GUISetOnEvent($GUI_EVENT_DROPPED, "_EventsGUI")
 
 	; used to determine separator position
 	$FrameWidth1 = (@DesktopWidth - 600) / 3
@@ -157,8 +167,6 @@ Func _FilesAu3()
 	_GUIToolTip_SetMaxTipWidth($hToolTip1, 400)
 	$hToolTip2 = _GUIToolTip_Create(0)
 	_GUIToolTip_SetMaxTipWidth($hToolTip2, 400)
-	$hToolTip3 = _GUIToolTip_Create(0)
-	_GUIToolTip_SetMaxTipWidth($hToolTip3, 400)
 
 	GUISetFont(10, $FW_NORMAL, $GUI_FONTNORMAL, $sButtonFont)
 
@@ -200,25 +208,49 @@ Func _FilesAu3()
 	; reset GUI font
 	GUISetFont(10, $FW_NORMAL, $GUI_FONTNORMAL, "Segoe UI")
 
-	; Menu
-	If $isDarkMode Then
-		Local $idFileMenu = _GUICtrlCreateODTopMenu("& File", $g_hGUI)
-		Local $idViewMenu = _GUICtrlCreateODTopMenu("& View", $g_hGUI)
-		Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
-	Else
-		Local $idFileMenu = _GUICtrlCreateODTopMenu("& File", $g_hGUI)
-		Local $idViewMenu = _GUICtrlCreateODTopMenu("& View", $g_hGUI)
-		Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
-	EndIf
+	; Menubar
+	Local $idFileMenu = _GUICtrlCreateODTopMenu("& File", $g_hGUI)
+	Local $idEditMenu = _GUICtrlCreateODTopMenu("& Edit", $g_hGUI)
+	Local $idViewMenu = _GUICtrlCreateODTopMenu("& View", $g_hGUI)
+	Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
 
-	$idPropertiesItem = GUICtrlCreateMenuItem("&Properties", $idFileMenu)
+	; File menu
+	$idDeleteItem = GUICtrlCreateMenuItem("&Delete" & @TAB & "Delete", $idFileMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlSetState($idDeleteItem, $GUI_DISABLE)
+	$idRenameItem = GUICtrlCreateMenuItem("&Rename", $idFileMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlSetState($idRenameItem, $GUI_DISABLE)
+	$idPropertiesItem = GUICtrlCreateMenuItem("&Properties" & @TAB & "Shift+P", $idFileMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
 	GUICtrlCreateMenuItem("", $idFileMenu)
 	$idExitItem = GUICtrlCreateMenuItem("&Exit", $idFileMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	; Edit menu
+	$idUndoItem = GUICtrlCreateMenuItem("&Undo" & @TAB & "Ctrl+Z", $idEditMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlSetState($idUndoItem, $GUI_DISABLE)
+	GUICtrlCreateMenuItem("", $idEditMenu)
+	$idCopyItem = GUICtrlCreateMenuItem("&Copy" & @TAB & "Ctrl+C", $idEditMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlSetState($idCopyItem, $GUI_DISABLE)
+	$idPasteItem = GUICtrlCreateMenuItem("&Paste" & @TAB & "Ctrl+V", $idEditMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlSetState($idPasteItem, $GUI_DISABLE)
+	; View menu
 	$idThemeItem = GUICtrlCreateMenuItem("&Dark Mode", $idViewMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlCreateMenuItem("", $idViewMenu)
+	$idHiddenItem = GUICtrlCreateMenuItem("&Show Hidden Files", $idViewMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlSetState($idHiddenItem, $GUI_CHECKED)
+	$bHideHidden = False
+	$idSystemItem = GUICtrlCreateMenuItem("&Hide Protected System Files", $idViewMenu)
+	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	GUICtrlSetState($idSystemItem, $GUI_CHECKED)
+	$bHideSystem = True
+	; Help menu
 	$idAboutItem = GUICtrlCreateMenuItem("&About", $idHelpMenu)
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 
@@ -249,16 +281,11 @@ Func _FilesAu3()
 	$aWinSize1 = WinGetClientSize(_GUIFrame_GetHandle($iFrame_A, 1))
 
 	; create treeview
-	Local $iStyle = BitOR($TVS_HASBUTTONS, $TVS_HASLINES, $TVS_LINESATROOT, $TVS_SHOWSELALWAYS, $TVS_TRACKSELECT)
+	Local $iStyle = BitOR($TVS_HASBUTTONS, $TVS_HASLINES, $TVS_LINESATROOT, $TVS_SHOWSELALWAYS, $TVS_TRACKSELECT, $TVS_EDITLABELS)
 	$idTreeView = GUICtrlCreateTreeView(0, 0, $aWinSize1[0], $iFrameHeight, $iStyle)
 	GUICtrlSetState(-1, $GUI_DROPACCEPTED)
 	GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
 	$g_hTreeView = GUICtrlGetHandle($idTreeView)
-
-	_GUIToolTip_AddTool($hToolTip3, $g_hGUI, " ", $g_hGUI)
-
-	_GUIToolTip_SetTitle($hToolTip3, 'File Operation', $TTI_INFO_LARGE)
-	_GUIToolTip_Deactivate($hToolTip3)
 
 	; Create TLE system
 	$hTLESystem = __TreeListExplorer_CreateSystem($g_hGUI, "", "_folderCallback")
@@ -266,6 +293,10 @@ Func _FilesAu3()
 	; Add Views to TLE system
 	__TreeListExplorer_AddView($hTLESystem, $idInputPath)
 	__TreeListExplorer_AddView($hTLESystem, $idTreeView)
+	__TreeListExplorer_SetViewIconSize($idTreeView, $iTreeListIconSize)
+
+	; set callback to allow filtering of hidden and/or protected system files
+	__TreeListExplorer_SetCallback($idTreeView, $__TreeListExplorer_Callback_Filter, "_filterCallback")
 
 	; Create listview frame
 	_GUIFrame_Switch($iFrame_A, 2)
@@ -285,18 +316,25 @@ Func _FilesAu3()
 	_GUICtrlHeader_SetItemAlign($g_hHeader, 1, 1)
 
 	; Set sort arrow
-	_GUICtrlHeader_SetItemFormat($g_hHeader, 0, $HDF_SORTUP)
+	;_GUICtrlHeader_SetItemFormat($g_hHeader, 0, $HDF_SORTUP)
 
 	; get header height
 	$iHeaderHeight = _WinAPI_GetWindowHeight($g_hHeader)
 
 	; create listview control
 	Local $iExStyles = BitOR($LVS_EX_FULLROWSELECT, $LVS_EX_DOUBLEBUFFER, $LVS_EX_TRACKSELECT)
-	$idListview = GUICtrlCreateListView("Name|Size|Date Modified|Type", 0, $iHeaderHeight, $aWinSize2[0], $iFrameHeight - $iHeaderHeight, BitOR($LVS_SHOWSELALWAYS, $LVS_NOCOLUMNHEADER), $iExStyles)
+	$idListview = GUICtrlCreateListView("Name|Size|Date Modified|Type", 0, $iHeaderHeight, $aWinSize2[0], $iFrameHeight - $iHeaderHeight, BitOR($LVS_SHOWSELALWAYS, $LVS_NOCOLUMNHEADER, $LVS_EDITLABELS), $iExStyles)
 	GUICtrlSetState(-1, $GUI_DROPACCEPTED)
 	GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
 
 	$g_hListview = GUICtrlGetHandle($idListview)
+
+	;Create Target for our GUI & register.
+	$pLVDropTarget = CreateDropTarget($g_hListview)
+	RegisterDragDrop($g_hListview, $pLVDropTarget)
+
+	$pTVDropTarget = CreateDropTarget($g_hTreeView)
+	RegisterDragDrop($g_hTreeView, $pTVDropTarget)
 
 	_GUIToolTip_AddTool($hToolTip1, $g_hGUI, "", $g_hListview)
 
@@ -310,10 +348,14 @@ Func _FilesAu3()
 
 	; add listview and callbacks to TLE system
 	__TreeListExplorer_AddView($hTLESystem, $idListview, True, True, True, False, False)
+	__TreeListExplorer_SetViewIconSize($idListview, $iTreeListIconSize)
 	__TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_Loading, "_loadingCallback")
 	__TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_DoubleClick, "_doubleClickCallback")
 	__TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_ListViewPaths, "_handleListViewData")
 	__TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_ListViewItemCreated, "_handleListViewItemCreated")
+
+	; set callback to allow filtering of hidden and/or protected system files
+	__TreeListExplorer_SetCallback($idListview, $__TreeListExplorer_Callback_Filter, "_filterCallback")
 
 	; Set resizing flag for all created frames
 	_GUIFrame_ResizeSet(0)
@@ -404,6 +446,26 @@ Func _FilesAu3()
 	Local $i_ExStyle_Old = _WinAPI_GetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 1), $GWL_EXSTYLE)
 	_WinAPI_SetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 1), $GWL_EXSTYLE, BitOR($i_ExStyle_Old, $WS_EX_COMPOSITED))
 
+	; add drop files support to treeview frame and listview frame
+	$i_ExStyle_Old = _WinAPI_GetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 1), $GWL_EXSTYLE)
+	_WinAPI_SetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 1), $GWL_EXSTYLE, BitOR($i_ExStyle_Old, $WS_EX_ACCEPTFILES))
+
+	; add drop files support to treeview frame and listview frame
+	$i_ExStyle_Old = _WinAPI_GetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 2), $GWL_EXSTYLE)
+	_WinAPI_SetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 2), $GWL_EXSTYLE, BitOR($i_ExStyle_Old, $WS_EX_ACCEPTFILES))
+
+	Local $sMsg = "Attention: The file operation code is new and caution is advised." & @CRLF & @CRLF
+	$sMsg &= "Please consider testing any file operations in less important areas of your file system. Creating an area "
+	$sMsg &= "on your file system with test folders and test files would be a good idea for testing purposes." & @CRLF & @CRLF
+	$sMsg &= "At the moment, Files Au3 allows you to Undo the most recent drag and drop, copy, move, delete, rename, etc. "
+	$sMsg &= "by pressing Ctrl+Z or Undo from the Edit menu. Future versions will expand to allow more than just the most "
+	$sMsg &= "recent Undo operation."
+	MsgBox($MB_ICONWARNING, "Files Au3", $sMsg)
+
+	; TreeView has initial focus
+	$sControlFocus = 'Tree'
+	$bFocusChanged = True
+
 	While True
 		If $bTooltipActive Then
 			; check if cursor is still over listview
@@ -418,8 +480,89 @@ Func _FilesAu3()
 			EndIf
 		EndIf
 
-		Sleep(200)
+		If $bFocusChanged Or $bSelectChanged Then
+			; keep track of which control currently has focus to determine which menu items to enable/disable
+			$bFocusChanged = False
+			$bSelectChanged = False
+			Select
+				Case $sControlFocus = 'List'
+					; ListView currently has focus
+					Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
+					If $aSelectedLV[0] = 0 Then
+						; no selections in ListView currently
+						GUICtrlSetState($idRenameItem, $GUI_DISABLE)
+						GUICtrlSetState($idCopyItem, $GUI_DISABLE)
+						HotKeySet("^c")
+						GUICtrlSetState($idDeleteItem, $GUI_DISABLE)
+						HotKeySet("{DELETE}")
+						GUICtrlSetState($idPasteItem, $bCopy ? $GUI_ENABLE : $GUI_DISABLE)
+						HotKeySet("^v", $bCopy ? "_PasteItems" : "")
+						GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
+						HotKeySet("+p", "_Properties")
+						GUICtrlSetState($idPropertiesLV, $GUI_ENABLE)
+					ElseIf $aSelectedLV[0] = 1 Then
+						; 1 item selection in ListView
+						GUICtrlSetState($idRenameItem, $GUI_ENABLE)
+						GUICtrlSetState($idCopyItem, $GUI_ENABLE)
+						HotKeySet("^c", "_CopyItems")
+						GUICtrlSetState($idDeleteItem, $GUI_ENABLE)
+						HotKeySet("{DELETE}", "_DeleteItems")
+						Local $sSelectedItem = _GUICtrlListView_GetItemText($idListview, $aSelectedLV[1], 0)
+						Local $sSelectedLV = __TreeListExplorer_GetPath($hTLESystem) & $sSelectedItem
+						; is selected path a folder
+						If StringInStr(FileGetAttrib($sSelectedLV), "D") Then
+							GUICtrlSetState($idPasteItem, $bCopy ? $GUI_ENABLE : $GUI_DISABLE)
+							HotKeySet("^v", $bCopy ? "_PasteItems" : "")
+						Else
+							GUICtrlSetState($idPasteItem, $GUI_DISABLE)
+							HotKeySet("^v")
+						EndIf
+						GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
+						HotKeySet("+p", "_Properties")
+						GUICtrlSetState($idPropertiesLV, $GUI_ENABLE)
+					Else
+						; multiple items selected in ListView
+						GUICtrlSetState($idRenameItem, $GUI_DISABLE) ; not supporting multiple file Rename right now
+						GUICtrlSetState($idCopyItem, $GUI_ENABLE)
+						HotKeySet("^c", "_CopyItems")
+						GUICtrlSetState($idDeleteItem, $GUI_ENABLE)
+						HotKeySet("{DELETE}", "_DeleteItems")
+						GUICtrlSetState($idPasteItem, $GUI_DISABLE)
+						HotKeySet("^v")
+						GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
+						HotKeySet("+p", "_Properties")
+						GUICtrlSetState($idPropertiesLV, $GUI_ENABLE)
+					EndIf
+				Case $sControlFocus = 'Tree'
+					; TreeView currently has focus
+					; treeview always has a selection
+					GUICtrlSetState($idRenameItem, $GUI_ENABLE)
+					GUICtrlSetState($idCopyItem, $GUI_ENABLE)
+					HotKeySet("^c", "_CopyItems")
+					GUICtrlSetState($idDeleteItem, $GUI_ENABLE)
+					HotKeySet("{DELETE}", "_DeleteItems")
+					GUICtrlSetState($idPasteItem, $bCopy ? $GUI_ENABLE : $GUI_DISABLE)
+					HotKeySet("^v", $bCopy ? "_PasteItems" : "")
+					GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
+					HotKeySet("+p", "_Properties")
+					GUICtrlSetState($idPropertiesLV, $GUI_DISABLE)
+				Case Not $sControlFocus
+					; Neither the ListView or TreeView has focus right now
+					; in this case likely disable menu options
+					GUICtrlSetState($idRenameItem, $GUI_DISABLE)
+					GUICtrlSetState($idCopyItem, $GUI_DISABLE)
+					HotKeySet("^c")
+					GUICtrlSetState($idDeleteItem, $GUI_DISABLE)
+					HotKeySet("{DELETE}")
+					GUICtrlSetState($idPasteItem, $GUI_DISABLE)
+					HotKeySet("^v")
+					GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
+					HotKeySet("+p")
+					GUICtrlSetState($idPropertiesLV, $GUI_DISABLE)
+			EndSelect
+		EndIf
 
+		Sleep(200)
 	WEnd
 EndFunc   ;==>_FilesAu3
 
@@ -550,21 +693,6 @@ Func _selectionChangedLV()
 
 	Local $iItemCount = $iFileCount + $iDirCount
 
-	; Properties dialog
-	If $iItemCount = 1 Then
-		$sCurrentPath = $sSelectedLV
-		GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
-		GUICtrlSetState($idPropertiesLV, $GUI_ENABLE)
-	ElseIf $iItemCount <> 1 And $iItemCount <> 0 Then
-		; multi-properties
-		; need number of selected items to declare array
-		GUICtrlSetState($idPropertiesItem, $GUI_ENABLE)
-		GUICtrlSetState($idPropertiesLV, $GUI_ENABLE)
-	Else
-		GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
-		GUICtrlSetState($idPropertiesLV, $GUI_DISABLE)
-	EndIf
-
 	If $iItemCount > 1 Then
 		$g_aText[1] = "  " & $iItemCount & " items selected"
 	ElseIf $iItemCount = 1 Then
@@ -692,6 +820,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 	Local Static $iItemPrev
 	Local $iItemRow
 
+	Local $tText
+
 	; header and listview combined functionality
 	Local $hWndFrom = HWnd(DllStructGetData($tNMHDR, "hWndFrom"))
 	Local $iCode = DllStructGetData($tNMHDR, "Code")
@@ -781,14 +911,40 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						_GUIToolTip_UpdateTipText($hToolTip1, $g_hGUI, $g_hListview, $gText)
 					EndIf
 				Case $LVN_ITEMCHANGED
+					; follow up in main While loop
+					$bSelectChanged = True
 					; item selection(s) have changed
 					_selectionChangedLV()
-				Case $LVN_BEGINDRAG
+				Case $LVN_BEGINDRAG, $LVN_BEGINRDRAG
 					Local $tNMListView = DllStructCreate($tagNMLISTVIEW, $lParam)
-					$bDragTreeList = True
-					$sDragSrc = "List"
-					; fire off adlib to get multiple selection drag details
-					AdlibRegister("_ListGetSelections", 10)
+					$hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
+
+					; create array with list of selected listview items
+					Local $aItems = _GUICtrlListView_GetSelectedIndices($tNMHDR.hwndFrom, True)
+					For $i = 1 To $aItems[0]
+						$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($tNMHDR.hwndFrom, $aItems[$i])
+					Next
+
+					Local $pDataObj, $pDropSource
+					;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
+
+					_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
+					$pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+
+					;Create an IDropSource to handle our end of the drag/drop operation.
+					$pDropSource = CreateDropSource()
+
+					Local $iResult = _SHDoDragDrop($pDataObj, $pDropSource, BitOR($DROPEFFECT_MOVE, $DROPEFFECT_COPY, $DROPEFFECT_LINK))
+					;__TreeListExplorer_Reload($hTLESystem)
+
+					DestroyDropSource($pDropSource)
+					_Release($pDataObj)
+
+					; allow Undo if drop returns successful
+					If $iResult = $DRAGDROP_S_DROP Then _AllowUndo()
+
+					; there is not supposed to be a Return value on LVN_BEGINDRAG
+					; however it fixes an issue with built-in drag-drop mechanism
 					Return 0
 				Case $LVN_HOTTRACK                ; Sent by a list-view control When the user moves the mouse over an item
 					Local $tInfo2 = DllStructCreate($tagNMLISTVIEW, $lParam)
@@ -842,17 +998,231 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						$bTooltipActive = True
 					EndIf
 					Return 1                     ; prevent the hover from being processed
+				Case $LVN_KEYDOWN
+					Local $tLVKeyDown = DllStructCreate($tagNMLVKEYDOWN, $lParam)
+					Local $iVKey = DllStructGetData($tLVKeyDown, "VKey")
+					If $iVKey = 46 Then
+						; create array with list of selected listview items
+						Local $aItems = _GUICtrlListView_GetSelectedIndices($tNMHDR.hwndFrom, True)
+						For $i = 1 To $aItems[0]
+							$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($tNMHDR.hwndFrom, $aItems[$i])
+						Next
+
+						;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
+
+						_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
+						Local $pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+
+						Local $iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+						_IFileOperationDelete($pDataObj, $iFlags)
+
+						__TreeListExplorer_Reload($hTLESystem)
+
+						_Release($pDataObj)
+						_AllowUndo()
+					EndIf
+				Case $LVN_BEGINLABELEDITA, $LVN_BEGINLABELEDITW
+					Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
+					; there should only be one selected item during a rename
+					Local $iItemLV = $aSelectedLV[1]
+					Local $sRenameItem = _GUICtrlListView_GetItemText($idListview, $iItemLV, 0)
+					$sRenameFrom = __TreeListExplorer_GetPath($hTLESystem) & $sRenameItem
+					; set hotkeys to ensure that file name cannot contain illegal characters
+					; \ / : * ? " < > |
+					HotKeySet ('{\}', "_RenameCheckLV")
+					HotKeySet ('{/}', "_RenameCheckLV")
+					HotKeySet ('{:}', "_RenameCheckLV")
+					HotKeySet ('{*}', "_RenameCheckLV")
+					HotKeySet ('{?}', "_RenameCheckLV")
+					HotKeySet ('{"}', "_RenameCheckLV")
+					HotKeySet ('{<}', "_RenameCheckLV")
+					HotKeySet ('{>}', "_RenameCheckLV")
+					HotKeySet ('{|}', "_RenameCheckLV")
+					Return False
+				Case $LVN_ENDLABELEDITA, $LVN_ENDLABELEDITW
+					; unset hotkeys that block illegal characters from being set
+					HotKeySet ('{\}')
+					HotKeySet ('{/}')
+					HotKeySet ('{:}')
+					HotKeySet ('{*}')
+					HotKeySet ('{?}')
+					HotKeySet ('{"}')
+					HotKeySet ('{<}')
+					HotKeySet ('{>}')
+					HotKeySet ('{|}')
+					Local $sRenameTo
+                    $tText = DllStructCreate($tagNMLVDISPINFO, $lParam)
+                    Local $tBuffer = DllStructCreate("wchar Text[" & DllStructGetData($tText, "TextMax") & "]", DllStructGetData($tText, "Text"))
+					Local $sTextRet = DllStructGetData($tBuffer, "Text")
+                    Local $sIllegal = "A file name can't contain any of the following characters:" & @CRLF & @CRLF
+                    $sIllegal &= '\ / : * ? " < > |'
+                    ;   A file name can't contain any of the following characters:
+                    ;   \/:*?"<>|
+                    Select
+                        Case StringInStr($sTextRet, '\', 2)
+                            Return False
+                        Case StringInStr($sTextRet, '/', 2)
+                            Return False
+                        Case StringInStr($sTextRet, ':', 2)
+                            Return False
+                        Case StringInStr($sTextRet, '*', 2)
+                            Return False
+                        Case StringInStr($sTextRet, '?', 2)
+                            Return False
+                        Case StringInStr($sTextRet, '"', 2)
+                            Return False
+                        Case StringInStr($sTextRet, '<', 2)
+                            Return False
+                        Case StringInStr($sTextRet, '>', 2)
+                            Return False
+                        Case StringInStr($sTextRet, '|', 2)
+                            Return False
+                        Case Not $sTextRet
+                            Return False
+                        Case Else
+							$sRenameTo = __TreeListExplorer_GetPath($hTLESystem) & $sTextRet
+							_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
+							; refresh TLE system to pick up any folder changes, file type changes, etc.
+							__TreeListExplorer_Reload($hTLESystem)
+							_AllowUndo()
+                            Return True     ; allow rename to occur
+                    EndSelect
+				Case $NM_SETFOCUS
+					$sControlFocus = 'List'
+					$bFocusChanged = True
+				Case $NM_KILLFOCUS
+					$sControlFocus = ''
+					$bFocusChanged = True
 			EndSwitch
 		Case $g_hTreeView
 			Switch $iCode
-				Case $TVN_BEGINDRAGA, $TVN_BEGINDRAGW
-					$aDragSource = ""
+				Case $TVN_BEGINDRAGW, $TVN_BEGINRDRAGW
 					Local $tTree = DllStructCreate($tagNMTREEVIEW, $lParam)
 					Local $hDragItem = DllStructGetData($tTree, "NewhItem")
-					$aDragSource = TreeItemToPath($g_hTreeView, $hDragItem, True)
-					$bDragTreeList = True
-					$sDragSrc = "Tree"
+					$hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
 
+					Local $sItemText = TreeItemToPath($g_hTreeView, $hDragItem)
+
+					Local $pDataObj, $pDropSource
+
+					;Get an IDataObject representing the file to copy
+					$pDataObj = GetDataObjectOfFile($hWnd, $sItemText)
+					If Not @error Then
+
+						;Create an IDropSource to handle our end of the drag/drop operation.
+						$pDropSource = CreateDropSource()
+
+						If Not @error Then
+							Local $iResult = _SHDoDragDrop($pDataObj, $pDropSource,  BitOR($DROPEFFECT_MOVE, $DROPEFFECT_COPY, $DROPEFFECT_LINK))
+
+							;Operation done, destroy our drop source. (Can't just IUnknown_Release() this one!)
+							DestroyDropSource($pDropSource)
+						EndIf
+
+						;Relase the data object so the system can destroy it (prevent memory leaks)
+						_Release($pDataObj)
+
+						; allow Undo if drop returns successful
+						If $iResult = $DRAGDROP_S_DROP Then _AllowUndo()
+					EndIf
+				Case $TVN_KEYDOWN
+					Local $tTVKeyDown = DllStructCreate($tagNMTVKEYDOWN, $lParam)
+					Local $iVKey = DllStructGetData($tTVKeyDown, "VKey")
+					If $iVKey = 46 Then
+						Local $hTreeItemSel = _GUICtrlTreeView_GetSelection($g_hTreeView)
+						Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItemSel)
+
+						Local $pDataObj, $pDropSource
+
+						;Get an IDataObject representing the file to copy
+						$pDataObj = GetDataObjectOfFile($hWnd, $sItemText)
+						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+						_IFileOperationDelete($pDataObj, $iFlags)
+
+						__TreeListExplorer_Reload($hTLESystem)
+
+							;Relase the data object so the system can destroy it (prevent memory leaks)
+						_Release($pDataObj)
+						_AllowUndo()
+					EndIf
+				Case $TVN_BEGINLABELEDITA, $TVN_BEGINLABELEDITW
+					HotKeySet("{Enter}", "_SaveEditTV")
+					HotKeySet("{Esc}", "_CancelEditTV")
+					$hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
+					$sRenameFrom = TreeItemToPath($g_hTreeView, $hTreeItemOrig)
+					; set hotkeys to ensure that file name cannot contain illegal characters
+					; \ / : * ? " < > |
+					HotKeySet ('{\}', "_RenameCheckTV")
+					HotKeySet ('{/}', "_RenameCheckTV")
+					HotKeySet ('{:}', "_RenameCheckTV")
+					HotKeySet ('{*}', "_RenameCheckTV")
+					HotKeySet ('{?}', "_RenameCheckTV")
+					HotKeySet ('{"}', "_RenameCheckTV")
+					HotKeySet ('{<}', "_RenameCheckTV")
+					HotKeySet ('{>}', "_RenameCheckTV")
+					HotKeySet ('{|}', "_RenameCheckTV")
+					Return False
+				Case $TVN_ENDLABELEDITA, $TVN_ENDLABELEDITW
+					Local $sRenameTo
+					HotKeySet("{Enter}")
+					HotKeySet("{Esc}")
+					; unset hotkeys that block illegal characters from being set
+					HotKeySet ('{\}')
+					HotKeySet ('{/}')
+					HotKeySet ('{:}')
+					HotKeySet ('{*}')
+					HotKeySet ('{?}')
+					HotKeySet ('{"}')
+					HotKeySet ('{<}')
+					HotKeySet ('{>}')
+					HotKeySet ('{|}')
+					If $bSaveEdit Then
+						$bSaveEdit = False
+						$tText = DllStructCreate($tagNMTVDISPINFO, $lParam)
+						Local $tBuffer = DllStructCreate("wchar Text[" & DllStructGetData($tText, "TextMax") & "]", DllStructGetData($tText, "Text"))
+						Local $sTextRet = DllStructGetData($tBuffer, "Text")
+						;   A file name can't contain any of the following characters:
+						;   \/:*?"<>|
+						Select
+							Case StringInStr($sTextRet, '\', 2)
+								Return False
+							Case StringInStr($sTextRet, '/', 2)
+								Return False
+							Case StringInStr($sTextRet, ':', 2)
+								Return False
+							Case StringInStr($sTextRet, '*', 2)
+								Return False
+							Case StringInStr($sTextRet, '?', 2)
+								Return False
+							Case StringInStr($sTextRet, '"', 2)
+								Return False
+							Case StringInStr($sTextRet, '<', 2)
+								Return False
+							Case StringInStr($sTextRet, '>', 2)
+								Return False
+							Case StringInStr($sTextRet, '|', 2)
+								Return False
+							Case Not $sTextRet
+								Return False
+							Case Else
+								Local $aPath = _StringBetween($sRenameFrom, "\", "\")
+								Local $sRenameItem = $aPath[UBound($aPath) - 1]
+								$sRenameTo = StringReplace($sRenameFrom, $sRenameItem, $sTextRet)
+								_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
+								;__TreeListExplorer_Reload($hTLESystem)
+								_AllowUndo()
+								Return True     ; allow rename to occur
+                    	EndSelect
+					EndIf
+				Case $NM_SETFOCUS
+					$sControlFocus = 'Tree'
+					$bFocusChanged = True
+				Case $NM_KILLFOCUS
+					$sControlFocus = ''
+					$bFocusChanged = True
+				Case $TVN_SELCHANGINGA, $TVN_SELCHANGINGW
+					; follow up in main While loop
+					$bSelectChanged = True
 			EndSwitch
 	EndSwitch
 
@@ -913,6 +1283,30 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_NOTIFY2
+
+Func _RenameCheckLV()
+	Local $sIllegal = "A file name can't contain any of the following characters:" & @CRLF & @CRLF
+    $sIllegal &= '\ / : * ? " < > |'
+	Local $hEdit = _GUICtrlListView_GetEditControl($g_hListview)
+	_GUICtrlEdit_ShowBalloonTip($hEdit, '', $sIllegal, $TTI_INFO)
+EndFunc
+
+Func _RenameCheckTV()
+	Local $sIllegal = "A file name can't contain any of the following characters:" & @CRLF & @CRLF
+    $sIllegal &= '\ / : * ? " < > |'
+	Local $hEdit = _GUICtrlTreeView_GetEditControl($g_hTreeView)
+	_GUICtrlEdit_ShowBalloonTip($hEdit, '', $sIllegal, $TTI_INFO)
+EndFunc
+
+Func _SaveEditTV()
+	$bSaveEdit = True
+	_GUICtrlTreeView_EndEdit($g_hTreeView)
+EndFunc
+
+Func _CancelEditTV()
+	$bSaveEdit = False
+	_GUICtrlTreeView_EndEdit($g_hTreeView)
+EndFunc
 
 Func _removeExStyles()
 	; remove WS_EX_COMPOSITED from GUI
@@ -1040,7 +1434,8 @@ EndFunc   ;==>WM_COMMAND2
 
 Func _About()
 	Local $sMsg
-	$sMsg = "Version: " & @TAB & @TAB & $sVersion & @CRLF & @CRLF
+	$sMsg = "Program Version: " & @TAB & $sVersion & @CRLF & @CRLF
+	$sMsg &= "TreeListExplorer: " & @TAB & _VersionToString(_UDFGetVersion("../lib/TreeListExplorer.au3")) & @CRLF & @CRLF
 	$sMsg &= "Made by: " & @TAB & "AutoIt Community"
 	MsgBox(0, "Files Au3", $sMsg)
 EndFunc   ;==>_About
@@ -1050,7 +1445,10 @@ Func _CleanExit()
 	_GUICtrlHeader_Destroy($g_hHeader)
 	_GUIToolTip_Destroy($hToolTip1)
 	_GUIToolTip_Destroy($hToolTip2)
-	_GUIToolTip_Destroy($hToolTip3)
+	RevokeDragDrop($g_hListview)
+	DestroyDropTarget($pLVDropTarget)
+	RevokeDragDrop($g_hTreeView)
+	DestroyDropTarget($pTVDropTarget)
 	GUIDelete($g_hGUI)
 	_ClearDarkSizebox()
 
@@ -1086,182 +1484,6 @@ Func _InitDarkSizebox()
 	$g_hDots = CreateDots($g_iHeight, $g_iHeight, 0x00000000 + $iBackColorDef, 0xFF000000 + 0xBFBFBF)
 EndFunc   ;==>_InitDarkSizebox
 
-Func __Timer_QueryPerformanceFrequency_mod()
-	Local $aCall = DllCall($hKernel32, "bool", "QueryPerformanceFrequency", "int64*", 0)
-	If @error Then Return SetError(@error, @extended, 0)
-	Return SetExtended($aCall[0], $aCall[1])
-EndFunc   ;==>__Timer_QueryPerformanceFrequency_mod
-
-Func __Timer_QueryPerformanceCounter_mod()
-	Local $aCall = DllCall($hKernel32, "bool", "QueryPerformanceCounter", "int64*", 0)
-	If @error Then Return SetError(@error, @extended, -1)
-	Return SetExtended($aCall[0], $aCall[1])
-EndFunc   ;==>__Timer_QueryPerformanceCounter_mod
-
-Func _Timer_Diff_mod($iTimeStamp)
-	Return 1000 * (__Timer_QueryPerformanceCounter_mod() - $iTimeStamp) / __Timer_QueryPerformanceFrequency_mod()
-EndFunc   ;==>_Timer_Diff_mod
-
-Func _Timer_Init_mod()
-	Return __Timer_QueryPerformanceCounter_mod()
-EndFunc   ;==>_Timer_Init_mod
-
-Func _WinAPI_ReleaseDC_mod($hWnd, $hDC)
-	Local $aCall = DllCall($hUser32, "int", "ReleaseDC", "hwnd", $hWnd, "handle", $hDC)
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_ReleaseDC_mod
-
-Func _WinAPI_GetDCEx_mod($hWnd, $hRgn, $iFlags)
-	Local $aCall = DllCall($hUser32, 'handle', 'GetDCEx', 'hwnd', $hWnd, 'handle', $hRgn, 'dword', $iFlags)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_GetDCEx_mod
-
-Func _WinAPI_CreateRectRgn_mod($iLeftRect, $iTopRect, $iRightRect, $iBottomRect)
-	Local $aCall = DllCall($hGdi32, "handle", "CreateRectRgn", "int", $iLeftRect, "int", $iTopRect, "int", $iRightRect, _
-			"int", $iBottomRect)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_CreateRectRgn_mod
-
-Func _WinAPI_OffsetRect_mod(ByRef $tRECT, $iDX, $iDY)
-	Local $aCall = DllCall($hUser32, 'bool', 'OffsetRect', 'struct*', $tRECT, 'int', $iDX, 'int', $iDY)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_OffsetRect_mod
-
-Func _WinAPI_GetWindowRect_mod($hWnd)
-	Local $tRECT = DllStructCreate($tagRECT)
-	Local $aCall = DllCall($hUser32, "bool", "GetWindowRect", "hwnd", $hWnd, "struct*", $tRECT)
-	If @error Or Not $aCall[0] Then Return SetError(@error + 10, @extended, 0)
-
-	Return $tRECT
-EndFunc   ;==>_WinAPI_GetWindowRect_mod
-
-Func _WinAPI_ShellGetFileInfo_mod($sFilePath, $iFlags, $iAttributes, ByRef $tSHFILEINFO)
-	Local $aCall = DllCall($hShell32, 'dword_ptr', 'SHGetFileInfoW', 'wstr', $sFilePath, 'dword', $iAttributes, _
-			'struct*', $tSHFILEINFO, 'uint', DllStructGetSize($tSHFILEINFO), 'uint', $iFlags)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_ShellGetFileInfo_mod
-
-Func _WinAPI_GetClientRect_mod($hWnd)
-	Local $tRECT = DllStructCreate($tagRECT)
-	Local $aCall = DllCall($hUser32, "bool", "GetClientRect", "hwnd", $hWnd, "struct*", $tRECT)
-	If @error Or Not $aCall[0] Then Return SetError(@error + 10, @extended, 0)
-
-	Return $tRECT
-EndFunc   ;==>_WinAPI_GetClientRect_mod
-
-Func _WinAPI_GetWindowLong_mod($hWnd, $iIndex)
-	Local $sFuncName = "GetWindowLongW"
-	If @AutoItX64 Then $sFuncName = "GetWindowLongPtrW"
-	Local $aCall = DllCall($hUser32, "long_ptr", $sFuncName, "hwnd", $hWnd, "int", $iIndex)
-	If @error Or Not $aCall[0] Then Return SetError(@error + 10, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_GetWindowLong_mod
-
-Func _WinAPI_DefWindowProc_mod($hWnd, $iMsg, $wParam, $lParam)
-	Local $aCall = DllCall($hUser32, "lresult", "DefWindowProc", "hwnd", $hWnd, "uint", $iMsg, "wparam", $wParam, _
-			"lparam", $lParam)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_DefWindowProc_mod
-
-Func _WinAPI_SetLastError_mod($iErrorCode, Const $_iCallerError = @error, Const $_iCallerExtended = @extended)
-	DllCall($hKernel32, "none", "SetLastError", "dword", $iErrorCode)
-	Return SetError($_iCallerError, $_iCallerExtended, Null)
-EndFunc   ;==>_WinAPI_SetLastError_mod
-
-Func _WinAPI_SetWindowLong_mod($hWnd, $iIndex, $iValue)
-	_WinAPI_SetLastError_mod(0) ; as suggested in MSDN
-	Local $sFuncName = "SetWindowLongW"
-	If @AutoItX64 Then $sFuncName = "SetWindowLongPtrW"
-	Local $aCall = DllCall($hUser32, "long_ptr", $sFuncName, "hwnd", $hWnd, "int", $iIndex, "long_ptr", $iValue)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_SetWindowLong_mod
-
-Func _WinAPI_SetWindowPos_mod($hWnd, $hAfter, $iX, $iY, $iCX, $iCY, $iFlags)
-	Local $aCall = DllCall($hUser32, "bool", "SetWindowPos", "hwnd", $hWnd, "hwnd", $hAfter, "int", $iX, "int", $iY, _
-			"int", $iCX, "int", $iCY, "uint", $iFlags)
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_SetWindowPos_mod
-
-Func _WinAPI_DrawText_mod($hDC, $sText, ByRef $tRECT, $iFlags)
-	Local $aCall = DllCall($hUser32, "int", "DrawTextW", "handle", $hDC, "wstr", $sText, "int", -1, "struct*", $tRECT, _
-			"uint", $iFlags)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_DrawText_mod
-
-Func _WinAPI_SetBkColor_mod($hDC, $iColor)
-	Local $aCall = DllCall($hGdi32, "INT", "SetBkColor", "handle", $hDC, "INT", $iColor)
-	If @error Then Return SetError(@error, @extended, -1)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_SetBkColor_mod
-
-Func _WinAPI_DeleteObject_mod($hObject)
-	Local $aCall = DllCall($hGdi32, "bool", "DeleteObject", "handle", $hObject)
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_DeleteObject_mod
-
-Func _WinAPI_InflateRect_mod(ByRef $tRECT, $iDX, $iDY)
-	Local $aCall = DllCall($hUser32, 'bool', 'InflateRect', 'struct*', $tRECT, 'int', $iDX, 'int', $iDY)
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_InflateRect_mod
-
-Func _WinAPI_FillRect_mod($hDC, $tRECT, $hBrush)
-	Local $aCall
-	If IsPtr($hBrush) Then
-		$aCall = DllCall($hUser32, "int", "FillRect", "handle", $hDC, "struct*", $tRECT, "handle", $hBrush)
-	Else
-		$aCall = DllCall($hUser32, "int", "FillRect", "handle", $hDC, "struct*", $tRECT, "dword_ptr", $hBrush)
-	EndIf
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_FillRect_mod
-
-Func _WinAPI_CreateSolidBrush_mod($iColor)
-	Local $aCall = DllCall($hGdi32, "handle", "CreateSolidBrush", "INT", $iColor)
-	If @error Then Return SetError(@error, @extended, 0)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_CreateSolidBrush_mod
-
-Func _WinAPI_GetClassName_mod($hWnd)
-	If Not IsHWnd($hWnd) Then $hWnd = GUICtrlGetHandle($hWnd)
-	Local $aCall = DllCall($hUser32, "int", "GetClassNameW", "hwnd", $hWnd, "wstr", "", "int", 4096)
-	If @error Or Not $aCall[0] Then Return SetError(@error, @extended, '')
-
-	Return SetExtended($aCall[0], $aCall[2])
-EndFunc   ;==>_WinAPI_GetClassName_mod
-
-Func _WinAPI_SetTextColor_mod($hDC, $iColor)
-	Local $aCall = DllCall($hGdi32, "INT", "SetTextColor", "handle", $hDC, "INT", $iColor)
-	If @error Then Return SetError(@error, @extended, -1)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_SetTextColor_mod
-
 ; Resize the status bar when GUI size changes
 Func WM_SIZE($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $hWnd, $iMsg, $wParam, $lParam
@@ -1290,18 +1512,27 @@ Func WM_SIZE($hWnd, $iMsg, $wParam, $lParam)
 EndFunc   ;==>WM_SIZE
 
 Func _Properties()
-	Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
-	If $aSelectedLV[0] = 1 Then
-		_WinAPI_ShellObjectProperties($sCurrentPath)
-	ElseIf $aSelectedLV[0] = 0 Then
-		_WinAPI_ShellObjectProperties(__TreeListExplorer_GetPath($hTLESystem))
-	Else
-		;$sSelectedItems
-		Local $aFiles = StringSplit($sSelectedItems, "|")
-		_ArrayDelete($aFiles, $aFiles[0])
-		_ArrayDelete($aFiles, 0)
-		_WinAPI_SHMultiFileProperties(__TreeListExplorer_GetPath($hTLESystem), $aFiles)
-	EndIf
+	Select
+		Case $sControlFocus = 'List'
+			Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
+			If $aSelectedLV[0] = 1 Then
+				Local $sSelectedItem = _GUICtrlListView_GetItemText($idListview, $aSelectedLV[1], 0)
+				Local $sSelectedLV = __TreeListExplorer_GetPath($hTLESystem) & $sSelectedItem
+				_WinAPI_ShellObjectProperties($sSelectedLV)
+			ElseIf $aSelectedLV[0] = 0 Then
+				_WinAPI_ShellObjectProperties(__TreeListExplorer_GetPath($hTLESystem))
+			Else
+				;$sSelectedItems
+				Local $aFiles = StringSplit($sSelectedItems, "|")
+				_ArrayDelete($aFiles, $aFiles[0])
+				_ArrayDelete($aFiles, 0)
+				_WinAPI_SHMultiFileProperties(__TreeListExplorer_GetPath($hTLESystem), $aFiles)
+			EndIf
+		Case $sControlFocus = 'Tree'
+			Local $hTreeItem = _GUICtrlTreeView_GetSelection($g_hTreeView)
+			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItem)
+			_WinAPI_ShellObjectProperties($sItemText)
+	EndSelect
 EndFunc   ;==>_Properties
 
 ; #FUNCTION# ====================================================================================================================
@@ -1463,13 +1694,6 @@ Func WM_DRAWITEM2($hWnd, $Msg, $wParam, $lParam)
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_DRAWITEM2
 
-Func _WinAPI_PathIsRoot_mod($sFilePath)
-	Local $aCall = DllCall($hShlwapi, 'bool', 'PathIsRootW', 'wstr', $sFilePath & "\")
-	If @error Then Return SetError(@error, @extended, False)
-
-	Return $aCall[0]
-EndFunc   ;==>_WinAPI_PathIsRoot_mod
-
 ;==============================================
 Func ScrollbarProc($hWnd, $iMsg, $wParam, $lParam) ; Andreik
 
@@ -1567,7 +1791,7 @@ EndFunc   ;==>WM_MOVE
 Func ApplyDPI()
 	; apply System DPI awareness and calculate factor
 	; Returns DPI scaling factor (1.0 = 100%), defaults to 1.0 on error
-	_WinAPI_SetThreadDpiAwarenessContext($DPI_AWARENESS_CONTEXT_SYSTEM_AWARE)
+	_WinAPI_SetProcessDpiAwarenessContext($DPI_AWARENESS_CONTEXT_SYSTEM_AWARE)
 	If @error Then Return 1
 
 	Local $iDPI2 = Round(_WinAPI_GetDpiForSystem() / 96, 2)
@@ -1576,15 +1800,15 @@ Func ApplyDPI()
 	Return $iDPI2
 EndFunc   ;==>ApplyDPI
 
-Func _WinAPI_SetThreadDpiAwarenessContext($DPI_AWARENESS_CONTEXT_value) ; UEZ
-	Local $aResult = DllCall("user32.dll", "uint", "SetThreadDpiAwarenessContext", @AutoItX64 ? "int64" : "int", $DPI_AWARENESS_CONTEXT_value)     ; requires Win10 v1703+ / Windows Server 2016+
-	If Not IsArray($aResult) Or @error Then Return SetError(1, @extended, 0)
-	If Not $aResult[0] Then Return SetError(2, @extended, 0)
-	Return $aResult[0]
-EndFunc   ;==>_WinAPI_SetThreadDpiAwarenessContext
+Func _WinAPI_SetProcessDpiAwarenessContext($DPI_AWARENESS_CONTEXT_value) ; UEZ
+    Local $aResult = DllCall("user32.dll", "bool", "SetProcessDpiAwarenessContext", @AutoItX64 ? "int64" : "int", $DPI_AWARENESS_CONTEXT_value) ;requires Win10 v1703+ / Windows Server 2016+
+    If Not IsArray($aResult) Or @error Then Return SetError(1, @extended, 0)
+    If Not $aResult[0] Then Return SetError(2, @extended, 0)
+    Return $aResult[0]
+EndFunc   ;==>_WinAPI_SetProcessDpiAwarenessContext
 
 Func _WinAPI_GetDpiForSystem() ; UEZ
-	Local $aResult = DllCall("user32.dll", "uint", "GetDpiForSystem")     ; requires Win10 v1607+ / no server support
+	Local $aResult = DllCall('user32.dll', "uint", "GetDpiForSystem")     ; requires Win10 v1607+ / no server support
 	If Not IsArray($aResult) Or @error Then Return SetError(1, @extended, 0)
 	If Not $aResult[0] Then Return SetError(2, @extended, 0)
 	Return $aResult[0]
@@ -1802,160 +2026,8 @@ Func _EventsGUI()
 			_resizeLVCols2()
 		Case $GUI_EVENT_RESIZED
 			_resizeLVCols2()
-		Case $GUI_EVENT_MOUSEMOVE
-			If Not $bDragTreeList Then ContinueCase
-			If Not $bDragToolActive Then
-				; check drag source to determine where to fetch icon from
-				If $sDragSrc = "Tree" Then
-					$hIcon = _GUICtrlTreeView_GetImageListIconHandle($idTreeView, 0)                     ; always folder icon
-					_GUIToolTip_SetTitle($hToolTip3, 'File Operation', $hIcon)
-				ElseIf $sDragSrc = "List" Then
-					$iImgIndex = _GUICtrlListView_GetItemImage($g_hListview, $iListDragIndex)
-					$hIcon = _GUIImageList_GetIcon($hListImgList, $iImgIndex)
-					_GUIToolTip_SetTitle($hToolTip3, 'File Operation', $hIcon)
-				EndIf
-				; temporarily delay regular listview tooltips
-				_GUICtrlListView_SetHoverTime($idListview, 50000)
-				_GUIToolTip_Activate($hToolTip3)
-				_GUIToolTip_TrackActivate($hToolTip3, True, $g_hGUI, $g_hGUI)
-				$bDragToolActive = True
-			EndIf
-			Local $aPosTool3 = MouseGetPos()
-			_GUIToolTip_TrackPosition($hToolTip3, $aPosTool3[0], $aPosTool3[1])
-
-			If Not $bTreeOrigStored Then
-				; store handle for the original treeview selection to restore selection later
-				$hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
-				$bTreeOrigStored = True
-			EndIf
-			Local $aTreeList = GUIGetCursorInfo($g_hGUI)
-			Local $sTreeListItemText
-			Local Static $sTreeListItemTextPrev
-			Select
-				Case $aTreeList[4] = $idTreeView
-					Local $hItemHover = TreeItemFromPoint($g_hTreeView)
-					If $hItemHover <> 0 Then
-						; bring focus to treeview to properly show DROPHILITE
-						_WinAPI_SetFocus($g_hTreeView)
-						_GUICtrlTreeView_SelectItem($g_hTreeView, $hItemHover)
-						_GUICtrlTreeView_SetState($g_hTreeView, $hTreeItemOrig, $TVIS_SELECTED, True)
-						Local $iTreeItem = TreeItemFromPoint($g_hTreeView)
-						$sTreeListItemText = _GUICtrlTreeView_GetText($g_hTreeView, $iTreeItem)
-						If $sTreeListItemText <> $sTreeListItemTextPrev Then
-							_GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sTreeListItemText)
-						EndIf
-						$sTreeListItemTextPrev = $sTreeListItemText
-					Else
-						; restore original treeview selection if cursor leaves treeview
-						_GUICtrlTreeView_SelectItem($g_hTreeView, $hTreeItemOrig)
-						$bTreeOrigStored = False
-					EndIf
-
-				Case $aTreeList[4] = $idListview
-					Local $iListHover = ListItemFromPoint($g_hListview)
-					If $iListHover >= 0 Then
-						; bring focus to listview to show hot item (needed for listview to listview drag)
-						_WinAPI_SetFocus($g_hListview)
-						_GUICtrlListView_SetHotItem($idListview, $iListHover)
-						Local $iListDrop = ListItemFromPoint($g_hListview)
-						Local $sListDropPath = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
-						If __TreeListExplorer__PathIsFolder($sListDropPath) Then
-							$sTreeListItemText = _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
-							If $sTreeListItemTextPrev <> $sTreeListItemText Then
-								_GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sTreeListItemText)
-							EndIf
-							$sTreeListItemTextPrev = $sTreeListItemText
-						Else
-							$sTreeListItemText = __TreeListExplorer_GetPath($hTLESystem)
-							$sTreeListItemText = _StringBetween($sTreeListItemText, "\", "\")[UBound(_StringBetween($sTreeListItemText, "\", "\")) - 1]
-							If $sTreeListItemTextPrev <> $sTreeListItemText Then
-								_GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sTreeListItemText)
-							EndIf
-							$sTreeListItemTextPrev = $sTreeListItemText
-						EndIf
-					ElseIf $iListHover = -1 Then
-						$sTreeListItemText = __TreeListExplorer_GetPath($hTLESystem)
-						$sTreeListItemText = _StringBetween($sTreeListItemText, "\", "\")[UBound(_StringBetween($sTreeListItemText, "\", "\")) - 1]
-						If $sTreeListItemTextPrev <> $sTreeListItemText Then
-							_GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, "Move to " & $sTreeListItemText)
-						EndIf
-						$sTreeListItemTextPrev = $sTreeListItemText
-					EndIf
-
-				Case Else
-					If $sTreeListItemTextPrev <> $sTreeListItemText Then
-						$sTreeListItemText = " "
-						_GUIToolTip_UpdateTipText($hToolTip3, $g_hGUI, $g_hGUI, $sTreeListItemText)
-					EndIf
-					$sTreeListItemTextPrev = $sTreeListItemText
-			EndSelect
-
-		Case $GUI_EVENT_PRIMARYUP
-			Local $iTreeItem, $sTreeDropItem, $sDragDest
-			If $bDragTreeList Then
-				If $bDragToolActive Then
-					_GUIToolTip_TrackActivate($hToolTip3, False, $g_hGUI, $g_hGUI)
-					_GUIToolTip_Deactivate($hToolTip3)
-					; restore original listview hover time
-					_GUICtrlListView_SetHoverTime($idListview, 500)
-					_GUIImageList_DestroyIcon($hIcon)
-					_GUIToolTip_SetTitle($hToolTip3, 'File Operation', $TTI_NONE)
-					$bDragToolActive = False
-				EndIf
-				$bDragTreeList = False
-				$bTreeOrigStored = False
-				; restore proper state back to original treeview selection
-				_GUICtrlTreeView_SelectItem($g_hTreeView, $hTreeItemOrig)
-				Local $aTreeList = GUIGetCursorInfo($g_hGUI)
-				If $aTreeList[4] = $idTreeView Then
-					$iTreeItem = TreeItemFromPoint($g_hTreeView)
-					$sTreeDropItem = TreeItemToPath($g_hTreeView, $iTreeItem)
-					$sDragDest = $sTreeDropItem
-
-					; example showing which source files should go to which destination
-					_MsgExample($aDragSource, $sDragDest)
-
-				ElseIf $aTreeList[4] = $idListview Then
-					Select
-						Case $sDragSrc = "Tree"                         ; drag and drop from treeview to listview
-							Local $sListDropItem = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, _GUICtrlListView_GetHotItem($idListview), 0)
-							If __TreeListExplorer__PathIsFolder($sListDropItem) Then
-								$sDragDest = $sListDropItem
-							Else
-								$sDragDest = __TreeListExplorer_GetPath($hTLESystem)
-							EndIf
-
-						Case $sDragSrc = "List"                         ; drag and drop from listview to listview
-							Local $iListDrop = ListItemFromPoint($g_hListview)
-							Local $sListDropItem = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $iListDrop, 0)
-							If __TreeListExplorer__PathIsFolder($sListDropItem) Then
-								$sDragDest = $sListDropItem
-							Else
-								$sDragDest = __TreeListExplorer_GetPath($hTLESystem)
-							EndIf
-					EndSelect
-
-					; example showing which source files should go to which destination
-					_MsgExample($aDragSource, $sDragDest)
-
-				ElseIf $aTreeList[4] <> $idListview And $aTreeList[4] <> $idTreeView Then
-					MsgBox($MB_ICONERROR, "Example", "Cursor has been released in an area not yet supported by drag and drop.")
-				EndIf
-			EndIf
 	EndSwitch
 EndFunc   ;==>_EventsGUI
-
-Func _MsgExample($aDragSource, $sDestination)
-	Local $sMsg
-	$sMsg = "Source Files: " & @CRLF
-	For $i = 1 To $aDragSource[0]
-		$sMsg &= $aDragSource[$i] & @CRLF
-	Next
-	$sMsg &= @CRLF
-	$sMsg &= "Destination: " & @CRLF
-	$sMsg &= $sDestination
-	MsgBox(0, "Example", $sMsg)
-EndFunc   ;==>_MsgExample
 
 Func TreeItemFromPoint($hWnd)
 	Local $tMPos = _WinAPI_GetMousePos(True, $hWnd)
@@ -1992,8 +2064,194 @@ Func _MenuFunctions()
 			_Properties()
 		Case $idAboutItem
 			_About()
+		Case $idDeleteItem
+			_DeleteItems()
+			_AllowUndo()
+		Case $idRenameItem
+			_RenameItem()
+			_AllowUndo()
+		Case $idCopyItem
+			_CopyItems()
+		Case $idPasteItem
+			_PasteItems()
+			_AllowUndo()
+		Case $idUndoItem
+			_UndoOp()
+		Case $idHiddenItem
+			If BitAND(GUICtrlRead($idHiddenItem), $GUI_CHECKED) = $GUI_CHECKED Then
+				GUICtrlSetState($idHiddenItem, $GUI_UNCHECKED)
+				$bHideHidden = True
+			Else
+				GUICtrlSetState($idHiddenItem, $GUI_CHECKED)
+				$bHideHidden = False
+			EndIf
+
+			__TreeListExplorer_ReloadView($idListView, True)
+			__TreeListExplorer_ReloadView($idTreeView, True)
+		Case $idSystemItem
+			If BitAND(GUICtrlRead($idSystemItem), $GUI_CHECKED) = $GUI_CHECKED Then
+				GUICtrlSetState($idSystemItem, $GUI_UNCHECKED)
+				$bHideSystem = False
+			Else
+				GUICtrlSetState($idSystemItem, $GUI_CHECKED)
+				$bHideSystem = True
+			EndIf
+
+			__TreeListExplorer_ReloadView($idListView, True)
+			__TreeListExplorer_ReloadView($idTreeView, True)
 	EndSwitch
 EndFunc   ;==>_MenuFunctions
+
+Func _UndoOp()
+	; perform Undo by sending Ctrl+Z to the Desktop (Progman class, SysListView32 class)
+    Local Const $hProgman = WinGetHandle("[CLASS:Progman]")
+    Local Const $hCurrent = WinGetHandle("[ACTIVE]")
+
+    Local Const $hSHELLDLL_DefView = _WinAPI_FindWindowEx($hProgman, 0, "SHELLDLL_DefView", "")
+    Local Const $hSysListView32    = _WinAPI_FindWindowEx($hSHELLDLL_DefView, 0, "SysListView32", "FolderView")
+
+    _WinAPI_SetForegroundWindow($hSysListView32)
+    _WinAPI_SetFocus($hSysListView32)
+
+    ControlSend($hSysListView32, "", "", "^z")
+    WinActivate($hCurrent)
+
+	__TreeListExplorer_Reload($hTLESystem)
+
+	GUICtrlSetState($idUndoItem, $GUI_DISABLE)
+	HotKeySet("^z")
+EndFunc
+
+Func _AllowUndo()
+	GUICtrlSetState($idUndoItem, $GUI_ENABLE)
+	HotKeySet("^z", "_UndoOp")
+EndFunc
+
+Func _PasteItems()
+	Local $sFullPath
+	Select
+		Case $sControlFocus = 'List'
+			Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
+			If $aSelectedLV[0] = 0 Then
+				; no selections in ListView currently, current path is Paste directory
+				Local $sSelectedLV = __TreeListExplorer_GetPath($hTLESystem)
+				$sFullPath = $sSelectedLV
+			ElseIf $aSelectedLV[0] = 1 Then
+				; 1 item selection in ListView
+				Local $sSelectedItem = _GUICtrlListView_GetItemText($idListview, $aSelectedLV[1], 0)
+				Local $sSelectedLV = __TreeListExplorer_GetPath($hTLESystem) & $sSelectedItem
+				; is selected path a folder
+				If StringInStr(FileGetAttrib($sSelectedLV), "D") Then
+					$sSelectedLV = $sSelectedLV
+				Else
+					Return
+				EndIf
+			EndIf
+			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+			$sAction = "CopyItems"
+			_IFileOperationFile($pCopyObj, $sFullPath, $sAction, $iFlags)
+			__TreeListExplorer_Reload($hTLESystem)
+		Case $sControlFocus = 'Tree'
+			Local $hTreeItem = _GUICtrlTreeView_GetSelection($g_hTreeView)
+			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItem)
+			$sFullPath = $sItemText
+			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+			$sAction = "CopyItems"
+			_IFileOperationFile($pCopyObj, $sFullPath, $sAction, $iFlags)
+			__TreeListExplorer_Reload($hTLESystem)
+	EndSelect
+EndFunc
+
+Func _CopyItems()
+	Select
+		Case $sControlFocus = 'List'
+			; if previous copy object exists and user initiates new copy, release previous object
+			If $bCopy Then _Release($pCopyObj)
+
+			; create array with list of selected listview items
+			Local $aItems = _GUICtrlListView_GetSelectedIndices($g_hListView, True)
+			For $i = 1 To $aItems[0]
+				$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListView, $aItems[$i])
+			Next
+
+			;Local $pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
+
+			_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
+			$pCopyObj = GetDataObjectOfFile_B($aItems) ; jugador function
+
+			; we don't want to release this until after Paste
+			;_Release($pCopyObj)
+
+			; keep track of copy status for menu
+			$bCopy = True
+		Case $sControlFocus = 'Tree'
+			; if previous copy object exists and user initiates new copy, release previous object
+			If $bCopy Then _Release($pCopyObj)
+
+			Local $hTreeItem = _GUICtrlTreeView_GetSelection($g_hTreeView)
+			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItem)
+
+			;Get an IDataObject representing the file to copy
+			$pCopyObj = GetDataObjectOfFile(_GUIFrame_GetHandle($iFrame_A, 1), $sItemText)
+
+			; we don't want to release this until after Paste
+			;_Release($pCopyObj)
+
+			; keep track of copy status for menu
+			$bCopy = True
+	EndSelect
+EndFunc
+
+Func _RenameItem()
+	Select
+		Case $sControlFocus = 'List'
+			Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
+			; there should only be one selected item during a rename
+			Local $iItemLV = $aSelectedLV[1]
+			Local $hEditLabel = _GUICtrlListView_EditLabel($g_hListView, $iItemLV)
+		Case $sControlFocus = 'Tree'
+			Local $hTreeItem = _GUICtrlTreeView_GetSelection($g_hTreeView)
+			_GUICtrlTreeView_EditText($g_hTreeView, $hTreeItem)
+	EndSelect
+EndFunc
+
+Func _DeleteItems()
+	Select
+		Case $sControlFocus = 'List'
+			; create array with list of selected listview items
+			Local $aItems = _GUICtrlListView_GetSelectedIndices($g_hListview, True)
+			For $i = 1 To $aItems[0]
+				$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListview, $aItems[$i])
+			Next
+
+			;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
+
+			_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
+			Local $pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+
+			Local $iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+			_IFileOperationDelete($pDataObj, $iFlags)
+
+			__TreeListExplorer_Reload($hTLESystem)
+
+			_Release($pDataObj)
+		Case $sControlFocus = 'Tree'
+			Local $hTreeItemSel = _GUICtrlTreeView_GetSelection($g_hTreeView)
+			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItemSel)
+
+			Local $pDataObj, $pDropSource
+
+			;Get an IDataObject representing the file to copy
+			$pDataObj = GetDataObjectOfFile(_GUIFrame_GetHandle($iFrame_A, 1), $sItemText)
+			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+			_IFileOperationDelete($pDataObj, $iFlags)
+
+			__TreeListExplorer_Reload($hTLESystem)
+
+				;Relase the data object so the system can destroy it (prevent memory leaks)
+			_Release($pDataObj)
+	EndSelect
+EndFunc
 
 Func _EndDrag()
 	; reorder columns after header drag and drop
@@ -2033,7 +2291,7 @@ EndFunc   ;==>_PathInputChanged
 Func _drawUAHMenuNCBottomLine($hWnd) ; ahmet
 	$rcClient = _WinAPI_GetClientRect($hWnd)
 
-	Local $aCall = DllCall('user32.dll', "int", "MapWindowPoints", _
+	Local $aCall = DllCall($hUser32, "int", "MapWindowPoints", _
 			"hwnd", $hWnd, _         ; hWndFrom
 			"hwnd", 0, _             ; hWndTo
 			"ptr", DllStructGetPtr($rcClient), _
@@ -2070,39 +2328,315 @@ Func WM_WINDOWPOSCHANGED_Handler($hWnd, $iMsg, $wParam, $lParam)
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_WINDOWPOSCHANGED_Handler
 
-Func _ListGetSelections()
-	$sListDragItems = ""
-	$aDragSource = ""
-	$aDragSource = _GUICtrlListView_GetSelectedIndices($g_hListview, True)
-	If $aDragSource[0] = 1 Then
-		$iListDragIndex = $aDragSource[1]
-	Else
-		$iListDragIndex = $aDragSource[1]
-	EndIf
-	For $i = 1 To $aDragSource[0]
-		$aDragSource[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($idListview, $aDragSource[$i], 0)
-		$sListDragItems &= $aDragSource[$i] & " + "
+;Convert @error codes from DllCall into win32 codes.
+Func TranslateDllError($iError = @error)
+	Switch $iError
+		Case 0
+			$iError = $ERROR_SUCCESS
+		Case 1
+			$iError = $ERROR_DLL_INIT_FAILED
+		Case Else
+			$iError = $ERROR_INVALID_PARAMETER
+	EndSwitch
+EndFunc
+
+Func CoTaskMemFree($pMemBlock)
+	DllCall("Ole32.dll", "none", "CoTaskMemFree", "ptr", $pMemBlock)
+EndFunc   ;==>CoTaskMemFree
+
+Func _SHDoDragDrop($pDataObj, $pDropSource, $iOKEffects)
+    ;We must pass a IID_IDropSource ptr.
+    $pDropSource = _QueryInterface($pDropSource, $sIID_IDropSource)
+    _Release($pDropSource)
+
+	;Local $aCall = DllCall($hShell32, "long", "SHDoDragDrop", "hwnd", $g_hGUI, "ptr", $pDataObj, "ptr", $pDropSource, "dword", $iOKEffects, "ptr*", 0)
+	Local $aCall = DllCall($hShell32, "long", "SHDoDragDrop", "hwnd", Null, "ptr", $pDataObj, "ptr", Null, "dword", $iOKEffects, "ptr*", 0)
+
+    If @error Then Return SetError(@error, @extended, $aCall)
+    Return '0x' & Hex($aCall[0])
+EndFunc   ;==>_SHDoDragDrop
+
+Func GetDataObjectOfFile($hWnd, $sPath)
+	;Get the path as an idList. This is allocated memory that we should free later on.
+	Local $aCall = DllCall("Shell32.dll", "long", "SHParseDisplayName", "wstr", $sPath, "ptr", 0, "ptr*", 0, "ulong", 0, "ulong*", 0)
+	Local $iError = @error ? TranslateDllError() : $aCall[0]
+	If $iError Then Return SetError($iError, 0, False)
+	Local $pIdl = $aCall[3]
+
+	;From the idList, get two things: IShellFolder for the parent folder & the item's IDL relative to the parent folder.
+	Local $tIID_IShellFolder = _WinAPI_GUIDFromString($sIID_IShellFolder)
+	$aCall = DllCall("Shell32.dll", "long", "SHBindToParent", "ptr", $pIdl, "struct*", $tIID_IShellFolder, "ptr*", 0, "ptr*", 0)
+	$iError = @error ? TranslateDllError() : $aCall[0]
+	If $iError Then Return SetError($iError, 0, False)
+	Local $pShellFolder = $aCall[3]
+	;SHBindToParent does not allocate a new PID, so we're not responsible for freeing $pIdlChild.
+	Local $tpIdlChild = DllStructCreate("ptr")
+	DllStructSetData($tpIdlChild, 1, $aCall[4])
+	Local $ppIdlChild = DllStructGetPtr($tpIdlChild)
+
+	;We have an interface tag for IShellFolder, so we can use ObjCreateInterface to "convert" it into an object datatype.
+	;$oShellFolder will automatically release when it goes out of scope, so we don't need to manually _Release($pShellFolder).
+	Local $oShellFolder = ObjCreateInterface($pShellFolder, $sIID_IShellFolder, $tagIShellFolder)
+	Local $pDataObject, $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
+	$iError = $oShellFolder.GetUIObjectOf($hWnd, 1, $ppIdlChild, $tIID_IDataObject, 0, $pDataObject)
+
+	;Free the IDL we initially created
+	CoTaskMemFree($pIdl)
+
+	Return SetError($iError, 0, Ptr($pDataObject))
+EndFunc   ;==>GetDataObjectOfFile
+
+Func GetDataObjectOfFiles($hWnd, $asPaths)
+	;If we use the DesktopFolder object as the parent, children can all be defined by normal file paths.
+	;So we don't need to worry about sibling folders to the root etc...
+
+	Local $aCall = DllCall("Shell32.dll", "long", "SHGetDesktopFolder", "ptr*", 0)
+	Local $iError = @error ? TranslateDllError() : $aCall[0]
+	If $iError Then Return SetError($iError, 0, False)
+
+	Local $pShellFolder = $aCall[1]
+	Local $tChildren = DllStructCreate(StringFormat("ptr pIdls[%d]", UBound($asPaths)))
+
+	Local $iEaten, $pChildIDL, $iAttributes
+	Local $oShellFolder = ObjCreateInterface($pShellFolder, $sIID_IShellFolder, $tagIShellFolder)
+
+	For $i = 1 To $asPaths[0]
+		$oShellFolder.ParseDisplayName($hWnd, 0, $asPaths[$i], $iEaten, $pChildIDL, $iAttributes)
+		$tChildren.pIdls(($i)) = $pChildIDL
 	Next
-	$sListDragItems = StringTrimRight($sListDragItems, 3)
-	AdlibUnRegister("_ListGetSelections")
-EndFunc   ;==>_ListGetSelections
 
-Func TreeItemToPath($hTree, $hItem, $bArray = False)
-	Local $sPath = StringReplace(_GUICtrlTreeView_GetTree($hTree, $hItem), "|", "\")
-	$sPath = StringTrimLeft($sPath, StringInStr($sPath, "\"))     ; remove this pc at the beginning
+	;We have an interface tag for IShellFolder, so we can use ObjCreateInterface to "convert" it into an object datatype.
+	;$oShellFolder will automatically release when it goes out of scope, so we don't need to manually _Release($pShellFolder).
+	Local $pDataObject, $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
+	$iError = $oShellFolder.GetUIObjectOf($hWnd,  $asPaths[0], DllStructGetPtr($tChildren), $tIID_IDataObject, 0, $pDataObject)
 
-	If StringInStr(FileGetAttrib($sPath), "D") Then
-		$sPath &= "\"   ; let folders end with \
+	;Free the IDLs now we have a data object.
+	For $i = 1 To $asPaths[0]
+		CoTaskMemFree($tChildren.pIdls(($i)) & @CRLF)
+	Next
+
+	Return SetError($iError, 0, Ptr($pDataObject))
+EndFunc   ;==>GetDataObjectOfFiles
+
+Func RegisterDragDrop($hWnd, $pDropTarget)
+	Local $aCall = DllCall("ole32.dll", "long", "RegisterDragDrop", "hwnd", $hWnd, "ptr", $pDropTarget)
+	If @error Then Return SetError(TranslateDllError(), 0, False)
+	Return SetError($aCall[0], 0, $aCall[0] = $S_OK)
+EndFunc   ;==>RegisterDragDrop
+
+Func RevokeDragDrop($hWnd)
+	Local $aCall = DllCall("ole32.dll", "long", "RevokeDragDrop", "hwnd", $hWnd)
+	If @error Then Return SetError(TranslateDllError(), 0, False)
+	Return SetError($aCall[0], 0, $aCall[0] = $S_OK)
+EndFunc   ;==>RevokeDragDrop
+
+
+; jugador code
+
+Func GetDataObjectOfFile_B(ByRef $sPath)
+    Local $iCount = UBound($sPath)
+    If $iCount = 0 Then Return 0
+
+    Local $sParentPath = StringLeft($sPath[0], StringInStr($sPath[0], "\", 0, -1) - 1)
+    Local $pParentPidl = _WinAPI_ShellILCreateFromPath($sParentPath)
+
+    Local $tPidls = DllStructCreate("ptr[" & $iCount & "]")
+
+    Local $pFullPidl, $pRelativePidl, $last_SHITEMID
+    For $i = 0 To $iCount - 1
+        $pFullPidl = _WinAPI_ShellILCreateFromPath($sPath[$i])
+        $last_SHITEMID = DllCall($hShell32, "ptr", "ILFindLastID", "ptr", $pFullPidl)[0]
+        $pRelativePidl = DllCall($hShell32, "ptr", "ILClone", "ptr", $last_SHITEMID)[0]
+        DllStructSetData($tPidls, 1, $pRelativePidl, $i + 1)
+        DllCall($hShell32, "none", "ILFree", "ptr", $pFullPidl)
+    Next
+
+    Local $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
+    Local $pIDataObject = __SHCreateDataObject($tIID_IDataObject, $pParentPidl, $iCount, DllStructGetPtr($tPidls), 0)
+
+    DllCall($hShell32, "none", "ILFree", "ptr", $pParentPidl)
+    For $i = 1 To $iCount
+        DllCall($hShell32, "none", "ILFree", "ptr", DllStructGetData($tPidls, 1, $i))
+    Next
+
+    If Not $pIDataObject Then Return 0
+    Return $pIDataObject
+EndFunc
+
+Func GetDataObjectOfFile_C(ByRef $sPath)
+    If UBound($sPath) = 0 Then Return 0
+
+    Local $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
+    Local $pIDataObject = __SHCreateDataObject($tIID_IDataObject, 0, 0, 0, 0)
+    If Not $pIDataObject Then Return 0
+
+    Local Const $tag_IDataObject = _
+                        "GetData hresult(ptr;ptr*);" & _
+                        "GetDataHere hresult(ptr;ptr*);" & _
+                        "QueryGetData hresult(ptr);" & _
+                        "GetCanonicalFormatEtc hresult(ptr;ptr*);" & _
+                        "SetData hresult(ptr;ptr;bool);" & _
+                        "EnumFormatEtc hresult(dword;ptr*);" & _
+                        "DAdvise hresult(ptr;dword;ptr;dword*);" & _
+                        "DUnadvise hresult(dword);" & _
+                        "EnumDAdvise hresult(ptr*);"
+    Local $oIDataObject = ObjCreateInterface($pIDataObject, $sIID_IDataObject, $tag_IDataObject)
+    If Not IsObj($oIDataObject) Then
+        _Release($pIDataObject)
+        Return 0
+    Endif
+
+    Local $tFORMATETC, $tSTGMEDIUM
+    __Fill_tag_FORMATETC($tFORMATETC)
+    __Fill_tag_STGMEDIUM($tSTGMEDIUM, $sPath)
+
+    $oIDataObject.SetData(DllStructGetPtr($tFORMATETC), DllStructGetPtr($tSTGMEDIUM), 1)
+    _AddRef($pIDataObject)
+
+    Return $pIDataObject
+EndFunc
+
+Func __Fill_tag_FORMATETC(Byref $tFORMATETC)
+    Local Const $CF_HDROP = 15
+    Local Const $TYMED_HGLOBAL = 1
+
+    $tFORMATETC = DllStructCreate("ushort cfFormat; ptr ptd; uint dwAspect; int lindex; uint tymed")
+    DllStructSetData($tFORMATETC, "cfFormat", $CF_HDROP)
+    DllStructSetData($tFORMATETC, "dwAspect", 1)
+    DllStructSetData($tFORMATETC, "lindex", -1)
+    DllStructSetData($tFORMATETC, "tymed", $TYMED_HGLOBAL)
+EndFunc
+
+Func __Fill_tag_STGMEDIUM(Byref $tSTGMEDIUM, Byref $aFiles)
+    Local Const $CF_HDROP = 15
+    Local Const $TYMED_HGLOBAL = 1
+
+    Local $sFileList = ""
+    For $i = 0 To UBound($aFiles) - 1
+        $sFileList &= $aFiles[$i] & Chr(0)
+    Next
+    $sFileList &= Chr(0)
+
+    Local $iSize = 20 + (StringLen($sFileList) * 2)
+
+    Local $hGlobal = DllCall($hKernel32, "ptr", "GlobalAlloc", "uint", 0x2042, "ulong_ptr", $iSize)[0]
+    Local $pLock = DllCall($hKernel32, "ptr", "GlobalLock", "ptr", $hGlobal)[0]
+
+    Local $tDROPFILES = DllStructCreate("dword pFiles; int x; int y; bool fNC; bool fWide", $pLock)
+    DllStructSetData($tDROPFILES, "pFiles", 20) 
+    DllStructSetData($tDROPFILES, "fWide", True)
+
+    Local $tPaths = DllStructCreate("wchar[" & StringLen($sFileList) & "]", $pLock + 20)
+    DllStructSetData($tPaths, 1, $sFileList)
+
+    DllCall($hKernel32, "bool", "GlobalUnlock", "ptr", $hGlobal)
+
+    $tSTGMEDIUM = DllStructCreate("uint tymed; ptr hGlobal; ptr pUnkForRelease")
+    DllStructSetData($tSTGMEDIUM, "tymed", $TYMED_HGLOBAL)
+    DllStructSetData($tSTGMEDIUM, "hGlobal", $hGlobal)
+    DllStructSetData($tSTGMEDIUM, "pUnkForRelease", 0)
+EndFunc
+
+Func __SHCreateDataObject($tIID_IDataObject, $ppidlFolder = 0, $cidl = 0, $papidl = 0, $pdtInner = 0)
+    Local $aRes = DllCall($hShell32, "long", "SHCreateDataObject", _
+                                         "ptr", $ppidlFolder, _          
+                                         "uint", $cidl, _
+                                         "ptr", $papidl, _ 
+                                         "ptr", $pdtInner, _
+                                         "struct*", $tIID_IDataObject, _
+                                         "ptr*", 0)
+    If @error Then Return SetError(1, 0, $aRes[0])
+    Return $aRes[6]
+EndFunc
+
+; jugador code above
+
+Func _VersionToString($arVersion, $sSep = " ")
+    If Not IsArray($arVersion) Or UBound($arVersion, 0)<2 Or UBound($arVersion, 1)<2 Then Return SetError(1, 1, "Version not parsed.")
+    Local $sVersion = ""
+    If $arVersion[1][0]>0 Then
+        $sVersion &= $arVersion[1][1]
+    EndIf
+    If $sVersion = "" Then Return "Version unknown"
+    Return $sVersion
+EndFunc
+
+Func _UDFGetVersion($sFile)
+    Local $sCode = FileRead($sFile)
+    If @error Then Return SetError(@error, @extended, 0)
+    Local $arVersion = _GetVersion($sCode)
+    If @error Then Return SetError(@error, @extended, -1)
+    Return $arVersion
+EndFunc
+
+; #FUNCTION# ====================================================================================================================
+; Name ..........: _GetVersion
+; Description ...: Get the AutoIt Version as well as the UDF Version.
+; Syntax ........: _GetVersion($sUdfCode)
+; Parameters ....: $sUdfCode               - the sourcecode of the udf
+; Return values .: Array with version information.
+; Author ........: Kanashius
+; Modified ......:
+; Remarks .......: @extended (1 - Only AutoIt Version found, 2 - Only UDF Version found, 3 - Both found)
+;                  Resurns a 2D-Array with:
+;                  [0][0] being the amount of version parts found for the AutoIt Version + 1
+;                  [0][1] If [0][0]>0 then this is the full autoit version as string
+;                  [0][2] The first part of the autoit version (index 2-5 is a number)
+;                  ...
+;                  [0][6] The last part of the autoit version (last part is a/b/rc)
+;                  [1][0] being the amount of version parts found for the UDF Version + 1
+;                  [1][1] If [1][0]>0 then this is the full udf version as string
+;                  [1][2] The first part of the udf version (index 2-5 is a number)
+;                  ...
+;                  [1][6] The last part of the udf version (last part is a/b/rc)
+; Related .......:
+; Link ..........:
+; Example .......: No
+; ===============================================================================================================================
+Func _GetVersion($sUdfCode)
+    Local $iExtended = 0
+    Local $arAutoItVersion = StringRegExp($sUdfCode, "(?m)(?s)^;\s*#INDEX#\s*=*.*?;\s*AutoIt\s*Version\s*\.*:\s((\d+)(?:\.(\d+)(?:\.(\d+)(?:\.(\d+))?)?)?(a|b|rc)?)\s*$", 1)
+    If Not @error Then $iExtended = 1
+    Local $arUDFVersion =  StringRegExp($sUdfCode, "(?m)(?s)^;\s*#INDEX#\s*=*.*?;\s*Version\s*\.*:\s((\d+)(?:\.(\d+)(?:\.(\d+))?)?(a|b|rc)?)\s*$", 1)
+    If Not @error Then $iExtended += 2
+    Local $iVerNumbers = UBound($arAutoItVersion)
+    If UBound($arUDFVersion)>$iVerNumbers Then $iVerNumbers = UBound($arUDFVersion)
+    Local $arResult[2][$iVerNumbers+1]
+    $arResult[0][0] = UBound($arAutoItVersion)
+    For $i=0 to UBound($arAutoItVersion)-1 Step 1
+        $arResult[0][$i+1] = $arAutoItVersion[$i]
+    Next
+    $arResult[1][0] = UBound($arUDFVersion)
+    For $i=0 to UBound($arUDFVersion)-1 Step 1
+        $arResult[1][$i+1] = $arUDFVersion[$i]
+    Next
+    Return SetExtended($iExtended, $arResult)
+EndFunc
+
+Func _filterCallback($hSystem, $hView, $bIsFolder, $sPath, $sName, $sExt)
+	If $bHideHidden Or $bHideSystem Then
+		; ensure that root drive letters do not get hidden
+		If _WinAPI_PathIsRoot_mod($sPath&$sName&$sExt) Then Return True
+
+		Switch $sName
+			Case "$RECYCLE.BIN"
+				Return False
+			Case "System Volume Information"
+				Return False
+		EndSwitch
 	EndIf
 
-	If Not $bArray Then
-		Return $sPath
-	EndIf
+	Select
+		Case $bHideSystem
+			; filter out files and folders with System attribute
+			If StringInStr(FileGetAttrib($sPath&$sName&$sExt), "S", 2)>0 Then Return False
+		Case $bHideHidden
+			; filter out files and folders with Hidden attribute
+			If StringInStr(FileGetAttrib($sPath&$sName&$sExt), "H", 2)>0 Then Return False
+	EndSelect
 
-	Local $aPath = _ArrayFromString($sPath)
-	_ArrayInsert($aPath, 0, 1)
-	Return $aPath
-EndFunc   ;==>TreeItemToPath
+	Return True
+EndFunc
 
 Func _WinSetIcon($hWnd, $sFile, $iIndex = 0, $bSmall = False) ; https://www.autoitscript.com/forum/topic/168698-changing-a-windows-icon/#findComment-1461109
   Local $WM_SETICON = 128, $ICON_SMALL = 0, $ICON_BIG = 1, $hIcon = _WinAPI_ExtractIcon($sFile, $iIndex, $bSmall)
