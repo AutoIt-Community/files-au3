@@ -1598,8 +1598,6 @@ Func _WinAPI_SHMultiFileProperties($sPath, $aNames)
 
 	_WinAPI_CoTaskMemFree($PIDL)
 	For $i = 0 To $iCount - 1
-		$PIDL = DllStructGetData($aNames, $i + 1)
-		If $PIDL Then _WinAPI_CoTaskMemFree(DllStructGetData($aNames, $i + 1))
 		If $aPIDLAbsolute[$i] Then _WinAPI_CoTaskMemFree($aPIDLAbsolute[$i])
 	Next
 
