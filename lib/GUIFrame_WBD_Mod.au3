@@ -626,7 +626,6 @@ Func _GUIFrame_SIZE_Handler($hWnd, $iMsg, $wParam, $lParam)
     EndIf
 
     Return "GUI_RUNDEFMSG"
-
 EndFunc   ;==>_GUIFrame_SIZE_Handler
 
 ; #INTERNAL_USE_ONLY#============================================================================================================
@@ -778,7 +777,7 @@ Func _GUIFrame_SepWndProc($hWnd, $iMsg, $wParam, $lParam)
 
             ; release mouse capture after separator has stopped moving
             _WinAPI_ReleaseCapture()
-            
+
             $aGF_SizingIndex[$iIndex][6] = $iFirstHeight / $iHeight
 
         EndIf

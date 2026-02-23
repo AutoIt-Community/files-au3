@@ -1696,7 +1696,6 @@ EndFunc   ;==>WM_DRAWITEM2
 
 ;==============================================
 Func ScrollbarProc($hWnd, $iMsg, $wParam, $lParam) ; Andreik
-
 	If $hWnd = $g_hSizebox And $iMsg = $WM_PAINT Then
 		Local $tPAINTSTRUCT
 		Local $hDC = _WinAPI_BeginPaint($hWnd, $tPAINTSTRUCT)
