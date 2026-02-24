@@ -1,3 +1,4 @@
+#NoTrayIcon
 #AutoIt3Wrapper_UseX64=Y
 ;#AutoIt3Wrapper_Au3Check_Parameters=-d -w 1 -w 2 -w 3 -w 4 -w 5 -w 6 -w 7
 
@@ -439,6 +440,9 @@ Func _FilesAu3()
 	GUISetState(@SW_SHOW, $g_hGUI)
 	_drawUAHMenuNCBottomLine($g_hGUI)
 
+	; set GUI icon
+	_WinSetIcon($g_hGUI, @ScriptDir & "\app.ico")
+
 	_removeExStyles()
 
 	_GUICtrlListView_SetHoverTime($idListview, 500)
@@ -762,13 +766,15 @@ Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $b
 
 	If $bLoading Then
 		; add delay before changing cursor and clearing status item count
-		AdlibRegister("_ClearStatus", 250)
+		AdlibRegister("_ListViewLoadWait", 250)
 		Return
 	EndIf
 
 	If $bCursorOverride Then
 		; reset GUI cursor if it has been overridden
 		GUISetCursor($MCID_ARROW, 0, $g_hGUI)
+		GUISetCursor($MCID_ARROW, 0, _GUIFrame_GetHandle($iFrame_A, 2))
+		GUICtrlSetState($idListview, $GUI_SHOW)
 		$bCursorOverride = False
 	EndIf
 
@@ -776,17 +782,19 @@ Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $b
 	$bPathInputChanged = False
 EndFunc   ;==>_loadingCallback
 
-Func _ClearStatus()
+Func _ListViewLoadWait()
 	If $bLoadStatus Then
 		; override GUI with loading/waiting cursor on directories that are slower to load
 		$bCursorOverride = True
 		GUISetCursor($MCID_WAIT, 1, $g_hGUI)
+		GUISetCursor($MCID_WAIT, 1, _GUIFrame_GetHandle($iFrame_A, 2))
+		GUICtrlSetState($idListview, $GUI_HIDE)
 		; clear statusbar item count
 		$g_aText[0] = ""
 		_WinAPI_RedrawWindow($g_hStatus)
 	EndIf
-	AdlibUnRegister("_ClearStatus")
-EndFunc   ;==>_ClearStatus
+	AdlibUnRegister("_ListViewLoadWait")
+EndFunc   ;==>_ListViewLoadWait
 
 Func _folderCallback($hSystem, $sRoot, $sFolder, $sSelected)
 	Local Static $sFolderPrev = ""
@@ -2642,3 +2650,10 @@ Func _filterCallback($hSystem, $hView, $bIsFolder, $sPath, $sName, $sExt)
 
 	Return True
 EndFunc
+
+Func _WinSetIcon($hWnd, $sFile, $iIndex = 0, $bSmall = False) ; https://www.autoitscript.com/forum/topic/168698-changing-a-windows-icon/#findComment-1461109
+  Local $WM_SETICON = 128, $ICON_SMALL = 0, $ICON_BIG = 1, $hIcon = _WinAPI_ExtractIcon($sFile, $iIndex, $bSmall)
+  If Not $hIcon Then Return SetError(1, 0, 1) ; https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-seticon
+  _SendMessage($hWnd, $WM_SETICON, Int(Not $bSmall), $hIcon)
+  _WinAPI_DestroyIcon($hIcon)
+EndFunc   ;==>_WinSetIcon
