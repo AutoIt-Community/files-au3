@@ -708,6 +708,13 @@ Func _selectionChangedLV()
 		$g_aText[2] = "  " & __TreeListExplorer__GetSizeString($iFileSizes)
 	EndIf
 
+	; update number of items (files and folders) in statusbar
+	Local $iLVItemCount = _GUICtrlListView_GetItemCount($idListview)
+	$g_aText[0] = "  " & $iLVItemCount & " item"
+	If $iLVItemCount > 1 Then
+		$g_aText[0] &= "s"
+	EndIf
+
 	_WinAPI_RedrawWindow($g_hStatus)
 EndFunc   ;==>_selectionChangedLV
 
@@ -2092,6 +2099,8 @@ Func _MenuFunctions()
 
 			__TreeListExplorer_ReloadView($idListView, True)
 			__TreeListExplorer_ReloadView($idTreeView, True)
+			; update statusbar item count
+			_selectionChangedLV()
 		Case $idSystemItem
 			If BitAND(GUICtrlRead($idSystemItem), $GUI_CHECKED) = $GUI_CHECKED Then
 				GUICtrlSetState($idSystemItem, $GUI_UNCHECKED)
@@ -2103,6 +2112,8 @@ Func _MenuFunctions()
 
 			__TreeListExplorer_ReloadView($idListView, True)
 			__TreeListExplorer_ReloadView($idTreeView, True)
+			; update statusbar item count
+			_selectionChangedLV()
 	EndSwitch
 EndFunc   ;==>_MenuFunctions
 
