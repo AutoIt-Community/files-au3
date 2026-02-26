@@ -64,11 +64,11 @@ Global $hListImgList, $iListDragIndex, $sTargetCtrl, $hTreeItemOrig, $hIcon
 Global $sBack, $sForward, $sUpLevel, $sRefresh
 Global $sTreeDragItem, $sListDragItems, $bDragToolActive = False
 Global $pLVDropTarget, $pTVDropTarget
-Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
+Global $bLoadStatus = False, $bCursorOverride = False
 Global $idExitItem, $idAboutItem, $idDeleteItem, $idRenameItem, $idCopyItem, $idPasteItem, $idUndoItem, $idHiddenItem, $idSystemItem
 Global $bHideHidden = False, $bHideSystem = False
 Global $hCursor, $hProc
-Global $sSelectedItems, $g_aText, $gText
+Global $sSelectedItems, $g_aText[4], $gText
 Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $bTooltipActive
 Global $isDarkMode = _WinAPI_ShouldAppsUseDarkMode()
 Global $hFolderHistory = __History_Create("_doUnReDo", 100, "_historyChange"), $bFolderHistoryChanging = False
@@ -758,11 +758,6 @@ EndFunc   ;==>_doubleClickCallback
 
 Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $bLoading)
 	$bLoadStatus = $bLoading
-	; wait for ListView items to be done loading before getting item count for statusbar
-	If Not $bPathInputChanged Then
-		Return
-	EndIf
-
 	If $bLoading Then
 		; add delay before changing cursor and clearing status item count
 		AdlibRegister("_ListViewLoadWait", 250)
@@ -777,8 +772,8 @@ Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $b
 		$bCursorOverride = False
 	EndIf
 
+	; update statusbar item count
 	_PathInputChanged()
-	$bPathInputChanged = False
 EndFunc   ;==>_loadingCallback
 
 Func _ListViewLoadWait()
@@ -1435,9 +1430,6 @@ Func WM_COMMAND2($hWnd, $iMsg, $wParam, $lParam)
 				Case $EN_SETFOCUS
 					; select all text in path input box
 					AdlibRegister("_PathSelectAll", 10)
-				Case $EN_CHANGE
-					; signal path input change to follow up in _loadingCallback() function
-					$bPathInputChanged = True
 			EndSwitch
 	EndSwitch
 	Return $GUI_RUNDEFMSG
@@ -2099,8 +2091,6 @@ Func _MenuFunctions()
 
 			__TreeListExplorer_ReloadView($idListView, True)
 			__TreeListExplorer_ReloadView($idTreeView, True)
-			; update statusbar item count
-			_selectionChangedLV()
 		Case $idSystemItem
 			If BitAND(GUICtrlRead($idSystemItem), $GUI_CHECKED) = $GUI_CHECKED Then
 				GUICtrlSetState($idSystemItem, $GUI_UNCHECKED)
@@ -2112,8 +2102,6 @@ Func _MenuFunctions()
 
 			__TreeListExplorer_ReloadView($idListView, True)
 			__TreeListExplorer_ReloadView($idTreeView, True)
-			; update statusbar item count
-			_selectionChangedLV()
 	EndSwitch
 EndFunc   ;==>_MenuFunctions
 
@@ -2629,26 +2617,26 @@ Func _GetVersion($sUdfCode)
 EndFunc
 
 Func _filterCallback($hSystem, $hView, $bIsFolder, $sPath, $sName, $sExt)
-	If $bHideHidden Or $bHideSystem Then
-		; ensure that root drive letters do not get hidden
-		If _WinAPI_PathIsRoot_mod($sPath&$sName&$sExt) Then Return True
+	#forceref $hSystem, $hView, $bIsFolder
 
-		Switch $sName
-			Case "$RECYCLE.BIN"
-				Return False
-			Case "System Volume Information"
-				Return False
-		EndSwitch
-	EndIf
+	; nothing to filter
+	If Not $bHideHidden And Not $bHideSystem Then Return True
 
-	Select
-		Case $bHideSystem
-			; filter out files and folders with System attribute
-			If StringInStr(FileGetAttrib($sPath&$sName&$sExt), "S", 2)>0 Then Return False
-		Case $bHideHidden
-			; filter out files and folders with Hidden attribute
-			If StringInStr(FileGetAttrib($sPath&$sName&$sExt), "H", 2)>0 Then Return False
-	EndSelect
+	; always show root drive letters
+	Local $sFullPath = $sPath & $sName & $sExt
+	If _WinAPI_PathIsRoot_mod($sFullPath) Then Return True
+
+	Switch $sName
+		Case "$RECYCLE.BIN"
+			Return False
+		Case "System Volume Information"
+			Return False
+	EndSwitch
+
+	; fetch attributes and apply both filters (System and Hidden) independently
+	Local $sAttrib = FileGetAttrib($sFullPath)
+	If $bHideSystem And StringInStr($sAttrib, "S", 2) > 0 Then Return False
+	If $bHideHidden And StringInStr($sAttrib, "H", 2) > 0 Then Return False
 
 	Return True
 EndFunc
