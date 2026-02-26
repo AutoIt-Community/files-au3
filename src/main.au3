@@ -64,11 +64,11 @@ Global $hListImgList, $iListDragIndex, $sTargetCtrl, $hTreeItemOrig, $hIcon
 Global $sBack, $sForward, $sUpLevel, $sRefresh
 Global $sTreeDragItem, $sListDragItems, $bDragToolActive = False
 Global $pLVDropTarget, $pTVDropTarget
-Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
+Global $bLoadStatus = False, $bCursorOverride = False
 Global $idExitItem, $idAboutItem, $idDeleteItem, $idRenameItem, $idCopyItem, $idPasteItem, $idUndoItem, $idHiddenItem, $idSystemItem
 Global $bHideHidden = False, $bHideSystem = False
 Global $hCursor, $hProc
-Global $sSelectedItems, $g_aText, $gText
+Global $sSelectedItems, $g_aText[4], $gText
 Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $bTooltipActive
 Global $isDarkMode = _WinAPI_ShouldAppsUseDarkMode()
 Global $hFolderHistory = __History_Create("_doUnReDo", 100, "_historyChange"), $bFolderHistoryChanging = False
@@ -708,6 +708,13 @@ Func _selectionChangedLV()
 		$g_aText[2] = "  " & __TreeListExplorer__GetSizeString($iFileSizes)
 	EndIf
 
+	; update number of items (files and folders) in statusbar
+	Local $iLVItemCount = _GUICtrlListView_GetItemCount($idListview)
+	$g_aText[0] = "  " & $iLVItemCount & " item"
+	If $iLVItemCount > 1 Then
+		$g_aText[0] &= "s"
+	EndIf
+
 	_WinAPI_RedrawWindow($g_hStatus)
 EndFunc   ;==>_selectionChangedLV
 
@@ -751,11 +758,6 @@ EndFunc   ;==>_doubleClickCallback
 
 Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $bLoading)
 	$bLoadStatus = $bLoading
-	; wait for ListView items to be done loading before getting item count for statusbar
-	If Not $bPathInputChanged Then
-		Return
-	EndIf
-
 	If $bLoading Then
 		; add delay before changing cursor and clearing status item count
 		AdlibRegister("_ListViewLoadWait", 250)
@@ -770,8 +772,8 @@ Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $b
 		$bCursorOverride = False
 	EndIf
 
+	; update statusbar item count
 	_PathInputChanged()
-	$bPathInputChanged = False
 EndFunc   ;==>_loadingCallback
 
 Func _ListViewLoadWait()
@@ -1427,9 +1429,6 @@ Func WM_COMMAND2($hWnd, $iMsg, $wParam, $lParam)
 				Case $EN_SETFOCUS
 					; select all text in path input box
 					AdlibRegister("_PathSelectAll", 10)
-				Case $EN_CHANGE
-					; signal path input change to follow up in _loadingCallback() function
-					$bPathInputChanged = True
 			EndSwitch
 	EndSwitch
 	Return $GUI_RUNDEFMSG
