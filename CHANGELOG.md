@@ -11,42 +11,6 @@ Go to [legend](#legend-types-of-changes) for further information about the types
 
 ## [Unreleased]
 
-### Changed
-
-- Clear previous statusbar item count. [b34bb50](https://github.com/AutoIt-Community/files-au3/commit/b34bb50728fdda8357e91317583d08c4c7a56952)
-- Apply code review suggestions and add GUI cursor override for slow loading directories. [6c17901](https://github.com/AutoIt-Community/files-au3/commit/6c17901ecf7efe12626ded122e400835a466b622)
-
-### Documented
-
-- Update license file. [1762860](https://github.com/AutoIt-Community/files-au3/commit/1762860ddd44aaec0627327e8c5e201c8db2901d)
-
-### Fixed
-
-- Enumeration of items on statusbar by ensuring that ListView update is complete. [38e9979](https://github.com/AutoIt-Community/files-au3/commit/38e99791d29cabfb2558a94ac9e1f3603810b0de)
-
-### Refactored
-
-- Apply alphabetical order for include statements. [a8f4655](https://github.com/AutoIt-Community/files-au3/commit/a8f4655690ff5ad7b7b559556465265264eab2be)
-- Use local scope of a variable instead of global (because not needed to be global). [49f153d](https://github.com/AutoIt-Community/files-au3/commit/49f153d6a13ebd13be7efcd0fb3765f0fbcc548b)
-- Use one-time used constants directly in function instead of global constant. [0a0a8aa](https://github.com/AutoIt-Community/files-au3/commit/0a0a8aaa893ff7be9c2b79e7c9414f5868c122ca)
-- Syntax clean-up by tidy usage. [70b275b](https://github.com/AutoIt-Community/files-au3/commit/70b275b8a09039d6652728452286256f6449e621)
-- Drag and drop improvements. [195e421](https://github.com/AutoIt-Community/files-au3/commit/195e421ae2b2aeb26e2112518922a58e05ddfc23)
-- Apply return early pattern (code review suggestion). [68c01dd](https://github.com/AutoIt-Community/files-au3/commit/68c01dd07bc2c30527feeeb425f1ed3f947742ff)
-
-### Removed
-
-- Get rid of unused variables. [6ab1a5b](https://github.com/AutoIt-Community/files-au3/commit/6ab1a5b02fe7aba57fd5243ae18a8f83ad2903c5)
-- Unused WinAPI function (including return value) in _InitDarkSizebox. [c225e09](https://github.com/AutoIt-Community/files-au3/commit/c225e0968a0d81f09e8238a654f52b694e5f3a1b)
-- Dead code (unused WinAPI function call). [c2127d3](https://github.com/AutoIt-Community/files-au3/commit/c2127d3ebd6e4c719bbf68ab003540fd042898bf)
-
-### Styled
-
-- Trival adjustments to comments (syntax). [a65308f](https://github.com/AutoIt-Community/files-au3/commit/a65308fee10bcc79b0d804ce03beece9bff43f93)
-
-### Thanks to the contributors (committers)
-
-[@sven-seyfert](https://github.com/sven-seyfert), [@WildByDesign](https://github.com/WildByDesign)
-
 ## [0.4.0] - 2026-01-22
 
 ### Added
