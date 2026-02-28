@@ -8,12 +8,9 @@
 #include <Clipboard.au3>
 
 Global Const $S_FALSE = 1
-Global Const $PTR_LEN = @AutoItX64 ? 8 : 4
 
 Global Const $sCLSID_DragDropHelper = "{4657278A-411B-11D2-839A-00C04FD918D0}"
 Global Const $sIID_IUnknown = "{00000000-0000-0000-C000-000000000046}"
-Global Const $sIID_IShellFolder = "{000214E6-0000-0000-C000-000000000046}"
-Global Const $sIID_IDataObject = "{0000010e-0000-0000-C000-000000000046}"
 Global Const $sIID_IDropSource = "{00000121-0000-0000-C000-000000000046}"
 Global Const $sIID_IDropSourceNotify = "{0000012B-0000-0000-C000-000000000046}"
 Global Const $sIID_IEnumFORMATETC = "{00000103-0000-0000-C000-000000000046}"
@@ -115,18 +112,6 @@ Global Const $tagDROPDESCRIPTION = "struct;int iType;wchar sMessage[260];wchar s
 Global Const $tagSHFILEINFOW = "struct;handle hIcon;int iIcon;dword iAttributes;wchar sDisplayName[260];wchar sTypeName[80];endstruct;"
 
 ;~ 		"ParseDisplayName hresult(hwnd; ptr; wstr; ulong*; ptr*; ulong*);" & _
-
-Global Const $tagIShellFolder = _
-		"ParseDisplayName hresult(hwnd; ptr; wstr; ulong*; ptr*; ulong*);" & _
-		"EnumObjects hresult(hwnd; ulong; ptr*);" & _
-		"BindToObject hresult(ptr; ptr*; struct*; ptr*);" & _
-		"BindToStorage hresult(ptr; ptr*; struct*; ptr*);" & _
-		"CompareIDs hresult(lparam; ptr; ptr);" & _
-		"CreateViewObject hresult(hwnd; struct*; ptr*);" & _
-		"GetAttributesOf hresult(uint; ptr; ulong*);" & _
-		"GetUIObjectOf hresult(hwnd; uint; ptr; struct*; uint*; ptr*);" & _
-		"GetDisplayNameOf hresult(ptr; ulong; ptr*);" & _
-		"SetNameOf hresult(hwnd; ptr; wstr; ulong; ptr*);"
 
 Global Const $tagIDataObject = _
 		"GetData hresult(struct*; struct*);" & _
