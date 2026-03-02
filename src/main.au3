@@ -935,7 +935,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
 
 					_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
-					$pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+					$pDataObj = GetDataObject($aItems)
 
 					;Create an IDropSource to handle our end of the drag/drop operation.
 					$pDropSource = CreateDropSource()
@@ -1016,11 +1016,11 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 
 						;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
 
-						_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
-						Local $pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+						_ArrayDelete($aItems, 0)
+						Local $pDataObj = GetDataObject($aItems)
 
 						Local $iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-						_IFileOperationDelete($pDataObj, $iFlags)
+						_IFileOperationDeleteItems($pDataObj)
 
 						__TreeListExplorer_Reload($hTLESystem)
 
@@ -1087,7 +1087,10 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                             Return False
                         Case Else
 							$sRenameTo = __TreeListExplorer_GetPath($hTLESystem) & $sTextRet
+							;$sRenameTo = $sTextRet ; used for _IFileOperationRenameItem
 							_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
+							; TODO: _IFileOperationRenameItem is failing but only for ListView. TreeView is fine.
+							;_IFileOperationRenameItem($sRenameFrom, $sRenameTo)
 							; refresh TLE system to pick up any folder changes, file type changes, etc.
 							__TreeListExplorer_Reload($hTLESystem)
 							_AllowUndo()
@@ -1143,7 +1146,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						;Get an IDataObject representing the file to copy
 						$pDataObj = GetDataObjectOfFile($hWnd, $sItemText)
 						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-						_IFileOperationDelete($pDataObj, $iFlags)
+						_IFileOperationDeleteItems($pDataObj)
 
 						__TreeListExplorer_Reload($hTLESystem)
 
@@ -1213,8 +1216,9 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 							Case Else
 								Local $aPath = _StringBetween($sRenameFrom, "\", "\")
 								Local $sRenameItem = $aPath[UBound($aPath) - 1]
-								$sRenameTo = StringReplace($sRenameFrom, $sRenameItem, $sTextRet)
-								_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
+								;$sRenameTo = StringReplace($sRenameFrom, $sRenameItem, $sTextRet) ; prev used with _WinAPI_ShellFileOperation
+								$sRenameTo = $sTextRet
+								_IFileOperationRenameItem($sRenameFrom, $sRenameTo)
 								;__TreeListExplorer_Reload($hTLESystem)
 								_AllowUndo()
 								Return True     ; allow rename to occur
@@ -2179,8 +2183,8 @@ Func _CopyItems()
 
 			;Local $pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
 
-			_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
-			$pCopyObj = GetDataObjectOfFile_B($aItems) ; jugador function
+			_ArrayDelete($aItems, 0)
+			$pCopyObj = GetDataObject($aItems)
 
 			; we don't want to release this until after Paste
 			;_Release($pCopyObj)
@@ -2229,11 +2233,11 @@ Func _DeleteItems()
 
 			;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
 
-			_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
-			Local $pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+			_ArrayDelete($aItems, 0)
+			Local $pDataObj = GetDataObject($aItems)
 
 			Local $iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-			_IFileOperationDelete($pDataObj, $iFlags)
+			_IFileOperationDeleteItems($pDataObj)
 
 			__TreeListExplorer_Reload($hTLESystem)
 
@@ -2247,7 +2251,7 @@ Func _DeleteItems()
 			;Get an IDataObject representing the file to copy
 			$pDataObj = GetDataObjectOfFile(_GUIFrame_GetHandle($iFrame_A, 1), $sItemText)
 			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-			_IFileOperationDelete($pDataObj, $iFlags)
+			_IFileOperationDeleteItems($pDataObj)
 
 			__TreeListExplorer_Reload($hTLESystem)
 
@@ -2433,72 +2437,6 @@ Func RevokeDragDrop($hWnd)
 	Return SetError($aCall[0], 0, $aCall[0] = $S_OK)
 EndFunc   ;==>RevokeDragDrop
 
-
-; jugador code
-
-Func GetDataObjectOfFile_B(ByRef $sPath)
-    Local $iCount = UBound($sPath)
-    If $iCount = 0 Then Return 0
-
-    Local $sParentPath = StringLeft($sPath[0], StringInStr($sPath[0], "\", 0, -1) - 1)
-    Local $pParentPidl = _WinAPI_ShellILCreateFromPath($sParentPath)
-
-    Local $tPidls = DllStructCreate("ptr[" & $iCount & "]")
-
-    Local $pFullPidl, $pRelativePidl, $last_SHITEMID
-    For $i = 0 To $iCount - 1
-        $pFullPidl = _WinAPI_ShellILCreateFromPath($sPath[$i])
-        $last_SHITEMID = DllCall($hShell32, "ptr", "ILFindLastID", "ptr", $pFullPidl)[0]
-        $pRelativePidl = DllCall($hShell32, "ptr", "ILClone", "ptr", $last_SHITEMID)[0]
-        DllStructSetData($tPidls, 1, $pRelativePidl, $i + 1)
-        DllCall($hShell32, "none", "ILFree", "ptr", $pFullPidl)
-    Next
-
-    Local $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
-    Local $pIDataObject = __SHCreateDataObject($tIID_IDataObject, $pParentPidl, $iCount, DllStructGetPtr($tPidls), 0)
-
-    DllCall($hShell32, "none", "ILFree", "ptr", $pParentPidl)
-    For $i = 1 To $iCount
-        DllCall($hShell32, "none", "ILFree", "ptr", DllStructGetData($tPidls, 1, $i))
-    Next
-
-    If Not $pIDataObject Then Return 0
-    Return $pIDataObject
-EndFunc
-
-Func GetDataObjectOfFile_C(ByRef $sPath)
-    If UBound($sPath) = 0 Then Return 0
-
-    Local $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
-    Local $pIDataObject = __SHCreateDataObject($tIID_IDataObject, 0, 0, 0, 0)
-    If Not $pIDataObject Then Return 0
-
-    Local Const $tag_IDataObject = _
-                        "GetData hresult(ptr;ptr*);" & _
-                        "GetDataHere hresult(ptr;ptr*);" & _
-                        "QueryGetData hresult(ptr);" & _
-                        "GetCanonicalFormatEtc hresult(ptr;ptr*);" & _
-                        "SetData hresult(ptr;ptr;bool);" & _
-                        "EnumFormatEtc hresult(dword;ptr*);" & _
-                        "DAdvise hresult(ptr;dword;ptr;dword*);" & _
-                        "DUnadvise hresult(dword);" & _
-                        "EnumDAdvise hresult(ptr*);"
-    Local $oIDataObject = ObjCreateInterface($pIDataObject, $sIID_IDataObject, $tag_IDataObject)
-    If Not IsObj($oIDataObject) Then
-        _Release($pIDataObject)
-        Return 0
-    Endif
-
-    Local $tFORMATETC, $tSTGMEDIUM
-    __Fill_tag_FORMATETC($tFORMATETC)
-    __Fill_tag_STGMEDIUM($tSTGMEDIUM, $sPath)
-
-    $oIDataObject.SetData(DllStructGetPtr($tFORMATETC), DllStructGetPtr($tSTGMEDIUM), 1)
-    _AddRef($pIDataObject)
-
-    Return $pIDataObject
-EndFunc
-
 Func __Fill_tag_FORMATETC(Byref $tFORMATETC)
     Local Const $CF_HDROP = 15
     Local Const $TYMED_HGLOBAL = 1
@@ -2539,20 +2477,6 @@ Func __Fill_tag_STGMEDIUM(Byref $tSTGMEDIUM, Byref $aFiles)
     DllStructSetData($tSTGMEDIUM, "hGlobal", $hGlobal)
     DllStructSetData($tSTGMEDIUM, "pUnkForRelease", 0)
 EndFunc
-
-Func __SHCreateDataObject($tIID_IDataObject, $ppidlFolder = 0, $cidl = 0, $papidl = 0, $pdtInner = 0)
-    Local $aRes = DllCall($hShell32, "long", "SHCreateDataObject", _
-                                         "ptr", $ppidlFolder, _          
-                                         "uint", $cidl, _
-                                         "ptr", $papidl, _ 
-                                         "ptr", $pdtInner, _
-                                         "struct*", $tIID_IDataObject, _
-                                         "ptr*", 0)
-    If @error Then Return SetError(1, 0, $aRes[0])
-    Return $aRes[6]
-EndFunc
-
-; jugador code above
 
 Func _VersionToString($arVersion, $sSep = " ")
     If Not IsArray($arVersion) Or UBound($arVersion, 0)<2 Or UBound($arVersion, 1)<2 Then Return SetError(1, 1, "Version not parsed.")
