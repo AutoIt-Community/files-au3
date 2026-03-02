@@ -932,9 +932,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					Next
 
 					Local $pDataObj, $pDropSource
-					;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
-
-					_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
+					_ArrayDelete($aItems, 0)
 					$pDataObj = GetDataObject($aItems)
 
 					;Create an IDropSource to handle our end of the drag/drop operation.
@@ -1013,8 +1011,6 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						For $i = 1 To $aItems[0]
 							$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($tNMHDR.hwndFrom, $aItems[$i])
 						Next
-
-						;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
 
 						_ArrayDelete($aItems, 0)
 						Local $pDataObj = GetDataObject($aItems)
@@ -1216,10 +1212,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 							Case Else
 								Local $aPath = _StringBetween($sRenameFrom, "\", "\")
 								Local $sRenameItem = $aPath[UBound($aPath) - 1]
-								;$sRenameTo = StringReplace($sRenameFrom, $sRenameItem, $sTextRet) ; prev used with _WinAPI_ShellFileOperation
 								$sRenameTo = $sTextRet
 								_IFileOperationRenameItem($sRenameFrom, $sRenameTo)
-								;__TreeListExplorer_Reload($hTLESystem)
 								_AllowUndo()
 								Return True     ; allow rename to occur
                     	EndSelect
@@ -2181,8 +2175,6 @@ Func _CopyItems()
 				$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListView, $aItems[$i])
 			Next
 
-			;Local $pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
-
 			_ArrayDelete($aItems, 0)
 			$pCopyObj = GetDataObject($aItems)
 
@@ -2230,8 +2222,6 @@ Func _DeleteItems()
 			For $i = 1 To $aItems[0]
 				$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListview, $aItems[$i])
 			Next
-
-			;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
 
 			_ArrayDelete($aItems, 0)
 			Local $pDataObj = GetDataObject($aItems)

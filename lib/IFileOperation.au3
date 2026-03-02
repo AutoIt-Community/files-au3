@@ -200,7 +200,7 @@ Func _IFileOperationMoveItems($pDataObj, $sPathTo, $iFlags = 0)
 EndFunc   ;==>_IFileOperationMoveItems
 
 ; Original function name, still needed for Files Au3
-; TO DO: would like to switch to using _IFileOperationMoveItems and _IFileOperationCopyItems
+; TODO: would like to switch to using _IFileOperationMoveItems and _IFileOperationCopyItems
 Func _IFileOperationFile($pDataObj, $sPathTo, $sAction, $iFlags = 0)
     If Not FileExists($sPathTo) Then DirCreate($sPathTo)
     Local $tIIDIShellItem = CLSIDFromString($IID_IShellItem)
