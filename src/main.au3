@@ -26,6 +26,7 @@ Global $hShell32 = DllOpen('shell32.dll')
 #include "../lib/ProjectConstants.au3"
 #include "../lib/DropSourceObject.au3"
 #include "../lib/DropTargetObject.au3"
+#include "../lib/Lang.au3"
 
 ; CREDITS:
 ; Kanashius     TreeListExplorer UDF
@@ -56,8 +57,13 @@ $iDPI = ApplyDPI()
 Opt("GUIOnEventMode", 1)
 Opt("GUICloseOnESC", 0)
 
+Global $sPathPrefix = @Compiled?"":"../" ; assuming that the compiled .exe will be put in the project root
+Global $sConfigPath = $sPathPrefix&"config/config.ini"
+Global $sAssetPath = $sPathPrefix&"assets/"
+Global $sLanguageConfigPath = $sAssetPath&"language/languages.ini"
 Global $hTLESystem, $iFrame_A, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus, $idTreeView
 Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hParentFrame, $g_iIconWidth, $g_hTreeView
+Global $g_idMenuLangFirst = Default, $g_arLanguages
 Global $g_hSizebox, $g_hOldProc, $g_iHeight, $g_hDots
 Global $idPropertiesItem, $idPropertiesLV, $sCurrentPath
 Global $hListImgList, $iListDragIndex, $sTargetCtrl, $hTreeItemOrig, $hIcon
@@ -127,6 +133,11 @@ OnAutoItExitRegister(_CleanExit)
 _FilesAu3()
 
 Func _FilesAu3()
+	; todo maybe detect system language and use that instead of Default; Functionality may be added to Lang UDF.
+	__Lang_Load(IniRead($sConfigPath, "general", "lang", Default), $sLanguageConfigPath)
+	If @error Then ConsoleWrite("Error loading language from "&$sConfigPath&" ("&@error&":"&@extended&")"&@crlf)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackOther"))
+
 	_GDIPlus_Startup()
 	Local $sButtonSpacing = 20
 	; calculate icon size for TreeListExplorer
@@ -147,6 +158,8 @@ Func _FilesAu3()
 
 	; Create GUI and register events
 	$g_hGUI = GUICreate("Files Au3", @DesktopWidth - 600, @DesktopHeight - 400, -1, -1, $WS_OVERLAPPEDWINDOW)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackWinTitle", $g_hGUI), "applicationTitle")
+
 	GUISetOnEvent($GUI_EVENT_CLOSE, "_EventsGUI")
 	GUISetOnEvent($GUI_EVENT_MAXIMIZE, "_EventsGUI")
 	GUISetOnEvent($GUI_EVENT_RESIZED, "_EventsGUI")
@@ -179,6 +192,7 @@ Func _FilesAu3()
 	$iButtonHeight = $aPos[3]
 	GUICtrlSetState($sBack, $GUI_DISABLE)
 	_GUIToolTip_AddTool($hToolTip2, $g_hGUI, "Back", GUICtrlGetHandle($sBack))
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackToolInfo", $hToolTip2, $g_hGUI, GUICtrlGetHandle($sBack)), "back")
 
 	$sForward = GUICtrlCreateButton(ChrW(0xE64D), $sBackPosH + $sButtonSpacing, 10, -1, -1)
 	GUICtrlSetOnEvent(-1, "_ButtonFunctions")
@@ -188,6 +202,7 @@ Func _FilesAu3()
 	$sForwardPosH = $aPos[0] + $aPos[2]
 	GUICtrlSetState($sForward, $GUI_DISABLE)
 	_GUIToolTip_AddTool($hToolTip2, $g_hGUI, "Forward", GUICtrlGetHandle($sForward))
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackToolInfo", $hToolTip2, $g_hGUI, GUICtrlGetHandle($sForward)), "forward")
 
 	$sUpLevel = GUICtrlCreateButton(ChrW(0xE64C), $sForwardPosH + $sButtonSpacing, 10, -1, -1)
 	GUICtrlSetOnEvent(-1, "_ButtonFunctions")
@@ -196,6 +211,7 @@ Func _FilesAu3()
 	$sUpLevelPosV = $aPos[1] + $aPos[3]
 	$sUpLevelPosH = $aPos[0] + $aPos[2]
 	_GUIToolTip_AddTool($hToolTip2, $g_hGUI, "Up", GUICtrlGetHandle($sUpLevel))
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackToolInfo", $hToolTip2, $g_hGUI, GUICtrlGetHandle($sUpLevel)), "up")
 
 	$sRefresh = GUICtrlCreateButton(ChrW(0xE72C), $sUpLevelPosH + $sButtonSpacing, 10, -1, -1)
 	GUICtrlSetOnEvent(-1, "_ButtonFunctions")
@@ -204,55 +220,82 @@ Func _FilesAu3()
 	$sRefreshPosV = $aPos[1] + $aPos[3]
 	$sRefreshPosH = $aPos[0] + $aPos[2]
 	_GUIToolTip_AddTool($hToolTip2, $g_hGUI, "Refresh", GUICtrlGetHandle($sRefresh))
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackToolInfo", $hToolTip2, $g_hGUI, GUICtrlGetHandle($sRefresh)), "refresh")
 
 	; reset GUI font
 	GUISetFont(10, $FW_NORMAL, $GUI_FONTNORMAL, "Segoe UI")
 
 	; Menubar
 	Local $idFileMenu = _GUICtrlCreateODTopMenu("& File", $g_hGUI)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $idFileMenu), "menuFile")
 	Local $idEditMenu = _GUICtrlCreateODTopMenu("& Edit", $g_hGUI)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $idEditMenu), "menuEdit")
 	Local $idViewMenu = _GUICtrlCreateODTopMenu("& View", $g_hGUI)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $idViewMenu), "menuView")
 	Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $idHelpMenu), "menuHelp")
+	Local $idLanguageMenu = _GUICtrlCreateODTopMenu("& Language", $g_hGUI)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $idLanguageMenu), "menuLanguage")
 
 	; File menu
 	$idDeleteItem = GUICtrlCreateMenuItem("&Delete" & @TAB & "Delete", $idFileMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idDeleteItem), "menuDelete")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idDeleteItem, $GUI_DISABLE)
 	$idRenameItem = GUICtrlCreateMenuItem("&Rename", $idFileMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idRenameItem), "menuRename")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idRenameItem, $GUI_DISABLE)
 	$idPropertiesItem = GUICtrlCreateMenuItem("&Properties" & @TAB & "Shift+P", $idFileMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idPropertiesItem), "menuProperties")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
 	GUICtrlCreateMenuItem("", $idFileMenu)
 	$idExitItem = GUICtrlCreateMenuItem("&Exit", $idFileMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idExitItem), "menuExit")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	; Edit menu
 	$idUndoItem = GUICtrlCreateMenuItem("&Undo" & @TAB & "Ctrl+Z", $idEditMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idUndoItem), "menuUndo")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idUndoItem, $GUI_DISABLE)
 	GUICtrlCreateMenuItem("", $idEditMenu)
 	$idCopyItem = GUICtrlCreateMenuItem("&Copy" & @TAB & "Ctrl+C", $idEditMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idCopyItem), "menuCopy")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idCopyItem, $GUI_DISABLE)
 	$idPasteItem = GUICtrlCreateMenuItem("&Paste" & @TAB & "Ctrl+V", $idEditMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idPasteItem), "menuPaste")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idPasteItem, $GUI_DISABLE)
 	; View menu
 	$idThemeItem = GUICtrlCreateMenuItem("&Dark Mode", $idViewMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idThemeItem), "menuDarkMode")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlCreateMenuItem("", $idViewMenu)
 	$idHiddenItem = GUICtrlCreateMenuItem("&Show Hidden Files", $idViewMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idHiddenItem), "menuShowHiddenFiles")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idHiddenItem, $GUI_CHECKED)
 	$bHideHidden = False
 	$idSystemItem = GUICtrlCreateMenuItem("&Hide Protected System Files", $idViewMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idSystemItem), "menuHideProtectedSystemFiles")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	GUICtrlSetState($idSystemItem, $GUI_CHECKED)
 	$bHideSystem = True
 	; Help menu
 	$idAboutItem = GUICtrlCreateMenuItem("&About", $idHelpMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idAboutItem), "menuAbout")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
+	; Language menu
+	$g_arLanguages = __Lang_GetLanguages($sLanguageConfigPath)
+	Local $sCurrentLang = __Lang_GetCurrentLanguage()
+	For $i=0 To UBound($g_arLanguages)-1
+		Local $idMenuItem = GUICtrlCreateMenuItem($g_arLanguages[$i][1], $idLanguageMenu, -1, 1)
+		GUICtrlSetOnEvent(-1, "_MenuFunctions")
+		If $i=0 Then $g_idMenuLangFirst = $idMenuItem
+		If $g_arLanguages[$i][0]=$sCurrentLang Then GUICtrlSetState($idMenuItem, $GUI_CHECKED)
+	Next
 
 	If $isDarkMode Then GUICtrlSetState($idThemeItem, $GUI_CHECKED)
 
@@ -307,13 +350,18 @@ Func _FilesAu3()
 	Local $hChildLV = _GUIFrame_GetHandle($iFrame_A, 2)
 	$g_hHeader = _GUICtrlHeader_Create($hChildLV, BitOR($HDS_BUTTONS, $HDS_DRAGDROP, $HDS_FULLDRAG))
 	GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
-	_GUICtrlHeader_AddItem($g_hHeader, "Name", 300)
-	_GUICtrlHeader_AddItem($g_hHeader, "Size", 100)
-	_GUICtrlHeader_AddItem($g_hHeader, "Date Modified", 150)
-	_GUICtrlHeader_AddItem($g_hHeader, "Type", 150)
+	Local $iHeaderName = _GUICtrlHeader_AddItem($g_hHeader, "Name", 300)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackHeaderItem", $g_hHeader, $iHeaderName), "name")
+	Local $iHeaderSize = _GUICtrlHeader_AddItem($g_hHeader, "Size", 100)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackHeaderItem", $g_hHeader, $iHeaderSize), "size")
+	Local $iHeaderDateModified = _GUICtrlHeader_AddItem($g_hHeader, "Date Modified", 150)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackHeaderItem", $g_hHeader, $iHeaderDateModified), "dateModified")
+	Local $iHeaderType = _GUICtrlHeader_AddItem($g_hHeader, "Type", 150)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackHeaderItem", $g_hHeader, $iHeaderType), "type")
 
 	; Set Size column alignment
-	_GUICtrlHeader_SetItemAlign($g_hHeader, 1, 1)
+	; disabled for now. The windows file explorer size header is not right aligned either and this would complicate setting the language read direction (_langCallbackHeaderItem)
+	; _GUICtrlHeader_SetItemAlign($g_hHeader, 1, 1)
 
 	; Set sort arrow
 	;_GUICtrlHeader_SetItemFormat($g_hHeader, 0, $HDF_SORTUP)
@@ -344,6 +392,7 @@ Func _FilesAu3()
 	; listview context menu
 	Local $idContextLV = GUICtrlCreateContextMenu($idListview)
 	$idPropertiesLV = GUICtrlCreateMenuItem("Properties", $idContextLV)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idPropertiesLV), "properties")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 
 	; add listview and callbacks to TLE system
@@ -460,7 +509,7 @@ Func _FilesAu3()
 	$sMsg &= "At the moment, Files Au3 allows you to Undo the most recent drag and drop, copy, move, delete, rename, etc. "
 	$sMsg &= "by pressing Ctrl+Z or Undo from the Edit menu. Future versions will expand to allow more than just the most "
 	$sMsg &= "recent Undo operation."
-	MsgBox($MB_ICONWARNING, "Files Au3", $sMsg)
+	MsgBox($MB_ICONWARNING, __Lang_Get("applicationTitle"), __Lang_Get("fileOperationNewCodeWarning"))
 
 	; TreeView has initial focus
 	$sControlFocus = 'Tree'
@@ -694,9 +743,9 @@ Func _selectionChangedLV()
 	Local $iItemCount = $iFileCount + $iDirCount
 
 	If $iItemCount > 1 Then
-		$g_aText[1] = "  " & $iItemCount & " items selected"
+		$g_aText[1] = "  " & $iItemCount & __Lang_Get("itemsSelected", " ")
 	ElseIf $iItemCount = 1 Then
-		$g_aText[1] = "  1 item selected"
+		$g_aText[1] = __Lang_Get("oneItemSelected", "  ")
 	Else
 		$g_aText[1] = " "
 	EndIf
@@ -710,10 +759,7 @@ Func _selectionChangedLV()
 
 	; update number of items (files and folders) in statusbar
 	Local $iLVItemCount = _GUICtrlListView_GetItemCount($idListview)
-	$g_aText[0] = "  " & $iLVItemCount & " item"
-	If $iLVItemCount > 1 Then
-		$g_aText[0] &= "s"
-	EndIf
+	$g_aText[0] = "  " & $iLVItemCount & ($iLVItemCount>1?__Lang_Get("items", " "):__Lang_Get("item", " "))
 
 	_WinAPI_RedrawWindow($g_hStatus)
 EndFunc   ;==>_selectionChangedLV
@@ -955,6 +1001,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					$gText = _GUICtrlListView_GetItemText($hWndFrom, DllStructGetData($tInfo2, "Item"), 0)
 					$iItemRow = DllStructGetData($tInfo2, "Item")
 					; clear tooltip if cursor not over column 0 or different item
+					; todo: instead of subitem column 0, should't this check the column with the file/folder/drive name? I think the order can change.
 					If DllStructGetData($tInfo2, "SubItem") <> 0 Or $iItemRow <> $iItemPrev Then
 						; ensure that tooltip only shows when over column 0
 						_GUIToolTip_TrackActivate($hToolTip1, False, $g_hGUI, $g_hListview)
@@ -968,23 +1015,23 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					; need to determine if file or folder to get more details
 					If $gText <> "" Then
 						$gText = __TreeListExplorer_GetPath($hTLESystem) & $gText & @CRLF
-						Local $gText2 = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListview, _GUICtrlListView_GetHotItem($g_hListview), 0)
+						Local $sFilePath = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListview, _GUICtrlListView_GetHotItem($g_hListview), 0)
 						; is selected path a folder
-						If StringInStr(FileGetAttrib($gText2), "D") Then
-							If _WinAPI_PathIsRoot_mod($gText2) Then
+						If StringInStr(FileGetAttrib($sFilePath), "D") Then
+							If _WinAPI_PathIsRoot_mod($sFilePath) Then
 								; update drive space information
-								Local $iDriveFree = Round(DriveSpaceFree($gText2) / 1024, 1)
-								Local $iDriveTotal = Round(DriveSpaceTotal($gText2) / 1024, 1)
-								Local $iPercentFree = Round(($iDriveFree / $iDriveTotal) * 100)
-								Local $sDriveInfo = $iDriveFree & " GB free" & " (" & $iPercentFree & "%)"
+								Local $iDriveFree = DriveSpaceFree($sFilePath) / 1024
+								Local $iDriveTotal = DriveSpaceTotal($sFilePath) / 1024
+								Local $iPercentFree = ($iDriveFree / $iDriveTotal) * 100
+								Local $sDriveInfo = __Lang_Get("nGBFree", $iDriveFree, $iPercentFree)
 								$gText = $sDriveInfo
 							Else
-								$gText &= "Size: " & __TreeListExplorer__GetSizeString(DirGetSize($gText2)) & @CRLF
-								$gText &= "Date Modified: " & _GUICtrlListView_GetItemText($g_hListview, _GUICtrlListView_GetHotItem($g_hListview), 2)
+								$gText &= __Lang_Get("sizeX", __TreeListExplorer__GetSizeString(DirGetSize($sFilePath))) & @CRLF
+								$gText &= __Lang_Get("dateModifiedX", _GUICtrlListView_GetItemText($g_hListview, _GUICtrlListView_GetHotItem($g_hListview), 2))
 							EndIf
 						Else
-							$gText &= "Size: " & _GUICtrlListView_GetItemText($g_hListview, _GUICtrlListView_GetHotItem($g_hListview), 1) & @CRLF
-							$gText &= "Date Modified: " & _GUICtrlListView_GetItemText($g_hListview, _GUICtrlListView_GetHotItem($g_hListview), 2)
+							$gText &= __Lang_Get("sizeX", _GUICtrlListView_GetItemText($g_hListview, _GUICtrlListView_GetHotItem($g_hListview), 1)) & @CRLF
+							$gText &= __Lang_Get("dateModifiedX", _GUICtrlListView_GetItemText($g_hListview, _GUICtrlListView_GetHotItem($g_hListview), 2))
 						EndIf
 					EndIf
 					$aPosTip = MouseGetPos()
@@ -1029,6 +1076,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					Local $iItemLV = $aSelectedLV[1]
 					Local $sRenameItem = _GUICtrlListView_GetItemText($idListview, $iItemLV, 0)
 					$sRenameFrom = __TreeListExplorer_GetPath($hTLESystem) & $sRenameItem
+					; todo: consider using another method, without blocking keys globally. It is possible to monitor keys for input controls and to prevent them
 					; set hotkeys to ensure that file name cannot contain illegal characters
 					; \ / : * ? " < > |
 					HotKeySet ('{\}', "_RenameCheckLV")
@@ -1042,6 +1090,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					HotKeySet ('{|}', "_RenameCheckLV")
 					Return False
 				Case $LVN_ENDLABELEDITA, $LVN_ENDLABELEDITW
+					; todo: consider using another method, without blocking keys globally. It is possible to monitor keys for input controls and to prevent them
 					; unset hotkeys that block illegal characters from being set
 					HotKeySet ('{\}')
 					HotKeySet ('{/}')
@@ -1155,6 +1204,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					HotKeySet("{Esc}", "_CancelEditTV")
 					$hTreeItemOrig = _GUICtrlTreeView_GetSelection($g_hTreeView)
 					$sRenameFrom = TreeItemToPath($g_hTreeView, $hTreeItemOrig)
+					; todo: consider using another method, without blocking keys globally. It is possible to monitor keys for input controls and to prevent them
 					; set hotkeys to ensure that file name cannot contain illegal characters
 					; \ / : * ? " < > |
 					HotKeySet ('{\}', "_RenameCheckTV")
@@ -1169,6 +1219,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					Return False
 				Case $TVN_ENDLABELEDITA, $TVN_ENDLABELEDITW
 					Local $sRenameTo
+					; todo: consider using another method, without blocking keys globally. It is possible to monitor keys for input controls and to prevent them
 					HotKeySet("{Enter}")
 					HotKeySet("{Esc}")
 					; unset hotkeys that block illegal characters from being set
@@ -1289,17 +1340,13 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 EndFunc   ;==>WM_NOTIFY2
 
 Func _RenameCheckLV()
-	Local $sIllegal = "A file name can't contain any of the following characters:" & @CRLF & @CRLF
-    $sIllegal &= '\ / : * ? " < > |'
 	Local $hEdit = _GUICtrlListView_GetEditControl($g_hListview)
-	_GUICtrlEdit_ShowBalloonTip($hEdit, '', $sIllegal, $TTI_INFO)
+	_GUICtrlEdit_ShowBalloonTip($hEdit, '', __Lang_Get("aFilenameCantContainAnyOfTheFollowingCharacters", '\ / : * ? " < > |') & @CRLF & @CRLF, $TTI_INFO)
 EndFunc
 
 Func _RenameCheckTV()
-	Local $sIllegal = "A file name can't contain any of the following characters:" & @CRLF & @CRLF
-    $sIllegal &= '\ / : * ? " < > |'
 	Local $hEdit = _GUICtrlTreeView_GetEditControl($g_hTreeView)
-	_GUICtrlEdit_ShowBalloonTip($hEdit, '', $sIllegal, $TTI_INFO)
+	_GUICtrlEdit_ShowBalloonTip($hEdit, '', __Lang_Get("aFilenameCantContainAnyOfTheFollowingCharacters", '\ / : * ? " < > |') & @CRLF & @CRLF, $TTI_INFO)
 EndFunc
 
 Func _SaveEditTV()
@@ -1435,10 +1482,10 @@ EndFunc   ;==>WM_COMMAND2
 
 Func _About()
 	Local $sMsg
-	$sMsg = "Program Version: " & @TAB & $sVersion & @CRLF & @CRLF
-	$sMsg &= "TreeListExplorer: " & @TAB & _VersionToString(_UDFGetVersion("../lib/TreeListExplorer.au3")) & @CRLF & @CRLF
-	$sMsg &= "Made by: " & @TAB & "AutoIt Community"
-	MsgBox(0, "Files Au3", $sMsg)
+	$sMsg = __Lang_Get("applicationVersion", $sVersion) & @CRLF & @CRLF
+	$sMsg &= __Lang_Get("treeListExplorer", _VersionToString(_UDFGetVersion("../lib/TreeListExplorer.au3"))) & @CRLF & @CRLF
+	$sMsg &= __Lang_Get("madeByAutoItCommunity")
+	MsgBox(0, __Lang_Get("applicationTitle"), $sMsg)
 EndFunc   ;==>_About
 
 Func _CleanExit()
@@ -2101,6 +2148,13 @@ Func _MenuFunctions()
 			__TreeListExplorer_ReloadView($idListView, True)
 			__TreeListExplorer_ReloadView($idTreeView, True)
 	EndSwitch
+	If $g_idMenuLangFirst<>Default And @GUI_CtrlId>=$g_idMenuLangFirst And @GUI_CtrlId<=$g_idMenuLangFirst+UBound($g_arLanguages)-1 Then
+		Local $sLang = $g_arLanguages[@GUI_CtrlId-$g_idMenuLangFirst][0]
+		__Lang_Load($sLang, $sLanguageConfigPath)
+		Local $arFolder = StringRegExp($sConfigPath, "^(.*[\/\\]).*$", 1)
+		If UBound($arFolder)>0 And Not FileExists($arFolder[0]) Then DirCreate($arFolder[0])
+		If Not @error Then IniWrite($sConfigPath, "general", "lang", $sLang)
+	EndIf
 EndFunc   ;==>_MenuFunctions
 
 Func _UndoOp()
@@ -2272,16 +2326,13 @@ Func _PathInputChanged()
 
 	; update number of items (files and folders) in statusbar
 	Local $iLVItemCount = _GUICtrlListView_GetItemCount($idListview)
-	$g_aText[0] = "  " & $iLVItemCount & " item"
-	If $iLVItemCount > 1 Then
-		$g_aText[0] &= "s"
-	EndIf
+	$g_aText[0] = "  " & $iLVItemCount & ($iLVItemCount>1?__Lang_Get("items", " "):__Lang_Get("item", " "))
 
 	; update drive space information
 	Local $iDriveFree = Round(DriveSpaceFree(__TreeListExplorer_GetPath($hTLESystem)) / 1024, 1)
 	Local $iDriveTotal = Round(DriveSpaceTotal(__TreeListExplorer_GetPath($hTLESystem)) / 1024, 1)
 	Local $iPercentFree = Round(($iDriveFree / $iDriveTotal) * 100)
-	$g_aText[3] = "  " & $iDriveFree & " GB free" & " (" & $iPercentFree & "%)"
+	$g_aText[3] = "  " & __Lang_Get("nGBFree", $iDriveFree, $iPercentFree)
 	_WinAPI_RedrawWindow($g_hStatus)
 EndFunc   ;==>_PathInputChanged
 
@@ -2454,7 +2505,7 @@ Func __Fill_tag_STGMEDIUM(Byref $tSTGMEDIUM, Byref $aFiles)
     Local $pLock = DllCall($hKernel32, "ptr", "GlobalLock", "ptr", $hGlobal)[0]
 
     Local $tDROPFILES = DllStructCreate("dword pFiles; int x; int y; bool fNC; bool fWide", $pLock)
-    DllStructSetData($tDROPFILES, "pFiles", 20) 
+    DllStructSetData($tDROPFILES, "pFiles", 20)
     DllStructSetData($tDROPFILES, "fWide", True)
 
     Local $tPaths = DllStructCreate("wchar[" & StringLen($sFileList) & "]", $pLock + 20)
@@ -2469,12 +2520,12 @@ Func __Fill_tag_STGMEDIUM(Byref $tSTGMEDIUM, Byref $aFiles)
 EndFunc
 
 Func _VersionToString($arVersion, $sSep = " ")
-    If Not IsArray($arVersion) Or UBound($arVersion, 0)<2 Or UBound($arVersion, 1)<2 Then Return SetError(1, 1, "Version not parsed.")
+    If Not IsArray($arVersion) Or UBound($arVersion, 0)<2 Or UBound($arVersion, 1)<2 Then Return SetError(1, 1, __Lang_Get("versionNotParsed"))
     Local $sVersion = ""
     If $arVersion[1][0]>0 Then
         $sVersion &= $arVersion[1][1]
     EndIf
-    If $sVersion = "" Then Return "Version unknown"
+    If $sVersion = "" Then Return __Lang_Get("versionUnknown")
     Return $sVersion
 EndFunc
 
@@ -2561,3 +2612,27 @@ Func _WinSetIcon($hWnd, $sFile, $iIndex = 0, $bSmall = False) ; https://www.auto
   _SendMessage($hWnd, $WM_SETICON, Int(Not $bSmall), $hIcon)
   _WinAPI_DestroyIcon($hIcon)
 EndFunc   ;==>_WinSetIcon
+
+Func _langCallbackWinTitle($sKey, $sVal, $bRTL, $hGui)
+	WinSetTitle($hGui, "", $sVal)
+EndFunc
+
+Func _langCallbackToolInfo($sKey, $sVal, $bRTL, $hTool, $hGui, $hCtrl)
+	Local $arInfo = _GUIToolTip_GetToolInfo($hTool, $hGui, $hCtrl)
+	If UBound($arInfo)<1 Then Return
+	_GUIToolTip_SetToolInfo($hTool, $hGui, $hCtrl, $sVal, BitOR(BitAND($arInfo[0], BitNOT($TTF_RTLREADING)), $bRTL?$TTF_RTLREADING:0))
+EndFunc
+
+Func _langCallbackODMenuItem($sKey, $sVal, $bRTL, $idMenuItem)
+	_GUICtrlODMenuItemSetText($idMenuItem, $sVal)
+EndFunc
+
+Func _langCallbackHeaderItem($sKey, $sVal, $bRTL, $hHeader, $iHeaderIndex)
+	_GUICtrlHeader_SetItemText($hHeader, $iHeaderIndex, $sVal)
+	_GUICtrlHeader_SetItemAlign($hHeader, $iHeaderIndex, $bRTL?1:0)
+EndFunc
+
+Func _langCallbackOther($bRTL)
+	_selectionChangedLV()
+	_PathInputChanged()
+EndFunc

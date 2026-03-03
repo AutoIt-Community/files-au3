@@ -3,3 +3,4 @@ temp/
 Au3ChangelogUpdater.exe
 package.json
 lib/desktop.ini
+config/
