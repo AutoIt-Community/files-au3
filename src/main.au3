@@ -65,11 +65,11 @@ Global $hListImgList, $iListDragIndex, $sTargetCtrl, $hTreeItemOrig, $hIcon
 Global $sBack, $sForward, $sUpLevel, $sRefresh
 Global $sTreeDragItem, $sListDragItems, $bDragToolActive = False
 Global $pLVDropTarget, $pTVDropTarget
-Global $bPathInputChanged = False, $bLoadStatus = False, $bCursorOverride = False
+Global $bLoadStatus = False, $bCursorOverride = False
 Global $idExitItem, $idAboutItem, $idDeleteItem, $idRenameItem, $idCopyItem, $idPasteItem, $idUndoItem, $idHiddenItem, $idSystemItem
 Global $bHideHidden = False, $bHideSystem = False
 Global $hCursor, $hProc
-Global $sSelectedItems, $g_aText, $gText
+Global $sSelectedItems, $g_aText[4], $gText
 Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $bTooltipActive
 Global $isDarkMode = _WinAPI_ShouldAppsUseDarkMode()
 Global $hFolderHistory = __History_Create("_doUnReDo", 100, "_historyChange"), $bFolderHistoryChanging = False
@@ -712,6 +712,13 @@ Func _selectionChangedLV()
 		$g_aText[2] = "  " & __TreeListExplorer__GetSizeString($iFileSizes)
 	EndIf
 
+	; update number of items (files and folders) in statusbar
+	Local $iLVItemCount = _GUICtrlListView_GetItemCount($idListview)
+	$g_aText[0] = "  " & $iLVItemCount & " item"
+	If $iLVItemCount > 1 Then
+		$g_aText[0] &= "s"
+	EndIf
+
 	_WinAPI_RedrawWindow($g_hStatus)
 EndFunc   ;==>_selectionChangedLV
 
@@ -755,11 +762,6 @@ EndFunc   ;==>_doubleClickCallback
 
 Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $bLoading)
 	$bLoadStatus = $bLoading
-	; wait for ListView items to be done loading before getting item count for statusbar
-	If Not $bPathInputChanged Then
-		Return
-	EndIf
-
 	If $bLoading Then
 		; add delay before changing cursor and clearing status item count
 		AdlibRegister("_ClearStatus", 250)
@@ -772,8 +774,8 @@ Func _loadingCallback($hSystem, $hView, $sRoot, $sFolder, $sSelected, $sPath, $b
 		$bCursorOverride = False
 	EndIf
 
+	; update statusbar item count
 	_PathInputChanged()
-	$bPathInputChanged = False
 EndFunc   ;==>_loadingCallback
 
 Func _ClearStatus()
@@ -930,10 +932,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 					Next
 
 					Local $pDataObj, $pDropSource
-					;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
-
-					_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
-					$pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+					_ArrayDelete($aItems, 0)
+					$pDataObj = GetDataObject($aItems)
 
 					;Create an IDropSource to handle our end of the drag/drop operation.
 					$pDropSource = CreateDropSource()
@@ -1012,13 +1012,11 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 							$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($tNMHDR.hwndFrom, $aItems[$i])
 						Next
 
-						;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
-
-						_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
-						Local $pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+						_ArrayDelete($aItems, 0)
+						Local $pDataObj = GetDataObject($aItems)
 
 						Local $iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-						_IFileOperationDelete($pDataObj, $iFlags)
+						_IFileOperationDeleteItems($pDataObj)
 
 						__TreeListExplorer_Reload($hTLESystem)
 
@@ -1085,7 +1083,10 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
                             Return False
                         Case Else
 							$sRenameTo = __TreeListExplorer_GetPath($hTLESystem) & $sTextRet
+							;$sRenameTo = $sTextRet ; used for _IFileOperationRenameItem
 							_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
+							; TODO: _IFileOperationRenameItem is failing but only for ListView. TreeView is fine.
+							;_IFileOperationRenameItem($sRenameFrom, $sRenameTo)
 							; refresh TLE system to pick up any folder changes, file type changes, etc.
 							__TreeListExplorer_Reload($hTLESystem)
 							_AllowUndo()
@@ -1141,7 +1142,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 						;Get an IDataObject representing the file to copy
 						$pDataObj = GetDataObjectOfFile($hWnd, $sItemText)
 						$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-						_IFileOperationDelete($pDataObj, $iFlags)
+						_IFileOperationDeleteItems($pDataObj)
 
 						__TreeListExplorer_Reload($hTLESystem)
 
@@ -1211,9 +1212,8 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 							Case Else
 								Local $aPath = _StringBetween($sRenameFrom, "\", "\")
 								Local $sRenameItem = $aPath[UBound($aPath) - 1]
-								$sRenameTo = StringReplace($sRenameFrom, $sRenameItem, $sTextRet)
-								_WinAPI_ShellFileOperation($sRenameFrom, $sRenameTo, $FO_RENAME, BitOR($FOF_ALLOWUNDO, $FOF_NO_UI))
-								;__TreeListExplorer_Reload($hTLESystem)
+								$sRenameTo = $sTextRet
+								_IFileOperationRenameItem($sRenameFrom, $sRenameTo)
 								_AllowUndo()
 								Return True     ; allow rename to occur
                     	EndSelect
@@ -1428,9 +1428,6 @@ Func WM_COMMAND2($hWnd, $iMsg, $wParam, $lParam)
 				Case $EN_SETFOCUS
 					; select all text in path input box
 					AdlibRegister("_PathSelectAll", 10)
-				Case $EN_CHANGE
-					; signal path input change to follow up in _loadingCallback() function
-					$bPathInputChanged = True
 			EndSwitch
 	EndSwitch
 	Return $GUI_RUNDEFMSG
@@ -2179,10 +2176,8 @@ Func _CopyItems()
 				$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListView, $aItems[$i])
 			Next
 
-			;Local $pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
-
-			_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
-			$pCopyObj = GetDataObjectOfFile_B($aItems) ; jugador function
+			_ArrayDelete($aItems, 0)
+			$pCopyObj = GetDataObject($aItems)
 
 			; we don't want to release this until after Paste
 			;_Release($pCopyObj)
@@ -2229,13 +2224,11 @@ Func _DeleteItems()
 				$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListview, $aItems[$i])
 			Next
 
-			;$pDataObj = GetDataObjectOfFiles($hWnd, $aItems) ; MattyD function
-
-			_ArrayDelete($aItems, 0) ; only needed for GetDataObjectOfFile_B
-			Local $pDataObj = GetDataObjectOfFile_B($aItems) ; jugador function
+			_ArrayDelete($aItems, 0)
+			Local $pDataObj = GetDataObject($aItems)
 
 			Local $iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-			_IFileOperationDelete($pDataObj, $iFlags)
+			_IFileOperationDeleteItems($pDataObj)
 
 			__TreeListExplorer_Reload($hTLESystem)
 
@@ -2249,7 +2242,7 @@ Func _DeleteItems()
 			;Get an IDataObject representing the file to copy
 			$pDataObj = GetDataObjectOfFile(_GUIFrame_GetHandle($iFrame_A, 1), $sItemText)
 			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-			_IFileOperationDelete($pDataObj, $iFlags)
+			_IFileOperationDeleteItems($pDataObj)
 
 			__TreeListExplorer_Reload($hTLESystem)
 
@@ -2435,72 +2428,6 @@ Func RevokeDragDrop($hWnd)
 	Return SetError($aCall[0], 0, $aCall[0] = $S_OK)
 EndFunc   ;==>RevokeDragDrop
 
-
-; jugador code
-
-Func GetDataObjectOfFile_B(ByRef $sPath)
-    Local $iCount = UBound($sPath)
-    If $iCount = 0 Then Return 0
-
-    Local $sParentPath = StringLeft($sPath[0], StringInStr($sPath[0], "\", 0, -1) - 1)
-    Local $pParentPidl = _WinAPI_ShellILCreateFromPath($sParentPath)
-
-    Local $tPidls = DllStructCreate("ptr[" & $iCount & "]")
-
-    Local $pFullPidl, $pRelativePidl, $last_SHITEMID
-    For $i = 0 To $iCount - 1
-        $pFullPidl = _WinAPI_ShellILCreateFromPath($sPath[$i])
-        $last_SHITEMID = DllCall($hShell32, "ptr", "ILFindLastID", "ptr", $pFullPidl)[0]
-        $pRelativePidl = DllCall($hShell32, "ptr", "ILClone", "ptr", $last_SHITEMID)[0]
-        DllStructSetData($tPidls, 1, $pRelativePidl, $i + 1)
-        DllCall($hShell32, "none", "ILFree", "ptr", $pFullPidl)
-    Next
-
-    Local $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
-    Local $pIDataObject = __SHCreateDataObject($tIID_IDataObject, $pParentPidl, $iCount, DllStructGetPtr($tPidls), 0)
-
-    DllCall($hShell32, "none", "ILFree", "ptr", $pParentPidl)
-    For $i = 1 To $iCount
-        DllCall($hShell32, "none", "ILFree", "ptr", DllStructGetData($tPidls, 1, $i))
-    Next
-
-    If Not $pIDataObject Then Return 0
-    Return $pIDataObject
-EndFunc
-
-Func GetDataObjectOfFile_C(ByRef $sPath)
-    If UBound($sPath) = 0 Then Return 0
-
-    Local $tIID_IDataObject = _WinAPI_GUIDFromString($sIID_IDataObject)
-    Local $pIDataObject = __SHCreateDataObject($tIID_IDataObject, 0, 0, 0, 0)
-    If Not $pIDataObject Then Return 0
-
-    Local Const $tag_IDataObject = _
-                        "GetData hresult(ptr;ptr*);" & _
-                        "GetDataHere hresult(ptr;ptr*);" & _
-                        "QueryGetData hresult(ptr);" & _
-                        "GetCanonicalFormatEtc hresult(ptr;ptr*);" & _
-                        "SetData hresult(ptr;ptr;bool);" & _
-                        "EnumFormatEtc hresult(dword;ptr*);" & _
-                        "DAdvise hresult(ptr;dword;ptr;dword*);" & _
-                        "DUnadvise hresult(dword);" & _
-                        "EnumDAdvise hresult(ptr*);"
-    Local $oIDataObject = ObjCreateInterface($pIDataObject, $sIID_IDataObject, $tag_IDataObject)
-    If Not IsObj($oIDataObject) Then
-        _Release($pIDataObject)
-        Return 0
-    Endif
-
-    Local $tFORMATETC, $tSTGMEDIUM
-    __Fill_tag_FORMATETC($tFORMATETC)
-    __Fill_tag_STGMEDIUM($tSTGMEDIUM, $sPath)
-
-    $oIDataObject.SetData(DllStructGetPtr($tFORMATETC), DllStructGetPtr($tSTGMEDIUM), 1)
-    _AddRef($pIDataObject)
-
-    Return $pIDataObject
-EndFunc
-
 Func __Fill_tag_FORMATETC(Byref $tFORMATETC)
     Local Const $CF_HDROP = 15
     Local Const $TYMED_HGLOBAL = 1
@@ -2541,20 +2468,6 @@ Func __Fill_tag_STGMEDIUM(Byref $tSTGMEDIUM, Byref $aFiles)
     DllStructSetData($tSTGMEDIUM, "hGlobal", $hGlobal)
     DllStructSetData($tSTGMEDIUM, "pUnkForRelease", 0)
 EndFunc
-
-Func __SHCreateDataObject($tIID_IDataObject, $ppidlFolder = 0, $cidl = 0, $papidl = 0, $pdtInner = 0)
-    Local $aRes = DllCall($hShell32, "long", "SHCreateDataObject", _
-                                         "ptr", $ppidlFolder, _
-                                         "uint", $cidl, _
-                                         "ptr", $papidl, _
-                                         "ptr", $pdtInner, _
-                                         "struct*", $tIID_IDataObject, _
-                                         "ptr*", 0)
-    If @error Then Return SetError(1, 0, $aRes[0])
-    Return $aRes[6]
-EndFunc
-
-; jugador code above
 
 Func _VersionToString($arVersion, $sSep = " ")
     If Not IsArray($arVersion) Or UBound($arVersion, 0)<2 Or UBound($arVersion, 1)<2 Then Return SetError(1, 1, "Version not parsed.")
@@ -2619,26 +2532,26 @@ Func _GetVersion($sUdfCode)
 EndFunc
 
 Func _filterCallback($hSystem, $hView, $bIsFolder, $sPath, $sName, $sExt)
-	If $bHideHidden Or $bHideSystem Then
-		; ensure that root drive letters do not get hidden
-		If _WinAPI_PathIsRoot_mod($sPath&$sName&$sExt) Then Return True
+	#forceref $hSystem, $hView, $bIsFolder
 
-		Switch $sName
-			Case "$RECYCLE.BIN"
-				Return False
-			Case "System Volume Information"
-				Return False
-		EndSwitch
-	EndIf
+	; nothing to filter
+	If Not $bHideHidden And Not $bHideSystem Then Return True
 
-	Select
-		Case $bHideSystem
-			; filter out files and folders with System attribute
-			If StringInStr(FileGetAttrib($sPath&$sName&$sExt), "S", 2)>0 Then Return False
-		Case $bHideHidden
-			; filter out files and folders with Hidden attribute
-			If StringInStr(FileGetAttrib($sPath&$sName&$sExt), "H", 2)>0 Then Return False
-	EndSelect
+	; always show root drive letters
+	Local $sFullPath = $sPath & $sName & $sExt
+	If _WinAPI_PathIsRoot_mod($sFullPath) Then Return True
+
+	Switch $sName
+		Case "$RECYCLE.BIN"
+			Return False
+		Case "System Volume Information"
+			Return False
+	EndSwitch
+
+	; fetch attributes and apply both filters (System and Hidden) independently
+	Local $sAttrib = FileGetAttrib($sFullPath)
+	If $bHideSystem And StringInStr($sAttrib, "S", 2) > 0 Then Return False
+	If $bHideHidden And StringInStr($sAttrib, "H", 2) > 0 Then Return False
 
 	Return True
 EndFunc

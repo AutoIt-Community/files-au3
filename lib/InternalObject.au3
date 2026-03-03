@@ -1,6 +1,7 @@
 #include-once
 #include "ProjectConstants.au3"
 #include "IUnknown.au3"
+#include "IFileOperation.au3"
 
 Global $__g_aObjects[1][20]
 Global $__g_hMthd_QueryInterface, $__g_hMthd_AddRef, $__g_hMthd_Release
