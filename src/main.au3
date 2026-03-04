@@ -12,6 +12,7 @@
 #include <WindowsConstants.au3>
 #include <WindowsNotifsConstants.au3>
 #include <WindowsStylesConstants.au3>
+#include <GuiMenu.au3>
 
 Global $hKernel32 = DllOpen('kernel32.dll')
 Global $hGdi32 = DllOpen('gdi32.dll')
@@ -227,15 +228,15 @@ Func _FilesAu3()
 
 	; Menubar
 	Local $idFileMenu = _GUICtrlCreateODTopMenu("& File", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $idFileMenu), "menuFile")
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idFileMenu), "menuFile")
 	Local $idEditMenu = _GUICtrlCreateODTopMenu("& Edit", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $idEditMenu), "menuEdit")
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idEditMenu), "menuEdit")
 	Local $idViewMenu = _GUICtrlCreateODTopMenu("& View", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $idViewMenu), "menuView")
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idViewMenu), "menuView")
 	Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $idHelpMenu), "menuHelp")
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idHelpMenu), "menuHelp")
 	Local $idLanguageMenu = _GUICtrlCreateODTopMenu("& Language", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $idLanguageMenu), "menuLanguage")
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idLanguageMenu), "menuLanguage")
 
 	; File menu
 	$idDeleteItem = GUICtrlCreateMenuItem("&Delete" & @TAB & "Delete", $idFileMenu)
@@ -1404,10 +1405,14 @@ Func _resetExStylesAdlib()
 EndFunc   ;==>_resetExStylesAdlib
 
 ;==============================================
-Func _resizeLVCols() ; resize listview columns to match header widths (1st display only, before any horizontal scrolling)
-	For $i = 0 To _GUICtrlHeader_GetItemCount($g_hHeader) - 1
-		_GUICtrlListView_SetColumnWidth($g_hListview, $i, _GUICtrlHeader_GetItemWidth($g_hHeader, $i))
-	Next
+Func _resizeLVCols($iCol = Default) ; resize listview columns to match header widths (1st display only, before any horizontal scrolling)
+	If $iCol = Default Then
+		For $i = 0 To _GUICtrlHeader_GetItemCount($g_hHeader) - 1
+			_GUICtrlListView_SetColumnWidth($g_hListview, $i, _GUICtrlHeader_GetItemWidth($g_hHeader, $i))
+		Next
+	Else
+		_GUICtrlListView_SetColumnWidth($g_hListview, $iCol, _GUICtrlHeader_GetItemWidth($g_hHeader, $iCol))
+	EndIf
 
 	; In case column 0 got an icon, retrieve the width of the icon
 	Local $aRectLV = _GUICtrlListView_GetItemRect($g_hListview, 0, $LVIR_ICON)     ; bounding rectangle of the icon (if any)
@@ -2623,13 +2628,25 @@ Func _langCallbackToolInfo($sKey, $sVal, $bRTL, $hTool, $hGui, $hCtrl)
 	_GUIToolTip_SetToolInfo($hTool, $hGui, $hCtrl, $sVal, BitOR(BitAND($arInfo[0], BitNOT($TTF_RTLREADING)), $bRTL?$TTF_RTLREADING:0))
 EndFunc
 
-Func _langCallbackODMenuItem($sKey, $sVal, $bRTL, $idMenuItem)
+Func _langCallbackODMenuItem($sKey, $sVal, $bRTL, $hGui, $idMenuItem)
 	_GUICtrlODMenuItemSetText($idMenuItem, $sVal)
+	Local $hMain = _GUICtrlMenu_GetMenu($hGui)
+	For $i=0 To _GUICtrlMenu_GetItemCount($hMain)-1
+		Local $tItem = _GUICtrlMenu_GetItemInfo($hMain, $i)
+		If DllStructGetData($tItem, 5) = $idMenuItem Then
+			_GUICtrlMenu_RemoveMenu($hMain, $i)
+			DllStructSetData($tItem, 10, $sVal)
+			DllStructSetData($tItem, 11, StringLen($sVal))
+			_GUICtrlMenu_InsertMenuItemEx($hMain, $i, $tItem)
+			ExitLoop
+		EndIf
+	Next
 EndFunc
 
 Func _langCallbackHeaderItem($sKey, $sVal, $bRTL, $hHeader, $iHeaderIndex)
 	_GUICtrlHeader_SetItemText($hHeader, $iHeaderIndex, $sVal)
 	_GUICtrlHeader_SetItemAlign($hHeader, $iHeaderIndex, $bRTL?1:0)
+	_resizeLVCols($iHeaderIndex)
 EndFunc
 
 Func _langCallbackOther($bRTL)
