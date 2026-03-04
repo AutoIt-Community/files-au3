@@ -76,7 +76,7 @@ Global $sTreeDragItem, $sListDragItems, $bDragToolActive = False
 Global $pLVDropTarget, $pTVDropTarget
 Global $bLoadStatus = False, $bCursorOverride = False
 Global $idExitItem, $idAboutItem, $idDeleteItem, $idRenameItem, $idCopyItem, $idPasteItem, $idUndoItem, $idHiddenItem, $idSystemItem
-Global $bHideHidden = False, $bHideSystem = False
+Global $bHideHidden = False, $bHideSystem = True
 Global $hCursor, $hProc
 Global $sSelectedItems, $g_aText[4], $gText
 Global $idSeparator, $idThemeItem, $hToolTip1, $hToolTip2, $bTooltipActive
@@ -126,7 +126,6 @@ Func _FilesAu3()
 	; todo maybe detect system language and use that instead of Default; Functionality may be added to Lang UDF.
 	__Lang_Load(IniRead($sConfigPath, "general", "lang", Default), $sLanguageConfigPath)
 	If @error Then ConsoleWrite("Error loading language from "&$sConfigPath&" ("&@error&":"&@extended&")"&@crlf)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackOther"))
 
 	_GDIPlus_Startup()
 	Local $sButtonSpacing = 20
@@ -215,82 +214,7 @@ Func _FilesAu3()
 	; reset GUI font
 	GUISetFont(10, $FW_NORMAL, $GUI_FONTNORMAL, "Segoe UI")
 
-	; Menubar
-	Local $idFileMenu = GUICtrlCreateMenu("& File")
-	;__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idFileMenu), "menuFile")
-	Local $idEditMenu = GUICtrlCreateMenu("& Edit")
-	;__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idEditMenu), "menuEdit")
-	Local $idViewMenu = GUICtrlCreateMenu("& View")
-	;__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idViewMenu), "menuView")
-	Local $idOptionsMenu = GUICtrlCreateMenu("& Options")
-	;__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idOptionsMenu), "menuOptions")
-	Local $idHelpMenu = GUICtrlCreateMenu("& Help")
-	;__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idHelpMenu), "menuHelp")
-
-	; File menu
-	$idDeleteItem = GUICtrlCreateMenuItem("&Delete" & @TAB & "Delete", $idFileMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idDeleteItem), "menuDelete")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	GUICtrlSetState($idDeleteItem, $GUI_DISABLE)
-	$idRenameItem = GUICtrlCreateMenuItem("&Rename", $idFileMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idRenameItem), "menuRename")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	GUICtrlSetState($idRenameItem, $GUI_DISABLE)
-	$idPropertiesItem = GUICtrlCreateMenuItem("&Properties" & @TAB & "Shift+P", $idFileMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idPropertiesItem), "menuProperties")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	GUICtrlSetState($idPropertiesItem, $GUI_DISABLE)
-	GUICtrlCreateMenuItem("", $idFileMenu)
-	$idExitItem = GUICtrlCreateMenuItem("&Exit", $idFileMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idExitItem), "menuExit")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	; Edit menu
-	$idUndoItem = GUICtrlCreateMenuItem("&Undo" & @TAB & "Ctrl+Z", $idEditMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idUndoItem), "menuUndo")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	GUICtrlSetState($idUndoItem, $GUI_DISABLE)
-	GUICtrlCreateMenuItem("", $idEditMenu)
-	$idCopyItem = GUICtrlCreateMenuItem("&Copy" & @TAB & "Ctrl+C", $idEditMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idCopyItem), "menuCopy")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	GUICtrlSetState($idCopyItem, $GUI_DISABLE)
-	$idPasteItem = GUICtrlCreateMenuItem("&Paste" & @TAB & "Ctrl+V", $idEditMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idPasteItem), "menuPaste")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	GUICtrlSetState($idPasteItem, $GUI_DISABLE)
-	; View menu
-	$idThemeItem = GUICtrlCreateMenuItem("&Dark Mode", $idViewMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idThemeItem), "menuDarkMode")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	GUICtrlCreateMenuItem("", $idViewMenu)
-	$idHiddenItem = GUICtrlCreateMenuItem("&Show Hidden Files", $idViewMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idHiddenItem), "menuShowHiddenFiles")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	GUICtrlSetState($idHiddenItem, $GUI_CHECKED)
-	$bHideHidden = False
-	$idSystemItem = GUICtrlCreateMenuItem("&Hide Protected System Files", $idViewMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idSystemItem), "menuHideProtectedSystemFiles")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	GUICtrlSetState($idSystemItem, $GUI_CHECKED)
-	$bHideSystem = True
-	; Help menu
-	$idAboutItem = GUICtrlCreateMenuItem("&About", $idHelpMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idAboutItem), "menuAbout")
-	GUICtrlSetOnEvent(-1, "_MenuFunctions")
-	; Language menu
-	Local $idLanguageMenu = GUICtrlCreateMenu("& Language", $idOptionsMenu)
-	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idLanguageMenu), "menuLanguage")
-
-	$g_arLanguages = __Lang_GetLanguages($sLanguageConfigPath)
-	Local $sCurrentLang = __Lang_GetCurrentLanguage()
-	For $i=0 To UBound($g_arLanguages)-1
-		Local $idMenuItem = GUICtrlCreateMenuItem($g_arLanguages[$i][1], $idLanguageMenu, -1, 1)
-		GUICtrlSetOnEvent(-1, "_MenuFunctions")
-		If $i=0 Then $g_idMenuLangFirst = $idMenuItem
-		If $g_arLanguages[$i][0]=$sCurrentLang Then GUICtrlSetState($idMenuItem, $GUI_CHECKED)
-	Next
-
-	If $isDarkMode Then GUICtrlSetState($idThemeItem, $GUI_CHECKED)
+	_MenuItemsCreate($g_hGUI, True)
 
 	If $isDarkMode Then
 		If $iOSBuild >= 26100 And $iRevision >= 6899 Then
@@ -513,6 +437,9 @@ Func _FilesAu3()
 	$sControlFocus = 'Tree'
 	$bFocusChanged = True
 
+	; activate the callback for language changes calling complete methods
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackOther"))
+
 	While True
 		If $bTooltipActive Then
 			; check if cursor is still over listview
@@ -612,6 +539,71 @@ Func _FilesAu3()
 		Sleep(200)
 	WEnd
 EndFunc   ;==>_FilesAu3
+
+Func _MenuItemsCreate($hWnd, $bFirst = False)
+	Local $hMenu = _GUICtrlMenu_GetMenu($hwnd)
+	; delete all but the last item (deleted later to avoid the menu to flicker in light mode)
+	While _GUICtrlMenu_GetItemCount($hMenu)>1
+		_GUICtrlMenu_DeleteMenu($hMenu, 0)
+	WEnd
+
+	; Menubar
+	Local $idFileMenu = GUICtrlCreateMenu(__Lang_Get("menuFile"))
+	Local $idEditMenu = GUICtrlCreateMenu(__Lang_Get("menuEdit"))
+	Local $idViewMenu = GUICtrlCreateMenu(__Lang_Get("menuView"))
+	Local $idOptionsMenu = GUICtrlCreateMenu(__Lang_Get("menuOptions"))
+	Local $idHelpMenu = GUICtrlCreateMenu(__Lang_Get("menuHelp"))
+
+	Local $idLanguageMenu = 0
+
+	Local $arSubMenus = [ _ ; [idParentMenu, sLangKey, sVariableName, bDisabled, bChecked, $bSubMenu] => $sLangKey = Default is a spacer
+							_ ; File menu
+							[$idFileMenu, "menuDelete", "idDeleteItem", True, False, False], _
+							[$idFileMenu, "menuRename", "idRenameItem", True, False, False], _
+							[$idFileMenu, "menuProperties", "idPropertiesItem", True, False, False], _
+							[$idFileMenu, Default, "", False, False, False], _
+							[$idFileMenu, "menuExit", "idExitItem", False, False, False], _
+							_ ; Edit menu
+							[$idEditMenu, "menuUndo", "idUndoItem", True, False, False], _
+							[$idEditMenu, Default, "", True, False, False], _
+							[$idEditMenu, "menuCopy", "idCopyItem", True, False, False], _
+							[$idEditMenu, "menuPaste", "idPasteItem", True, False, False], _
+							_ ; View menu
+							[$idViewMenu, "menuDarkMode", "idThemeItem", False, $isDarkMode, False], _
+							[$idViewMenu, Default, "", False, False, False], _
+							[$idViewMenu, "menuShowHiddenFiles", "idHiddenItem", False, $bHideHidden, False], _
+							[$idViewMenu, "menuHideProtectedSystemFiles", "idSystemItem", False, $bHideSystem, False], _
+							_ ; Options menu
+							[$idOptionsMenu, "menuLanguage", "idLanguageMenu", False, False, True], _
+							_ ; Help menu
+							[$idHelpMenu, "menuAbout", "idAboutItem", False, False, False] _
+						]
+
+	For $i=0 To UBound($arSubMenus)-1
+		If $arSubMenus[$i][1] = Default Then
+			GUICtrlCreateMenuItem("", $arSubMenus[$i][0])
+		Else
+			Local $idItem = $arSubMenus[$i][5]?GUICtrlCreateMenu(__Lang_Get($arSubMenus[$i][1]), $arSubMenus[$i][0]):GUICtrlCreateMenuItem(__Lang_Get($arSubMenus[$i][1]), $arSubMenus[$i][0])
+			GUICtrlSetOnEvent(-1, "_MenuFunctions")
+			If $arSubMenus[$i][3] Then GUICtrlSetState($idItem, $GUI_DISABLE)
+			If $arSubMenus[$i][4] Then GUICtrlSetState($idItem, $GUI_CHECKED)
+			If Not Assign($arSubMenus[$i][2], $idItem, 4) Then ConsoleWrite("Variable $"&$arSubMenus[$i][2]&" does not exist. Make sure it exists!"&@crlf)
+		EndIf
+	Next
+	ConsoleWrite(">>>"&$idLanguageMenu&@crlf)
+	$g_arLanguages = __Lang_GetLanguages($sLanguageConfigPath)
+	Local $sCurrentLang = __Lang_GetCurrentLanguage()
+	For $i=0 To UBound($g_arLanguages)-1
+		Local $idMenuItem = GUICtrlCreateMenuItem($g_arLanguages[$i][1], $idLanguageMenu, -1, 1)
+		GUICtrlSetOnEvent(-1, "_MenuFunctions")
+		If $i=0 Then $g_idMenuLangFirst = $idMenuItem
+		If $g_arLanguages[$i][0]=$sCurrentLang Then GUICtrlSetState($idMenuItem, $GUI_CHECKED)
+	Next
+	; delete the last item later to avoid the menu to flicker in light mode
+	If Not $bFirst Then _GUICtrlMenu_DeleteMenu($hMenu, 0)
+	_GUITopMenuTheme($hWnd)
+    _GUICtrlMenu_DrawMenuBar($g_hGUI)
+EndFunc
 
 Func _themeTooltips()
 	Local $aData = _WinAPI_EnumProcessWindows(0, False)
@@ -2569,19 +2561,23 @@ Func _langCallbackToolInfo($sKey, $sVal, $bRTL, $hTool, $hGui, $hCtrl)
 	_GUIToolTip_SetToolInfo($hTool, $hGui, $hCtrl, $sVal, BitOR(BitAND($arInfo[0], BitNOT($TTF_RTLREADING)), $bRTL?$TTF_RTLREADING:0))
 EndFunc
 
-Func _langCallbackODMenuItem($sKey, $sVal, $bRTL, $hGui, $idMenuItem)
-	;_GUICtrlODMenuItemSetText($idMenuItem, $sVal)
-	Local $hMain = _GUICtrlMenu_GetMenu($hGui)
-	For $i=0 To _GUICtrlMenu_GetItemCount($hMain)-1
-		Local $tItem = _GUICtrlMenu_GetItemInfo($hMain, $i)
+Func _langCallbackMenuItem($sKey, $sVal, $bRTL, $hGui, $idMenuItem)
+	Local $hMenu = _GUICtrlMenu_GetMenu($hGui)
+	_GUICtrlMenu_SetItemText($hMenu, $idMenuItem, $sVal, False)
+	#cs
+	For $i=0 To _GUICtrlMenu_GetItemCount($hMenu)-1
+		Local $tItem = _GUICtrlMenu_GetItemInfo($hMenu, $i)
 		If DllStructGetData($tItem, 5) = $idMenuItem Then
-			_GUICtrlMenu_RemoveMenu($hMain, $i)
-			DllStructSetData($tItem, 10, $sVal)
-			DllStructSetData($tItem, 11, StringLen($sVal))
-			_GUICtrlMenu_InsertMenuItemEx($hMain, $i, $tItem)
+			ConsoleWrite("Changed: "&$i&@crlf)
+			_GUICtrlMenu_RemoveMenu($hMenu, $i)
+			If @error Then ConsoleWrite("Error remove"&@crlf)
+			_GUICtrlMenu_InsertMenuItemEx($hMenu, $i, $tItem)
+			If @error Then ConsoleWrite("Error insert"&@crlf)
 			ExitLoop
 		EndIf
 	Next
+	#ce
+	_GUICtrlMenu_DrawMenuBar($hGui)
 EndFunc
 
 Func _langCallbackHeaderItem($sKey, $sVal, $bRTL, $hHeader, $iHeaderIndex)
@@ -2593,4 +2589,5 @@ EndFunc
 Func _langCallbackOther($bRTL)
 	_selectionChangedLV()
 	_PathInputChanged()
+	_MenuItemsCreate($g_hGUI)
 EndFunc

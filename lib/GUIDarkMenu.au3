@@ -25,7 +25,6 @@
 #include "GUIDarkInternal.au3"
 
 ; Menu Info
-Global $g_aMenuText = []
 Const $ODT_MENU = 1
 Const $ODS_SELECTED = 0x0001
 Const $ODS_DISABLED = 0x0004
@@ -64,22 +63,17 @@ Func WM_MEASUREITEM($hWnd, $iMsg, $wParam, $lParam)
 
     Local $itemID = $t.itemID
 
-    ; itemID is the control ID, not the position!
-    ; We must derive the position from the itemID
-    Local $iPos = -1
-	For $i = 0 To UBound($g_aMenuText) - 1
-        If $itemID = $g_aMenuText[$i][0] Then
-            $iPos = $i
-            ExitLoop
-        EndIf
-    Next
+    Local $sText = _GUICtrlMenu_GetItemText(_GUICtrlMenu_GetMenu($hWnd), $itemID, False)
+	Local $arSize = _GetTextDimension($hWnd, $sText)
 
-    ; Fallback: try the itemID directly
-    If $iPos < 0 Then $iPos = $itemID
-    If $iPos < 0 Or $iPos >= UBound($g_aMenuText) Then $iPos = 0
+    ; Set dimensions with padding (with high DPI)
+	$t.itemWidth = _CalcMenuItemWidth($iDPIpct, $arSize[0])
+    $t.itemHeight = $arSize[1] + 1
 
-    Local $sText = $g_aMenuText[$iPos][1]
+    Return 1
+EndFunc   ;==>WM_MEASUREITEM_Handler
 
+Func _GetTextDimension($hWnd, $sText)
     ; Calculate text dimensions
     Local $hDC = __WinAPI_GetDC($hWnd)
     Local $hFont = __SendMessage($hWnd, $WM_GETFONT, 0, 0)
@@ -92,13 +86,9 @@ Func WM_MEASUREITEM($hWnd, $iMsg, $wParam, $lParam)
 
     __WinAPI_SelectObject($hDC, $hOldFont)
     __WinAPI_ReleaseDC($hWnd, $hDC)
-
-    ; Set dimensions with padding (with high DPI)
-	$t.itemWidth = _CalcMenuItemWidth($iDPIpct, $iTextWidth)
-    $t.itemHeight = $iTextHeight + 1
-
-    Return 1
-EndFunc   ;==>WM_MEASUREITEM_Handler
+	Local $arSize = [$iTextWidth, $iTextHeight]
+	Return $arSize
+EndFunc
 
 Func _CalcMenuItemWidth($iDPIpct, $iTextWidth)
     If $iDPIpct < 100 Or $iDPIpct > 400 Then
@@ -123,6 +113,7 @@ Func WM_DRAWITEM($hWnd, $iMsg, $wParam, $lParam)
 
     If $t.CtlType <> $ODT_MENU Then Return $GUI_RUNDEFMSG
 
+
     Local $hDC = $t.hDC
     Local $left = $t.left
     Local $top = $t.top
@@ -131,19 +122,18 @@ Func WM_DRAWITEM($hWnd, $iMsg, $wParam, $lParam)
     Local $state = $t.itemState
     Local $itemID = $t.itemID
 
+	Local $hMenu = _GUICtrlMenu_GetMenu($hWnd)
     ; convert itemID to position
     Local $iPos = -1
-    For $i = 0 To UBound($g_aMenuText) - 1
-        If $itemID = $g_aMenuText[$i][0] Then
+    For $i = 0 To _GUICtrlMenu_GetItemCount($hMenu) - 1
+        If $itemID = _GUICtrlMenu_GetItemID($hMenu, $i) Then
             $iPos = $i
             ExitLoop
         EndIf
     Next
+    If $iPos < 0 Then Return 1 ; something must have gone seriously wrong
 
-    If $iPos < 0 Then $iPos = $itemID
-    If $iPos < 0 Or $iPos >= UBound($g_aMenuText) Then $iPos = 0
-
-    Local $sText = $g_aMenuText[$iPos][1]
+    Local $sText = _GUICtrlMenu_GetItemText($hMenu, $iPos)
     $sText = StringReplace($sText, "&", "")
 
     ; Colors
@@ -151,18 +141,18 @@ Func WM_DRAWITEM($hWnd, $iMsg, $wParam, $lParam)
     Local $clrSel = _ColorToCOLORREF($COLOR_MENU_SEL)
     Local $clrText = _ColorToCOLORREF($COLOR_MENU_TEXT)
 
-    Static $iDrawCount = 0
-    Static $bFullBarDrawn = False
+    ;Static $iDrawCount = 0
+    ; Static $bFullBarDrawn = False
 
     ; Count how many items were drawn in this "draw cycle"
-    $iDrawCount += 1
+    ;$iDrawCount += 1
 
     ; argumentum ; pre-declare all the "Local" in those IF-THEN that could be needed
     Local $tClient, $iFullWidth, $tFullMenuBar, $hFullBrush
     Local $tEmptyArea, $hEmptyBrush
 
     ; If we are at the first item AND the bar has not yet been drawn
-    If $iPos = 0 And Not $bFullBarDrawn Then
+    If $iPos = 0 Then ; And Not $bFullBarDrawn Then
         ; Get the full window width
         $tClient = __WinAPI_GetClientRect($hWnd)
         $iFullWidth = $tClient.right
@@ -182,13 +172,13 @@ Func WM_DRAWITEM($hWnd, $iMsg, $wParam, $lParam)
     EndIf
 
     ; After drawing all items, mark as "drawn"
-    If $iDrawCount >= UBound($g_aMenuText) Then
-        $bFullBarDrawn = True
-        $iDrawCount = 0
-    EndIf
+    ;If $iDrawCount >= UBound($g_aMenuText) Then
+        ; $bFullBarDrawn = True
+        ;$iDrawCount = 0
+    ;EndIf
 
     ; Draw background for the area AFTER the last menu item
-    If $iPos = (UBound($g_aMenuText) - 1) Then ; Last menu
+    If $iPos = (_GUICtrlMenu_GetItemCount($hMenu) - 1) Then ; Last menu
         $tClient = __WinAPI_GetClientRect($hWnd)
         $iFullWidth = $tClient.right
 
@@ -270,50 +260,11 @@ Func _GUITopMenuTheme($hWnd)
 	$iDPIpct = Round(__WinAPI_GetDpiForWindow($hGUI) / 96, 2) * 100
 	If @error Then $iDPIpct = 100
 
-	$g_aMenuText = GetTopLevelMenuItems($hGUI)
-    ;_ArrayDisplay($g_aMenuText, "test")
-
-	For $i = 0 To UBound($g_aMenuText) - 1
+	For $i = 0 To _GUICtrlMenu_GetItemCount($hMenu) - 1
 		_GUICtrlMenu_SetItemType($hMenu, $i, $MFT_OWNERDRAW, True)
 	Next
     MenuBarBKColor($hMenu, $COLOR_MENU_BG)
 EndFunc   ;==>_GUITopMenuTheme
-
-Func GetTopLevelMenuItems($hWnd)
-	Local $iItemID = 10000
-	Local $hMenu = _GUICtrlMenu_GetMenu($hWnd)
-	Local $nItem = _GUICtrlMenu_GetItemCount($hMenu)
-	Local $aList[$nItem][2], $tInfo
-	Local $tText, $iLen
-	For $i = 0 To $nItem - 1
-		$tInfo = _GUICtrlMenu_GetItemInfo($hMenu, $i)
-		If Not $tInfo.ID Then
-            _GUICtrlMenu_SetItemID($hMenu, $i, $iItemID)
-            $aList[$i][0] = _GUICtrlMenu_GetItemID($hMenu, $i)
-            $iItemID += 1
-		Else
-		    $aList[$i][0] = $tInfo.ID
-		EndIf
-		;$aList[$i][1] = _GUICtrlMenu_GetItemText($hMenu, $i)
-		; retrieve text via GetMenuStringW (works better than _GUICtrlMenu_GetItemText)
-        $tText = DllStructCreate("wchar s[256]")
-        $iLen = DllCall($hUser32Dll, "int", "GetMenuStringW", _
-                                      "handle", $hMenu, _
-                                      "uint", $i, _
-                                      "struct*", $tText, _
-                                      "int", 255, _
-                                      "uint", $MF_BYPOSITION)
-
-		If IsArray($iLen) And $iLen[0] > 0 Then
-            $aList[$i][1] = $tText.s
-            ConsoleWrite("text: " & $tText.s & @CRLF)
-        Else
-            $aList[$i][1] = ""
-            ConsoleWrite("text is blank" & @CRLF)
-        EndIf
-	Next
-	Return $aList
-EndFunc   ;==>GetTopLevelMenuItems
 
 Func _SetMenuColors($hWnd, $MenuBG, $MenuHot, $MenuSel, $MenuText)
     Local $hMenu = _GUICtrlMenu_GetMenu($hWnd)
