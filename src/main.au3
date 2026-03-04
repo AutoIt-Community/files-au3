@@ -53,7 +53,10 @@ Global $iDPI = 1
 $iDPI = ApplyDPI()
 
 ; DPI must be set before ownerdrawn menu
-#include "../lib/ModernMenuRaw.au3"
+;#include "../lib/ModernMenuRaw.au3"
+; this must be set after DPI
+#include "../lib/GUIDarkInternal.au3"
+#include "../lib/GUIDarkMenu.au3"
 
 Opt("GUIOnEventMode", 1)
 Opt("GUICloseOnESC", 0)
@@ -114,20 +117,6 @@ EndIf
 
 ; Structure Definitions (using $tagNMHDR and $tagRECT which are defined in includes)
 Global Const $tagNMCUSTOMDRAW = $tagNMHDR & ";dword DrawStage;handle hdc;" & $tagRECT & ";dword_ptr ItemSpec;uint ItemState;lparam lItemParam;"
-
-If $isDarkMode Then
-	_SetMenuBkColor($iBackColorDef)
-	_SetMenuSelectBkColor(_WinAPI_ColorAdjustLuma($iBackColorDef, 30))
-	_SetMenuSelectRectColor(_WinAPI_ColorAdjustLuma($iBackColorDef, 30))
-	_SetMenuSelectTextColor(0xffffff)
-	_SetMenuTextColor(0xffffff)
-Else
-	_SetMenuBkColor(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOW)))
-	_SetMenuSelectBkColor(_WinAPI_ColorAdjustLuma(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOW)), -6))
-	_SetMenuSelectRectColor(_WinAPI_ColorAdjustLuma(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOW)), -6))
-	_SetMenuSelectTextColor(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOWTEXT)))
-	_SetMenuTextColor(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOWTEXT)))
-EndIf
 
 OnAutoItExitRegister(_CleanExit)
 
@@ -227,16 +216,16 @@ Func _FilesAu3()
 	GUISetFont(10, $FW_NORMAL, $GUI_FONTNORMAL, "Segoe UI")
 
 	; Menubar
-	Local $idFileMenu = _GUICtrlCreateODTopMenu("& File", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idFileMenu), "menuFile")
-	Local $idEditMenu = _GUICtrlCreateODTopMenu("& Edit", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idEditMenu), "menuEdit")
-	Local $idViewMenu = _GUICtrlCreateODTopMenu("& View", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idViewMenu), "menuView")
-	Local $idOptionsMenu = _GUICtrlCreateODTopMenu("& Options", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idOptionsMenu), "menuOptions")
-	Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idHelpMenu), "menuHelp")
+	Local $idFileMenu = GUICtrlCreateMenu("& File")
+	;__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idFileMenu), "menuFile")
+	Local $idEditMenu = GUICtrlCreateMenu("& Edit")
+	;__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idEditMenu), "menuEdit")
+	Local $idViewMenu = GUICtrlCreateMenu("& View")
+	;__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idViewMenu), "menuView")
+	Local $idOptionsMenu = GUICtrlCreateMenu("& Options")
+	;__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idOptionsMenu), "menuOptions")
+	Local $idHelpMenu = GUICtrlCreateMenu("& Help")
+	;__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idHelpMenu), "menuHelp")
 
 	; File menu
 	$idDeleteItem = GUICtrlCreateMenuItem("&Delete" & @TAB & "Delete", $idFileMenu)
@@ -437,8 +426,8 @@ Func _FilesAu3()
 	GUIRegisterMsg($WM_MOVE, "WM_MOVE")
 	GUIRegisterMsg($WM_SIZE, "WM_SIZE")
 	GUIRegisterMsg($WM_DRAWITEM, "WM_DRAWITEM2")
-	GUIRegisterMsg($WM_ACTIVATE, "WM_ACTIVATE_Handler")
-	GUIRegisterMsg($WM_WINDOWPOSCHANGED, "WM_WINDOWPOSCHANGED_Handler")
+	;GUIRegisterMsg($WM_ACTIVATE, "WM_ACTIVATE_Handler")
+	;GUIRegisterMsg($WM_WINDOWPOSCHANGED, "WM_WINDOWPOSCHANGED_Handler")
 
 	_GUICtrl_SetFont($g_hHeader, 16 * $iDPI, 400, 0, "Segoe UI")
 
@@ -482,6 +471,11 @@ Func _FilesAu3()
 	; get imagelist handles for treeview and listview
 	$hListImgList = _GUICtrlListView_GetImageList($idListview, 1)
 
+	; GUIDarkMenu
+    _GUITopMenuTheme($g_hGUI)
+    ; redraw menus
+    _GUICtrlMenu_DrawMenuBar($g_hGUI)
+
 	GUISetState(@SW_SHOW, $g_hGUI)
 	_drawUAHMenuNCBottomLine($g_hGUI)
 
@@ -513,7 +507,7 @@ Func _FilesAu3()
 	$sMsg &= "At the moment, Files Au3 allows you to Undo the most recent drag and drop, copy, move, delete, rename, etc. "
 	$sMsg &= "by pressing Ctrl+Z or Undo from the Edit menu. Future versions will expand to allow more than just the most "
 	$sMsg &= "recent Undo operation."
-	MsgBox($MB_ICONWARNING, __Lang_Get("applicationTitle"), __Lang_Get("fileOperationNewCodeWarning"))
+	;MsgBox($MB_ICONWARNING, __Lang_Get("applicationTitle"), __Lang_Get("fileOperationNewCodeWarning"))
 
 	; TreeView has initial focus
 	$sControlFocus = 'Tree'
@@ -655,14 +649,6 @@ Func _switchTheme()
 
 		_RefreshButtons()
 
-		_SetMenuBkColor(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOW)))
-		_SetMenuSelectBkColor(_WinAPI_ColorAdjustLuma(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOW)), -6))
-		_SetMenuSelectRectColor(_WinAPI_ColorAdjustLuma(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOW)), -6))
-		_SetMenuSelectTextColor(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOWTEXT)))
-		_SetMenuTextColor(_WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOWTEXT)))
-
-		_GUIMenuBarSetBkColor($g_hGUI, _WinAPI_SwitchColor(_WinAPI_GetSysColor($COLOR_WINDOW)))
-
 		GUICtrlSetState($idThemeItem, $GUI_UNCHECKED)
 		_themeTooltips()
 		_setThemeColors()
@@ -694,14 +680,6 @@ Func _switchTheme()
 		EndIf
 
 		_RefreshButtons()
-
-		_SetMenuBkColor($iBackColorDef)
-		_SetMenuSelectBkColor(_WinAPI_ColorAdjustLuma($iBackColorDef, 30))
-		_SetMenuSelectRectColor(_WinAPI_ColorAdjustLuma($iBackColorDef, 30))
-		_SetMenuSelectTextColor(0xffffff)
-		_SetMenuTextColor(0xffffff)
-
-		_GUIMenuBarSetBkColor($g_hGUI, $iBackColorDef)
 
 		GUICtrlSetState($idThemeItem, $GUI_CHECKED)
 		_themeTooltips()
@@ -1720,7 +1698,7 @@ EndFunc   ;==>_GUICtrl_SetFont
 Func WM_DRAWITEM2($hWnd, $Msg, $wParam, $lParam)
 	#forceref $Msg, $wParam, $lParam
 
-	; modernmenuraw
+	; GUIDarkMenu
 	WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 
 	Local $tDRAWITEMSTRUCT = DllStructCreate("uint CtlType;uint CtlID;uint itemID;uint itemAction;uint itemState;HWND hwndItem;HANDLE hDC;long rcItem[4];ULONG_PTR itemData", $lParam)
@@ -2344,46 +2322,6 @@ Func _PathInputChanged()
 	_WinAPI_RedrawWindow($g_hStatus)
 EndFunc   ;==>_PathInputChanged
 
-Func _drawUAHMenuNCBottomLine($hWnd) ; ahmet
-	$rcClient = _WinAPI_GetClientRect($hWnd)
-
-	Local $aCall = DllCall($hUser32, "int", "MapWindowPoints", _
-			"hwnd", $hWnd, _         ; hWndFrom
-			"hwnd", 0, _             ; hWndTo
-			"ptr", DllStructGetPtr($rcClient), _
-			"uint", 2)               ; number of points - 2 for RECT structure
-
-	$rcWindow = _WinAPI_GetWindowRect($hWnd)
-
-	_WinAPI_OffsetRect($rcClient, -$rcWindow.left, -$rcWindow.top)
-
-	$rcAnnoyingLine = DllStructCreate($tagRECT)
-	$rcAnnoyingLine.left = $rcClient.left
-	$rcAnnoyingLine.top = $rcClient.top
-	$rcAnnoyingLine.right = $rcClient.right
-	$rcAnnoyingLine.bottom = $rcClient.bottom
-
-	$rcAnnoyingLine.bottom = $rcAnnoyingLine.top
-	$rcAnnoyingLine.top = $rcAnnoyingLine.top - 1
-
-	$hRgn = _WinAPI_CreateRectRgn(0, 0, 8000, 8000)
-
-	$hDC = _WinAPI_GetDCEx($hWnd, $hRgn, BitOR($DCX_WINDOW, $DCX_INTERSECTRGN))
-	_WinAPI_FillRect($hDC, $rcAnnoyingLine, $hSolidBrush)
-	_WinAPI_ReleaseDC($hWnd, $hDC)
-EndFunc   ;==>_drawUAHMenuNCBottomLine
-
-Func WM_ACTIVATE_Handler($hWnd, $MsgID, $wParam, $lParam) ; ioa747
-	_drawUAHMenuNCBottomLine($g_hGUI)
-	Return $GUI_RUNDEFMSG
-EndFunc   ;==>WM_ACTIVATE_Handler
-
-Func WM_WINDOWPOSCHANGED_Handler($hWnd, $iMsg, $wParam, $lParam)
-	If $hWnd <> $g_hGUI Then Return $GUI_RUNDEFMSG
-	_drawUAHMenuNCBottomLine($hWnd)
-	Return $GUI_RUNDEFMSG
-EndFunc   ;==>WM_WINDOWPOSCHANGED_Handler
-
 ;Convert @error codes from DllCall into win32 codes.
 Func TranslateDllError($iError = @error)
 	Switch $iError
@@ -2632,7 +2570,7 @@ Func _langCallbackToolInfo($sKey, $sVal, $bRTL, $hTool, $hGui, $hCtrl)
 EndFunc
 
 Func _langCallbackODMenuItem($sKey, $sVal, $bRTL, $hGui, $idMenuItem)
-	_GUICtrlODMenuItemSetText($idMenuItem, $sVal)
+	;_GUICtrlODMenuItemSetText($idMenuItem, $sVal)
 	Local $hMain = _GUICtrlMenu_GetMenu($hGui)
 	For $i=0 To _GUICtrlMenu_GetItemCount($hMain)-1
 		Local $tItem = _GUICtrlMenu_GetItemInfo($hMain, $i)
