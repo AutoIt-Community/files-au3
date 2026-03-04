@@ -233,10 +233,10 @@ Func _FilesAu3()
 	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idEditMenu), "menuEdit")
 	Local $idViewMenu = _GUICtrlCreateODTopMenu("& View", $g_hGUI)
 	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idViewMenu), "menuView")
+	Local $idOptionsMenu = _GUICtrlCreateODTopMenu("& Options", $g_hGUI)
+	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idOptionsMenu), "menuOptions")
 	Local $idHelpMenu = _GUICtrlCreateODTopMenu("& Help", $g_hGUI)
 	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idHelpMenu), "menuHelp")
-	Local $idLanguageMenu = _GUICtrlCreateODTopMenu("& Language", $g_hGUI)
-	__Lang_SetCallback(__Lang_CreateCallback("_langCallbackODMenuItem", $g_hGUI, $idLanguageMenu), "menuLanguage")
 
 	; File menu
 	$idDeleteItem = GUICtrlCreateMenuItem("&Delete" & @TAB & "Delete", $idFileMenu)
@@ -289,6 +289,9 @@ Func _FilesAu3()
 	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idAboutItem), "menuAbout")
 	GUICtrlSetOnEvent(-1, "_MenuFunctions")
 	; Language menu
+	Local $idLanguageMenu = GUICtrlCreateMenu("& Language", $idOptionsMenu)
+	__Lang_SetCallback(__Lang_CreateCallback("__Lang_CallbackGuiCtrlSetData", $idLanguageMenu), "menuLanguage")
+
 	$g_arLanguages = __Lang_GetLanguages($sLanguageConfigPath)
 	Local $sCurrentLang = __Lang_GetCurrentLanguage()
 	For $i=0 To UBound($g_arLanguages)-1
