@@ -204,7 +204,7 @@ Global $sLOGFONT		=	"int;" & _ ; Height
 											"byte;" & _	; Quality
 											"byte;" & _	; Pitch & Family
 											"wchar[32]"	; Font name
-												
+
 Global Const $sNONCLIENTMETRICS			=	"uint;" & _			; Struct size
 											"int;" & _			;
 											"int;" & _			;
@@ -319,7 +319,7 @@ If Not IsDeclared("NIN_POPUPCLOSE")			Then Global Const $NIN_POPUPCLOSE = 0x0400
 ;If Not IsDeclared("WM_MBUTTONUP")			Then Global Const $WM_MBUTTONUP = 0x0208
 ;If Not IsDeclared("WM_MBUTTONDBLCLK")		Then Global Const $WM_MBUTTONDBLCLK = 0x0209
 
-	
+
 ;********************************************************************
 ; Main Creation Part
 ;********************************************************************
@@ -357,7 +357,7 @@ If $bUseRGBColors Then
 	$nMenuSelectBkClr				= 0xB6BDD2
 	$nMenuSelectRectClr				= 0x404285
 	$nMenuSideBkClr					= 0x0000D0
-	
+
 	$nTrayIconBkClr					= 0xDBD8D1
 	$nTraySelectBkClr				= 0xB6BDD2
 	$nTraySelectRectClr				= 0x404285
@@ -416,19 +416,19 @@ Func OnAutoItExit()
 	Next
 	ImageList_Destroy($hMenuImageList)
 	DeleteObject($hMenuFont)
-	
+
 	For $i = 1 To $arSideItems[0][0]
 		If $arSideItems[$i][6] <> 0 Then _
 			DeleteObject($arSideItems[$i][6])
 	Next
-	
+
 	DllClose($hComctl32Dll)
 	DllClose($hGdi32Dll)
 	DllClose($hKernel32Dll)
 	DllClose($hShell32Dll)
 	DllClose($hUser32Dll)
 	DllClose($hMsimg32Dll)
-	
+
 	$arMenuItems	= 0
 	$arSideItems	= 0
 	$TRAYNOTIFYIDS	= 0
@@ -545,7 +545,7 @@ Func _GetIconID($nID, $sFile)
 			$nID = - ($nID + 1)
 		EndIf
 	EndIf
-		
+
 	Return $nID
 EndFunc
 
@@ -554,14 +554,14 @@ EndFunc
 ;**********************************************************************
 Func _GetNewTrayIndex()
 	Local $i, $bFreeFound = FALSE
-	
+
 	For $i = 1 To $TRAYNOTIFYIDS[0][0]
 		If $TRAYNOTIFYIDS[$i][0] = 0 Then
 			$bFreeFound = TRUE
 			ExitLoop
 		EndIf
 	Next
-	
+
 	If Not $bFreeFound Then
 		$TRAYNOTIFYIDS[0][0] += 1
 		Local $nSize = UBound($TRAYNOTIFYIDS)
@@ -572,7 +572,7 @@ Func _GetNewTrayIndex()
 			Redim $TRAYNOTIFYIDS[$nSize + 10][9]
 		$i = $TRAYNOTIFYIDS[0][0]
 	EndIf
-	
+
 	Return $i
 EndFunc
 
@@ -582,11 +582,11 @@ EndFunc
 ;**********************************************************************
 Func _GetTrayNotifyIdx($nID)
 	If $TRAYMSGWND = 0 Then Return 0
-	
+
 	Local $i, $nResult = 0
 
 	If $nID = -1 Then $nID = $TRAYLASTID
-	
+
 	For $i = 1 To $TRAYNOTIFYIDS[0][0]
 		If $TRAYNOTIFYIDS[$i][0] = $nID Then
 			$nResult = $i
@@ -604,19 +604,19 @@ EndFunc
 Func _TrayItemSetIcon($nMenuID, $sIconFile = "", $nIconID = -1)
 	If $nMenuID = -1 Then $nMenuID = $TRAYLASTITEM
 	If $nMenuID <= 0 Then Return 0
-	
+
 	$nIconID = _GetIconID($nIconID, $sIconFile)
-	
+
 	Local $i, $sText = "", $hMenu = 0
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuID Then
 			$sText = $arMenuItems[$i][1]
 			$hMenu = $arMenuItems[$i][3]
-			
+
 			If $sIconFile = "" And $nIconID = -1 Then
 				$arMenuItems[$i][2] = -1
-				
+
 				_SetOwnerDrawn($hMenu, $nMenuID, $sText, FALSE)
 				GUICtrlSetData($nMenuID, $sText)
 			Else
@@ -625,14 +625,14 @@ Func _TrayItemSetIcon($nMenuID, $sIconFile = "", $nIconID = -1)
 				Else
 					$arMenuItems[$i][2] = -1
 				EndIf
-				
+
 				_SetOwnerDrawn($hMenu, $nMenuID, $sText)
 			EndIf
-			
+
 			Return 1
 		EndIf
 	Next
-	
+
 	Return 0
 EndFunc
 
@@ -643,19 +643,19 @@ EndFunc
 Func _TrayItemSetSelIcon($nMenuID, $sIconFile = "", $nIconID = -1)
 	If $nMenuID = -1 Then $nMenuID = $TRAYLASTITEM
 	If $nMenuID <= 0 Then Return 0
-	
+
 	$nIconID = _GetIconID($nIconID, $sIconFile)
-	
+
 	Local $i, $sText = "", $hMenu = 0
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuID Then
 			$sText = $arMenuItems[$i][1]
 			$hMenu = $arMenuItems[$i][3]
-			
+
 			If $sIconFile = "" And $nIconID = -1 Then
 				$arMenuItems[$i][6] = -1
-				
+
 				_SetOwnerDrawn($hMenu, $nMenuID, $sText, FALSE)
 				GUICtrlSetData($nMenuID, $sText)
 			Else
@@ -664,14 +664,14 @@ Func _TrayItemSetSelIcon($nMenuID, $sIconFile = "", $nIconID = -1)
 				Else
 					$arMenuItems[$i][6] = -1
 				EndIf
-				
+
 				_SetOwnerDrawn($hMenu, $nMenuID, $sText)
 			EndIf
-			
+
 			Return 1
 		EndIf
 	Next
-	
+
 	Return 0
 EndFunc
 
@@ -682,9 +682,9 @@ EndFunc
 Func _TrayItemSetText($nMenuID = -1, $sText = "")
 	If $nMenuID = -1 Then $nMenuID = $TRAYLASTITEM
 	If $nMenuID <= 0 Then Return 0
-	
+
 	Local $i
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuID Then
 			$arMenuItems[$i][1] = $sText
@@ -694,7 +694,7 @@ Func _TrayItemSetText($nMenuID = -1, $sText = "")
 			Return 1
 		EndIf
 	Next
-	
+
 	Return 0
 EndFunc
 
@@ -704,9 +704,9 @@ EndFunc
 ;**********************************************************************
 Func _TrayIconCreate($sToolTip = "", $sIconFile = @AutoItExe, $nIconID = 0, $sCallback = "", $nMsg = 0, $hIcon = 0)
 	If $sToolTip = "" Then $sToolTip = $sDefaultTT
-	
+
 	$nIconID = _GetIconID($nIconID, $sIconFile)
-	
+
 	If $sIconFile = "" Then
 		If $hIcon = 0 Then
 			If $nIconID = 0 Then
@@ -716,29 +716,29 @@ Func _TrayIconCreate($sToolTip = "", $sIconFile = @AutoItExe, $nIconID = 0, $sCa
 			EndIf
 		EndIf
 	EndIf
-	
+
 	If $sIconFile <> "" Then
 		Local $stIcon = DllStructCreate("hwnd")
-		
+
 		If ExtractIconExW($sIconFile, $nIconID, 0, DllStructGetPtr($stIcon), 1) > 0 Then
 			$hIcon = DllStructGetData($stIcon, 1)
 		Else
 			$hIcon = LoadIcon(0, 32516)
 		EndIf
 	EndIf
-	
+
 	If $TRAYMSGWND = 0 Then
 		$TRAYMSGWND = GUICreate("", 1, 1, 9999, 9999, -1, 0x00000080)
 		GUISetState()
 		ShowWindow($TRAYMSGWND, @SW_HIDE)
 	EndIf
-	
+
 	Local $nNID = _GetNewTrayIndex()
 	If $nNID = 0 Then
 		DestroyIcon($hIcon)
 		Return 0
 	EndIf
-	
+
 	$TRAYNOTIFYIDS[$nNID][0] = $nNID
 	$TRAYNOTIFYIDS[$nNID][1] = $hIcon
 	$TRAYNOTIFYIDS[$nNID][2] = 0
@@ -748,9 +748,9 @@ Func _TrayIconCreate($sToolTip = "", $sIconFile = @AutoItExe, $nIconID = 0, $sCa
 	$TRAYNOTIFYIDS[$nNID][6] = $nMsg
 	$TRAYNOTIFYIDS[$nNID][7] = FALSE
 	$TRAYNOTIFYIDS[$nNID][8] = FALSE
-	
+
 	$TRAYLASTID = $nNID
-	
+
 	Return $nNID
 EndFunc
 
@@ -761,26 +761,26 @@ EndFunc
 Func _TrayIconDelete($nID)
 	If $nID = -1 Then $nID = $TRAYLASTID
 	If $TRAYMSGWND = 0 Or $nID <= 0 Then Return 0
-	
+
 	Local $stNID ; = DllStructCreate($sNOTIFYICONDATAW) ; nickston
-	
+
 	;DllStructSetData($stNID, 1, DllStructGetSize($stNID)) ; nickston
 	;DllStructSetData($stNID, 2, $TRAYMSGWND)
 	;DllStructSetData($stNID, 3, $nID)
-	
+
 	Local $nResult = 0
 
 	Local $i
 	For $i = 1 To $TRAYNOTIFYIDS[0][0]
 		If $nID = $TRAYNOTIFYIDS[$i][0] Then
 			$stNID = DllStructCreate($sNOTIFYICONDATAW)
-	
+
 			DllStructSetData($stNID, 1, DllStructGetSize($stNID))
 			DllStructSetData($stNID, 2, $TRAYMSGWND)
 			DllStructSetData($stNID, 3, $nID)
-	
+
 			$nResult = Shell_NotifyIcon($NIM_DELETE, DllStructGetPtr($stNID))
-			
+
 			DestroyIcon($TRAYNOTIFYIDS[$i][1])
 			$TRAYNOTIFYIDS[$i][8] = FALSE
 			$TRAYNOTIFYIDS[$i][7] = FALSE
@@ -788,17 +788,17 @@ Func _TrayIconDelete($nID)
 			$TRAYNOTIFYIDS[$i][5] = ""
 			$TRAYNOTIFYIDS[$i][4] = ""
 			$TRAYNOTIFYIDS[$i][3] = 0
-			
+
 			If $TRAYNOTIFYIDS[$i][2] <> 0 Then GUIDelete($TRAYNOTIFYIDS[$i][2])
-			
+
 			$TRAYNOTIFYIDS[$i][2] = 0
 			$TRAYNOTIFYIDS[$i][1] = 0
 			$TRAYNOTIFYIDS[$i][0] = 0
-			
+
 			ExitLoop
 		EndIf
 	Next
-	
+
 	Return $nResult
 EndFunc
 
@@ -808,23 +808,23 @@ EndFunc
 ;**********************************************************************
 Func _TrayIconSetState($nID = -1, $nState = 1)
 	If $nState = 0 Then Return 1 ; No change
-	
+
 	If $nID = -1 Then $nID = $TRAYLASTID
 	If $TRAYMSGWND = 0 Or $nID <= 0 Then Return 0
-	
+
 	Local $i, $nResult = 0, $bFound = FALSE
-	
+
 	For $i = 1 To $TRAYNOTIFYIDS[0][0]
 		If $nID = $TRAYNOTIFYIDS[$i][0] Then
 			$bFound = TRUE
 			ExitLoop
 		EndIf
 	Next
-	
+
 	If Not $bFound Then Return 0
-	
+
 	Local $stNID = DllStructCreate($sNOTIFYICONDATAW)
-	
+
 	If BitAnd($nState, 1) Then
 		DllStructSetData($stNID, 1, DllStructGetSize($stNID))
 		DllStructSetData($stNID, 2, $TRAYMSGWND)
@@ -832,17 +832,17 @@ Func _TrayIconSetState($nID = -1, $nState = 1)
 		DllStructSetData($stNID, 4, BitOr($NIF_ICON, $NIF_MESSAGE))
 		DllStructSetData($stNID, 5, $TRAYTIPMSG)
 		DllStructSetData($stNID, 6, $TRAYNOTIFYIDS[$nID][1])
-		
+
 		$nResult = Shell_NotifyIcon($NIM_ADD, DllStructGetPtr($stNID))
 		If $nResult Then _TrayIconSetToolTip($nID, $TRAYNOTIFYIDS[$nID][4])
 	ElseIf BitAnd($nState, 2) Then
 		DllStructSetData($stNID, 1, DllStructGetSize($stNID))
 		DllStructSetData($stNID, 2, $TRAYMSGWND)
 		DllStructSetData($stNID, 3, $nID)
-		
+
 		$nResult = Shell_NotifyIcon($NIM_DELETE, DllStructGetPtr($stNID))
 	EndIf
-	
+
 	If BitAnd($nState, 4) Then
 		If Not $TRAYNOTIFYIDS[$nID][7] Then
 			If $hBlankIcon = 0 Then _CreateBlankIcon()
@@ -855,19 +855,19 @@ Func _TrayIconSetState($nID = -1, $nState = 1)
 	ElseIf BitAnd($nState, 8) Then
 		;KillTimer($TRAYMSGWND, $FLASHTIMERID) ; nickston
 		KillTimer($TRAYMSGWND, $nID)
-		
+
 		DllStructSetData($stNID, 1, DllStructGetSize($stNID))
 		DllStructSetData($stNID, 2, $TRAYMSGWND)
 		DllStructSetData($stNID, 3, $nID)
 		DllStructSetData($stNID, 4, $NIF_ICON)
 		DllStructSetData($stNID, 6, $TRAYNOTIFYIDS[$nID][1])
-		
+
 		$nResult = Shell_NotifyIcon($NIM_MODIFY, DllStructGetPtr($stNID))
-		
+
 		$TRAYNOTIFYIDS[$nID][7] = FALSE
 		$TRAYNOTIFYIDS[$nID][8] = FALSE
 	EndIf
-	
+
 	Return $nResult
 EndFunc
 
@@ -878,11 +878,11 @@ EndFunc
 Func _TrayIconSetIcon($nID = -1, $sIconFile = @AutoItExe, $nIconID = 0)
 	If $nID = -1 Then $nID = $TRAYLASTID
 	If $TRAYMSGWND = 0 Or $nID <= 0 Then Return 0
-	
+
 	$nIconID = _GetIconID($nIconID, $sIconFile)
-	
+
 	Local $hIcon = 0
-	
+
 	If $sIconFile = "" Then
 		If $nIconID = 0 Then
 			$sIconFile = @AutoItExe
@@ -890,17 +890,17 @@ Func _TrayIconSetIcon($nID = -1, $sIconFile = @AutoItExe, $nIconID = 0)
 			$hIcon = LoadIcon(0, $nIconID)
 		EndIf
 	EndIf
-	
+
 	If $sIconFile <> "" Then
 		Local $stIcon = DllStructCreate("hwnd")
-		
+
 		If ExtractIconExW($sIconFile, $nIconID, 0, DllStructGetPtr($stIcon), 1) > 0 Then
 			$hIcon = DllStructGetData($stIcon, 1)
 		Else
 			$hIcon = LoadIcon(0, 32516)
 		EndIf
 	EndIf
-	
+
 	Local $stNID	= DllStructCreate($sNOTIFYICONDATAW)
 	DllStructSetData($stNID, 1, DllStructGetSize($stNID))
 	DllStructSetData($stNID, 2, $TRAYMSGWND)
@@ -909,7 +909,7 @@ Func _TrayIconSetIcon($nID = -1, $sIconFile = @AutoItExe, $nIconID = 0)
 	DllStructSetData($stNID, 6, $hIcon)
 
 	DestroyIcon($TRAYNOTIFYIDS[$nID][1])
-	
+
 	Local $nResult = Shell_NotifyIcon($NIM_MODIFY, DllStructGetPtr($stNID))
 	If $nResult Then
 		$TRAYNOTIFYIDS[$nID][1] = $hIcon
@@ -917,7 +917,7 @@ Func _TrayIconSetIcon($nID = -1, $sIconFile = @AutoItExe, $nIconID = 0)
 		DestroyIcon($hIcon)
 		$TRAYNOTIFYIDS[$nID][1] = 0
 	EndIf
-	
+
 	Return $nResult
 EndFunc
 
@@ -928,7 +928,7 @@ EndFunc
 Func _TrayIconSetToolTip($nID = -1, $sToolTip = $sDefaultTT)
 	If $nID = -1 Then $nID = $TRAYLASTID
 	If $TRAYMSGWND = 0 Or $nID <= 0 Then Return 0
-	
+
 	Local $stNID	= DllStructCreate($sNOTIFYICONDATAW)
 	DllStructSetData($stNID, 1, DllStructGetSize($stNID))
 	DllStructSetData($stNID, 2, $TRAYMSGWND)
@@ -946,7 +946,7 @@ EndFunc
 Func _TrayGetMenuHandle($nID)
 	If $nID = -1 Then $nID = $TRAYLASTID
 	If $TRAYMSGWND = 0 Or $nID <= 0 Then Return 0
-	
+
 	Return $TRAYNOTIFYIDS[$nID][2]
 EndFunc
 
@@ -956,7 +956,7 @@ EndFunc
 ;**********************************************************************
 Func _GetNewItemIndex()
 	Local $i = 0, $bFreeFound = FALSE
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = 0 Then
 			$bFreeFound = TRUE
@@ -972,7 +972,7 @@ Func _GetNewItemIndex()
 			Redim $arMenuItems[$nSize + $nMenuItemsRedim][8]
 		$i = $arMenuItems[0][0]
 	EndIf
-	
+
 	Return $i
 EndFunc
 
@@ -982,7 +982,7 @@ EndFunc
 ;**********************************************************************
 Func _GetNewSideItemIndex()
 	Local $i = 0, $bFreeFound = FALSE
-	
+
 	For $i = 1 To $arSideItems[0][0]
 		If $arSideItems[$i][0] = 0 Then
 			$bFreeFound = TRUE
@@ -998,7 +998,7 @@ Func _GetNewSideItemIndex()
 			Redim $arSideItems[$nSize + $nMenuItemsRedim][10]
 		$i = $arSideItems[0][0]
 	EndIf
-	
+
 	Return $i
 EndFunc
 
@@ -1009,17 +1009,17 @@ EndFunc
 Func _TrayCreateContextMenu($nID = -1)
 	Local $nIdx = _GetTrayNotifyIdx($nID)
 	If $nIdx = 0 Then Return 0
-	
+
 	Local $nContext = 0
-	
+
 	If $TRAYNOTIFYIDS[$nIdx][2] = 0 Then
 		Local $nDummy = GUICtrlCreateDummy()
 		$nContext = GUICtrlCreateContextMenu($nDummy)
 		$TRAYNOTIFYIDS[$nIdx][2] = $nContext
-		
+
 		$TRAYLASTMENU = $nContext
 	EndIf
-		
+
 	Return $nContext
 EndFunc
 
@@ -1029,17 +1029,17 @@ EndFunc
 ;**********************************************************************
 Func _TrayCreateMenu($sText, $nMenuID = -1, $nMenuEntry = -1)
 	If $nMenuID = -1 Then $nMenuID = $TRAYLASTMENU
-	
+
 	Local $nMenu = GUICtrlCreateMenu($sText, $nMenuID, $nMenuEntry)
-	
+
 	If $nMenu > 0 Then
 		Local $nIdx = _GetNewItemIndex()
 		If $nIdx = 0 Then Return 0
 
 		$TRAYLASTITEM = $nMenu
-						
+
 		Local $hMenu = GUICtrlGetHandle($nMenuID)
-		
+
 		$arMenuItems[$nIdx][0] = $nMenu
 		$arMenuItems[$nIdx][1] = $sText
 		$arMenuItems[$nIdx][2] = -1
@@ -1049,7 +1049,7 @@ Func _TrayCreateMenu($sText, $nMenuID = -1, $nMenuEntry = -1)
 		$arMenuItems[$nIdx][6] = -1
 		$arMenuItems[$nIdx][7] = TRUE
 	EndIf
-	
+
 	Return $nMenu
 EndFunc
 
@@ -1059,17 +1059,17 @@ EndFunc
 ;**********************************************************************
 Func _TrayCreateItem($sText, $nMenuID = -1, $nMenuEntry = -1, $bRadio = 0)
 	If $nMenuID = -1 Then $nMenuID = $TRAYLASTMENU
-	
+
 	Local $nMenuItem = GUICtrlCreateMenuItem($sText, $nMenuID, $nMenuEntry, $bRadio)
-	
+
 	If $nMenuItem > 0 Then
 		Local $nIdx = _GetNewItemIndex()
 		If $nIdx = 0 Then Return 0
-	
+
 		$TRAYLASTITEM = $nMenuItem
-		
+
 		Local $hMenu = GUICtrlGetHandle($nMenuID)
-		
+
 		$arMenuItems[$nIdx][0] = $nMenuItem
 		$arMenuItems[$nIdx][1] = $sText
 		$arMenuItems[$nIdx][2] = -1
@@ -1079,7 +1079,7 @@ Func _TrayCreateItem($sText, $nMenuID = -1, $nMenuEntry = -1, $bRadio = 0)
 		$arMenuItems[$nIdx][6] = -1
 		$arMenuItems[$nIdx][7] = FALSE
 	EndIf
-	
+
 	Return $nMenuItem
 EndFunc
 
@@ -1094,22 +1094,22 @@ EndFunc
 
 Func _TrayDeleteItem($nID)
 	Local $i, $k, $nResult = 0, $bFound = FALSE
-	
+
 	Local $hMenu = GUICtrlGetHandle($nID)
 	Local $bIsMenu = FALSE
 	If $hMenu <> 0 Then $bIsMenu = TRUE
-		
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = 0 Then ContinueLoop
-		
+
 		If $bIsMenu Then
 			For $k = 1 To $arMenuItems[0][0]
 				If $arMenuItems[$k][3] = $hMenu And _
 					$arMenuItems[$i][0] <> $arMenuItems[$k][0] Then _TrayDeleteItem($arMenuItems[$k][0])
-					;$k <> $i Then _TrayDeleteItem($arMenuItems[$k][0])	
+					;$k <> $i Then _TrayDeleteItem($arMenuItems[$k][0])
 			Next
 		EndIf
-		
+
 		If $arMenuItems[$i][0] = $nID Then
 			If GUICtrlDelete($nID) Then
 				$arMenuItems[$i][0] = 0
@@ -1120,17 +1120,17 @@ Func _TrayDeleteItem($nID)
 				$arMenuItems[$i][5] = FALSE
 				$arMenuItems[$i][6] = -1
 				$arMenuItems[$i][7] = FALSE
-				
+
 				$nResult = 1
 				$bFound = TRUE
 			EndIf
-			
+
 			ExitLoop
 		EndIf
 	Next
-	
+
 	If Not $bFound And $nID <> 0 Then GUICtrlDelete($nID)
-	
+
 	Return $nResult
 EndFunc
 
@@ -1141,7 +1141,7 @@ EndFunc
 Func _TrayIconSetClick($nID, $nClicks)
 	If $nID = -1 Then $nID = $TRAYLASTID
 	If $TRAYMSGWND = 0 Or $nID <= 0 Then Return 0
-	
+
 	$TRAYNOTIFYIDS[$nID][3] = $nClicks
 EndFunc
 
@@ -1152,7 +1152,7 @@ EndFunc
 Func _TrayTip($nID, $sTitle, $sText, $nTimeOut = 10, $nInfoFlags = 0)
 	If $nID = -1 Then $nID = $TRAYLASTID
 	If $TRAYMSGWND = 0 Or $nID <= 0 Then Return 0
-	
+
 	Local $stNID = DllStructCreate($sNOTIFYICONDATAW)
 
 	DllStructSetData($stNID, 1, DllStructGetSize($stNID))
@@ -1163,7 +1163,7 @@ Func _TrayTip($nID, $sTitle, $sText, $nTimeOut = 10, $nInfoFlags = 0)
 	DllStructSetData($stNID, 11, $nTimeOut * 1000)
 	DllStructSetData($stNID, 12, $sTitle)
 	DllStructSetData($stNID, 13, $nInfoFlags)
-	
+
  	Local $nResult = Shell_NotifyIcon($NIM_MODIFY, DllStructGetPtr($stNID))
 
  	Return $nResult
@@ -1176,72 +1176,72 @@ EndFunc
 Func WM_MEASUREITEM($hWnd, $Msg, $wParam, $lParam)
 	#forceref $Msg, $wParam
 	Local $nResult = FALSE
-	
+
 	Local $stMeasureItem = DllStructCreate("uint;uint;uint;uint;uint;dword", $lParam)
-	
+
 	If DllStructGetData($stMeasureItem, 1) = 1 Then
-		
+
 		Local $nIconSize	= 0
 		Local $nCheckX		= 0
 		Local $nSpace		= 2
-		
+
 		_GetMenuInfos($nIconSize, $nCheckX)
-		
+
 		If $nIconSize < $nCheckX Then $nIconSize = $nCheckX
-		
+
 		Local $nMenuItemID	= DllStructGetData($stMeasureItem, 3)
-		
+
 		Local $hDC			= GetDC($hWnd)
-				
+
 		Local $hMenu		= _GetMenuHandle($nMenuItemID)
 
 		Local $nState		= GetMenuState($hMenu, $nMenuItemID, 0)
-		
+
 		; Reassign the current menu font to the menuitem
 		Local $hMFont		= 0
 		Local $bBoldFont	= FALSE
-		
+
 		If BitAnd($nState, 0x00001000) And Not BitAnd($nState, 0x00000010) Then
 			_CreateMenuFont($hMFont, TRUE)
 			$bBoldFont	= TRUE
 		Else
 			$hMFont = $hMenuFont
 		EndIf
-		
+
 		Local $hFont		= SelectObject($hDC, $hMFont)
-				
+
 		Local $sText		= _GetMenuText($nMenuItemID)
 		Local $nSideIdx		= _GetSideMenuIndex($hMenu)
 		Local $sSideText	= _GetSideMenuText($nSideIdx)
 		Local $hSideImage	= _GetSideMenuImage($nSideIdx)
 		Local $nSideWidth	= 0
-		
+
 		If $sSideText <> "" Then
 			If $hSideImage = 0 Then
 				Local $hSideFont = 0
 				_CreateMenuFont($hSideFont, TRUE, TRUE)
 				Local $hOldObj = SelectObject($hDC, $hSideFont)
-				
+
 				$nSideWidth = _GetSideMenuTextWidth($hDC, $sSideText) + 2 ; 1 x 1 left + right
 				SelectObject($hDC, $hOldObj)
 				DeleteObject($hSideFont)
 			Else
 				Local $nSideHeight	= 0
 				Local $bStretch		= FALSE
-				
+
 				_GetSideMenuImageSize($nSideIdx, $nSideWidth, $nSideHeight, $bStretch)
 			EndIf
 		EndIf
-		
+
 		Local $nMaxTextWidth	= 0
 		Local $nMaxTextAccWidth	= 0
-		
+
 		_GetMenuMaxTextWidth($hDC, $hMenu, $nMaxTextWidth, $nMaxTextAccWidth)
 		If $nMaxTextAccWidth > 0 Then $nMaxTextAccWidth += 4
-		
+
 		Local $nHeight		= 2 * $nSpace + $nIconSize
 		Local $nWidth		= 0
-	
+
 		; Set a default separator height
 		If $sText = "" Then
 			$nHeight = 4
@@ -1257,7 +1257,7 @@ Func WM_MEASUREITEM($hWnd, $Msg, $wParam, $lParam)
 
 		SelectObject($hDC, $hFont)
 		If $bBoldFont Then DeleteObject($hMFont)
-		
+
 		ReleaseDC($hWnd, $hDC)
 		$nResult = TRUE
 	EndIf
@@ -1275,7 +1275,7 @@ EndFunc
 Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 	#forceref $hWnd, $Msg, $wParam
 	Local $nResult		= "GUI_RUNDEFMSG"
-	
+
 	;Local $stDrawItem	= DllStructCreate("uint;uint;uint;uint;uint;dword;dword;int[4];dword", $lParam)
 	Local $stDrawItem	= DllStructCreate("uint;uint;uint;uint;uint;hwnd;hwnd;int[4];dword", $lParam) ; Works on x64
 
@@ -1287,14 +1287,14 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 		Local $nState		= DllStructGetData($stDrawItem, 5)
 		Local $hMenu		= DllStructGetData($stDrawItem, 6)
 		Local $hDC			= DllStructGetData($stDrawItem, 7)
-		
+
 		Local $bChecked		= BitAnd($nState, 0x0008)
 		Local $bGrayed		= BitAnd($nState, 0x0002)
 		Local $bSelected	= BitAnd($nState, 0x0001)
 		Local $bDefault		= BitAnd($nState, 0x0020)
 		Local $bNoAcc		= BitAnd($nState, 0x0100)
 		Local $bIsRadio		= _GetMenuIsRadio($nMenuItemID)
-		
+
 		Local $nSideIdx		= _GetSideMenuIndex($hMenu)
 		Local $sSideText	= _GetSideMenuText($nSideIdx)
 		Local $hSideImage	= _GetSideMenuImage($nSideIdx)
@@ -1304,7 +1304,7 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 		Local $nSideHeight	= 0
 		Local $bHasSide		= FALSE
 		Local $bStretch		= FALSE
-		
+
 		If $sSideText <> "" Then
 			If $hSideImage = 0 Then
 				_CreateMenuFont($hSideFont, TRUE, TRUE)
@@ -1314,26 +1314,26 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 			Else
 				_GetSideMenuImageSize($nSideIdx, $nSideWidth, $nSideHeight, $bStretch)
 			EndIf
-			
+
 			$bHasSide = TRUE
 		EndIf
-		
+
 		Local $arIR[4]
 		$arIR[0]			= DllStructGetData($stDrawItem, 8, 1) + $nSideWidth
 		$arIR[1]			= DllStructGetData($stDrawItem, 8, 2)
 		$arIR[2]			= DllStructGetData($stDrawItem, 8, 3)
 		$arIR[3]			= DllStructGetData($stDrawItem, 8, 4)
-		
+
 		Local $stItemRect	= DllStructCreate("int;int;int;int")
 		_SetItemRect($stItemRect, $arIR[0], $arIR[1], $arIR[2], $arIR[3])
-		
+
 		; Set default menu values if info function fails
 		Local $nIconSize	= 16
 		Local $nCheckX		= 16
 		Local $nSpace		= 2
-		
+
 		_GetMenuInfos($nIconSize, $nCheckX)
-		
+
 		Local $nMBkClr			= $nMenuBkClr
 		Local $nMIconBkClr		= $nMenuIconBkClr
 		Local $nMIconBkClr2		= $nMenuIconBkClr2
@@ -1341,15 +1341,15 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 		Local $nMSelectRectClr	= $nMenuSelectRectClr
 		Local $nMSelectTextClr	= $nMenuSelectTextClr
 		Local $nMTextClr		= $nMenuTextClr
-		
+
 		Local $bIsTrayItem		= _IsTrayItem($nMenuItemID)
-		
+
 		Local $IsMenuBarItem = (_GetMenuHandle($nMenuItemID)== "TOP") And Not $bIsTrayItem
 		If $nState = 320 And $IsMenuBarItem Then
 			$nMBkClr = $nMSelectBkClr
 			$nMTextClr = $nMSelectTextClr
 		EndIf
-		
+
 		If $bIsTrayItem Then
 			$nMBkClr			= $nTrayBkClr
 			$nMIconBkClr		= $nTrayIconBkClr
@@ -1359,29 +1359,29 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 			$nMSelectTextClr	= $nTraySelectTextClr
 			$nMTextClr			= $nTrayTextClr
 		EndIf
-		
+
 		; Select our at beginning selfcreated menu font into the item device context
 		Local $hMFont		= 0
 		Local $bBoldFont	= FALSE
-		
+
 		If $bDefault Then
 			_CreateMenuFont($hMFont, TRUE)
 			$bBoldFont = TRUE
 		Else
 			$hMFont = $hMenuFont
 		EndIf
-		
+
 		Local $hBrush		= 0
 		Local $hOldBrush	= 0
 		Local $nClrSel		= 0
 		Local $hBorderBrush	= 0
 		Local $nLen			= 0
-		
+
 		; Show side menu only if action = ODA_DRAWENTIRE
 		If $nAction = 1 Then
 			Local $nCount = GetMenuItemCount($hMenu)
 			Local $nID = GetMenuItemID($hMenu, $nCount - 1)
-			
+
 			If $nID = -1 Then
 				Local $stMII = DllStructCreate($sMENUITEMINFO)
 				DllStructSetData($stMII, 1, DllStructGetSize($stMII))
@@ -1389,78 +1389,78 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 				If GetMenuItemInfo($hMenu, $nCount - 1, TRUE, DllStructGetPtr($stMII)) Then _
 					$nID = DllStructGetData($stMII, 5)
 			EndIf
-			
+
 			If $nID = $nMenuItemID And $bHasSide Then
 				Local $stSideRect = DllStructCreate("int;int;int;int")
 				_SetItemRect($stSideRect, 0, 0, $nSideWidth, $arIR[3])
-				
+
 				Local $nSideClr		= $nMenuSideTxtClr
 				Local $nSideBkClr	= $nMenuSideBkClr
 				Local $nSideBkClr2	= $nMenuSideBkClr2
-				
+
 				_GetSideMenuColors($nSideIdx, $nSideClr, $nSideBkClr, $nSideBkClr2)
-				
+
 				If $nSideBkClr <> -1 Then
 					If $nSideBkClr = $nSideBkClr2 Or _
 						$nSideBkClr2 = -1 Then
 						SetBkColor($hDC, $nSideBkClr)
-						
+
 						$hBrush	= CreateSolidBrush($nSideBkClr)
 						$hOldBrush = SelectObject($hDC, $hBrush)
-						
+
 						FillRect($hDC, DllStructGetPtr($stSideRect), $hBrush)
-						
+
 						SelectObject($hDC, $hOldBrush)
 						DeleteObject($hBrush)
-						
+
 						$hBrush		= 0
 						$hOldBrush	= 0
 					Else
 						_FillGradientRect($hDC, $stSideRect, $nSideBkClr2, $nSideBkClr, TRUE)
 					EndIf
 				EndIf
-				
+
 				If $hSideImage = 0 Then
 					$nLen	= StringLen($sSideText)
-					
+
 					Local $stSideText = DllStructCreate("wchar[" & $nLen + 1 & "]")
 					DllStructSetData($stSideText, 1, $sSideText)
-					
+
 					$hOldObj = SelectObject($hDC, $hSideFont)
-					
+
 					Local $nOldMode = SetBkMode($hDC, 1)
 					SetTextColor($hDC, $nSideClr)
-									
+
 					DllStructSetData($stSideRect, 2, 8)
 					DllStructSetData($stSideRect, 4, DllStructGetData($stSideRect, 4) + 8)
-					
+
 					DrawTextW($hDC, DllStructGetPtr($stSideText), _
 									StringLen($sSideText), _
 									DllStructGetPtr($stSideRect), _
 									BitOr(0x00000008, 0x00000020, 0x00000100))
-					
+
 					SetBkMode($hDC, $nOldMode)
 					SelectObject($hDC, $hOldObj)
 				Else
 					Local $hCDC = CreateCompatibleDC($hDC)
 					Local $hObjOld = SelectObject($hCDC, $hSideImage)
-					
+
 					If $bStretch Then
 						StretchBlt($hDC, 0, 0, $nSideWidth, $arIR[3], $hCDC, 0, 0, $nSideWidth, $nSideHeight, 0x00CC0020)
 					Else
 						BitBlt($hDC, 0, 0, $nSideWidth, $arIR[3], $hCDC, 0, $nSideHeight - $arIR[3], 0x00CC0020)
 					EndIf
-					
+
 					SelectObject($hCDC, $hObjOld)
 					DeleteDC($hCDC)
 				EndIf
 			EndIf
 		EndIf
-		
+
 		If $hSideFont <> 0 Then DeleteObject($hSideFont)
-		
+
 		Local $hFont = SelectObject($hDC, $hMFont)
-		
+
 		; Only show a menu bar when the item is enabled
 		If $bSelected Then ;And Not $bGrayed Then
 			If ($bUseAdvMenu And $bIsTrayItem = FALSE) Or ($bUseAdvTrayMenu And $bIsTrayItem) Then
@@ -1472,7 +1472,7 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 					$hBrush		= CreateSolidBrush($nMSelectBkClr) ; BGR color value
 					$nClrSel	= $nMSelectBkClr
 				EndIf
-				
+
 			Else
 				$hBrush			= GetSysColorBrush(13)
 				$nClrSel		= GetSysColor(13)
@@ -1486,9 +1486,9 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 				$nClrSel		= GetSysColor(4)
 			EndIf
 		EndIf
-		
+
 		Local $nClrTxt		= 0
-		
+
 		If $bSelected And Not $bGrayed Then
 			If ($bUseAdvMenu And $bIsTrayItem = FALSE) Or ($bUseAdvTrayMenu And $bIsTrayItem) Then
 				$nClrTxt	= SetTextColor($hDC, $nMSelectTextClr)
@@ -1503,34 +1503,34 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 			Else
 				$nClrTxt	= SetTextColor($hDC, GetSysColor(7))
 			EndIf
-		EndIf	
-		
+		EndIf
+
 		Local $nClrBk		= SetBkColor($hDC, $nClrSel)
 		$hOldBrush			= SelectObject($hDC, $hBrush)
-		
+
 		FillRect($hDC, DllStructGetPtr($stItemRect), $hBrush)
 		SelectObject($hDC, $hOldBrush)
 		DeleteObject($hBrush)
-		
-		If $IsMenuBarItem Then 
+
+		If $IsMenuBarItem Then
 			$nIconSize	= 0
 			$nCheckX		= 0
 			$nSpace		= 2
 		EndIf
-		
+
 		If Not $IsMenuBarItem And ($bUseAdvMenu And $bIsTrayItem = FALSE) Or ($bUseAdvTrayMenu And $bIsTrayItem) Then
 			; Create a small gray edge
 			If Not $bSelected Or $bGrayed Then
 				; Reassign the item rect
 				_SetItemRect($stItemRect, $arIR[0], $arIR[1], $arIR[0] + 2 * $nSpace + $nIconSize + 1, $arIR[3])
-					
+
 				If $nMIconBkClr = $nMIconBkClr2  Or _
 					$nMIconBkClr2 = -1 Then
 					$hBrush		= CreateSolidBrush($nMIconBkClr)
 					$hOldBrush	= SelectObject($hDC, $hBrush)
-					
+
 					FillRect($hDC, DllStructGetPtr($stItemRect), $hBrush)
-					
+
 					SelectObject($hDC, $hOldBrush)
 					DeleteObject($hBrush)
 				Else
@@ -1538,16 +1538,16 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 				EndIf
 			EndIf
 		EndIf
-		
+
 		If $bChecked Then
 			_SetItemRect($stItemRect, $arIR[0] + 1, $arIR[1] + 1, $arIR[0] + $nIconSize + $nSpace + 1, $arIR[1] + $nIconSize + $nSpace + 1)
-			
+
 			If $bSelected Then
 				If ($bUseAdvMenu And $bIsTrayItem = FALSE) Or ($bUseAdvTrayMenu And $bIsTrayItem) Then
 					$hBrush		= CreateSolidBrush($nMSelectBkClr)
 				Else
 					$hBrush		= GetSysColorBrush(13)
-				EndIf	
+				EndIf
 			Else
 				If ($bUseAdvMenu And $bIsTrayItem = FALSE) Or ($bUseAdvTrayMenu And $bIsTrayItem) Then
 					$hBrush		= CreateSolidBrush($nMBkClr)
@@ -1555,122 +1555,122 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 					$hBrush		= GetSysColorBrush(4)
 				EndIf
 			EndIf
-			
+
 			$hOldBrush	= SelectObject($hDC, $hBrush)
 			FillRect($hDC, DllStructGetPtr($stItemRect), $hBrush)
 			SelectObject($hDC, $hOldBrush)
 			DeleteObject($hBrush)
-			
+
 			; Create a checkmark/bullet for the checked/radio items
 			Local $hDCBitmap	= CreateCompatibleDC($hDC)
 			Local $hbmpCheck	= CreateBitmap($nIconSize, $nIconSize, 1, 1, 0)
 			Local $hbmpOld		= SelectObject($hDCBitmap, $hbmpCheck)
-			
+
 			Local $x = DllStructGetData($stItemRect, 1) + ($nIconSize + $nSpace - $nCheckX) / 2
 			Local $y = DllStructGetData($stItemRect, 2) + ($nIconSize + $nSpace - $nCheckX) / 2 - $nSpace
-			
+
 			_SetItemRect($stItemRect, 0, 0, $nIconSize, $nIconSize)
-			
+
 			Local $nCtrlStyle = 0x0001
-			
+
 			If $bIsRadio Then $nCtrlStyle = 0x0002
-			
+
 			DrawFrameControl($hDCBitmap, DllStructGetPtr($stItemRect), 2, $nCtrlStyle)
-			
+
 			BitBlt($hDC, $x, $y + 1, $nCheckX, $nCheckX, $hDCBitmap, 0, 0, 0x00CC0020)
-			
+
 			If ($bUseAdvMenu And $bIsTrayItem = FALSE) Or ($bUseAdvTrayMenu And $bIsTrayItem) Then
 				_SetItemRect($stItemRect, $arIR[0] + 1, $arIR[1] + 1, $arIR[0] + $nIconSize + $nSpace + 1, $arIR[1] + $nIconSize + $nSpace + 1)
-				$hBrush	= CreateSolidBrush($nMSelectRectClr)					
+				$hBrush	= CreateSolidBrush($nMSelectRectClr)
 				$hOldBrush	= SelectObject($hDC, $hBrush)
 				FrameRect($hDC, DllStructGetPtr($stItemRect), $hBrush)
 				SelectObject($hDC, $hOldBrush)
 				DeleteObject($hBrush)
 			EndIf
-			
+
 			SelectObject($hDCBitmap, $hbmpOld)
 			DeleteObject($hbmpCheck)
 			DeleteDC($hDCBitmap)
-		EndIf		
-		
+		EndIf
+
 		; Reassign the item rect
 		_SetItemRect($stItemRect, $arIR[0], $arIR[1], $arIR[2], $arIR[3])
-		
+
 		If ($bUseAdvMenu And $bIsTrayItem = FALSE) Or ($bUseAdvTrayMenu And $bIsTrayItem) Then
 			;If $bSelected And Not $bGrayed Then
 			If $bSelected Then ; Show also a rect around a disabled item
 				$hOldBrush	= SelectObject($hDC, $hBorderBrush)
 				FrameRect($hDC, DllStructGetPtr($stItemRect), $hBorderBrush)
 				SelectObject($hDC, $hOldBrush)
-				DeleteObject($hBorderBrush)		
+				DeleteObject($hBorderBrush)
 			EndIf
 		EndIf
-		
+
 		Local $sText	= _GetMenuText($nMenuItemID)
 		If $bNoAcc Then $sText = StringReplace($sText, "&", "")
-		
+
 		Local $nWidth	= 0
 		Local $sAcc		= ""
 		Local $arText	= StringSplit($sText, @Tab)
 		Local $bTab		= FALSE
-		
+
 		If IsArray($arText) And $arText[0] > 1 Then
 			$sText	= $arText[1]
 			$sAcc	= $arText[2]
 			$bTab	= TRUE
 		EndIf
-		
+
 		$nLen			= StringLen($sText)
 		Local $stText	= DllStructCreate("wchar[" & $nLen + 1 & "]")
 		DllStructSetData($stText, 1, $sText)
-			
+
 		Local $nSaveLeft	= DllStructGetData($stItemRect, 1)
 		Local $nLeft		= $nSaveLeft
 		$nLeft += $nSpace		; Left border
 		$nLeft += $nSpace		; Space after gray border
 		$nLeft += $nIconSize	; Icon width
 		$nLeft += $nSpace + 2	; Right after the icon
-		
+
 		DllStructSetData($stItemRect, 1, $nLeft)
-		
+
 		Local $nFlags		= BitOr(0x00000100, 0x00000020, 0x00000004)
-		
+
 		DrawTextW($hDC, DllStructGetPtr($stText), $nLen, DllStructGetPtr($stItemRect), $nFlags)
-		
+
 		; Draw accelerator text
 		If $bTab Then
 			Local $nMaxTextWidth	= 0
 			Local $nMaxTextAccWidth	= 0
-			
+
 			_GetMenuMaxTextWidth($hDC, $hMenu, $nMaxTextWidth, $nMaxTextAccWidth)
 			If $nMaxTextAccWidth > 0 Then $nMaxTextAccWidth += 4
-			
+
 			$nWidth	= 6 * $nSpace + 2 * $nIconSize + $nMaxTextWidth
-			
+
 			; Maybe this differs - have no emulator here at the moment
 			$nWidth = $nWidth - $nCheckX + 1
-			
+
 			$nLen = StringLen($sAcc)
 			$stText = DllStructCreate("wchar[" & $nLen + 1 & "]")
 			DllStructSetData($stText, 1, $sAcc)
-			
+
 			; Set rect for acc text
 			_SetItemRect($stItemRect, $arIR[0] + $nWidth, $arIR[1], $arIR[0] + $nWidth + $nMaxTextAccWidth, $arIR[3])
-			
+
 			DrawTextW($hDC, DllStructGetPtr($stText), $nLen, DllStructGetPtr($stItemRect), $nFlags)
-			
+
 			; Reset rect values
 			_SetItemRect($stItemRect, $arIR[0], $arIR[1], $arIR[2], $arIR[3])
 		EndIf
-		
+
 		Local $nNoSelIconIndex = -1
 		Local $nSelIconIndex = -1
-		
-		_GetMenuIconIndex($nMenuItemID, $nNoSelIconIndex, $nSelIconIndex)		
-		
+
+		_GetMenuIconIndex($nMenuItemID, $nNoSelIconIndex, $nSelIconIndex)
+
 		Local $nIconIndex = $nNoSelIconIndex
 		If $bSelected And $nSelIconIndex > -1 Then $nIconIndex = $nSelIconIndex
-		
+
 		If $nIconIndex > -1 Then
 			If Not $bChecked Then
 				If $bGrayed Then
@@ -1696,9 +1696,9 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 				EndIf
 			EndIf
 		EndIf
-		
+
 		DllStructSetData($stItemRect, 1, $nSaveLeft)
-		
+
 		; Draw a "line" for a separator item
 		If StringLen($sText) = 0 Then
 			If ($bUseAdvMenu And $bIsTrayItem = FALSE) Or ($bUseAdvTrayMenu And $bIsTrayItem) Then
@@ -1710,22 +1710,22 @@ Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 			DllStructSetData($stItemRect, 4, DllStructGetData($stItemRect, 1) + 2)
 			DrawEdge($hDC, DllStructGetPtr($stItemRect), 0x0006, 0x0002)
 		EndIf
-		
+
 		$stText		= 0
 		$stItemRect	= 0
-		
+
 		SelectObject($hDC, $hFont)
 		If $bBoldFont Then DeleteObject($hMFont)
-		
+
 		SetTextColor($hDC, $nClrTxt)
 		SetBkColor($hDC, $nClrBk)
-		
+
 		$nResult = TRUE
 	EndIf
-	
+
 	$stDrawItem	= 0
-	
-	Return $nResult	
+
+	Return $nResult
 EndFunc
 
 
@@ -1734,9 +1734,9 @@ EndFunc
 ;********************************************************************
 Func _ColorGetClr($nColor, $nMode)
 	Local $nClr = $nColor
-	
+
 	If $bUseRGBColors Then $nClr = _GetBGRColor($nColor)
-	
+
 	Switch $nMode
 		Case 1
 			$nClr = BitShift($nClr, 16)
@@ -1745,7 +1745,7 @@ Func _ColorGetClr($nColor, $nMode)
 		Case 3
 			$nClr = BitAnd($nClr, 0xFF)
 	EndSwitch
-	
+
 	Return $nClr
 EndFunc
 
@@ -1756,25 +1756,25 @@ EndFunc
 Func _FillGradientRect($hDC, $stRect, $nClr1, $nClr2, $bVert = FALSE)
 	Local $stVert = DllStructCreate("long;long;ushort;ushort;ushort;ushort;" & _
 									"long;long;ushort;ushort;ushort;ushort")
-									
+
 	DllStructSetData($stVert, 1, DllStructGetData($stRect, 1))
 	DllStructSetData($stVert, 2, DllStructGetData($stRect, 2))
 	DllStructSetData($stVert, 3, BitShift(_ColorGetClr($nClr1, 3), -8))
 	DllStructSetData($stVert, 4, BitShift(_ColorGetClr($nClr1, 2), -8))
 	DllStructSetData($stVert, 5, BitShift(_ColorGetClr($nClr1, 1), -8))
 	DllStructSetData($stVert, 6, 0)
-	
+
 	DllStructSetData($stVert, 7, DllStructGetData($stRect, 3))
 	DllStructSetData($stVert, 8, DllStructGetData($stRect, 4))
 	DllStructSetData($stVert, 9, BitShift(_ColorGetClr($nClr2, 3), -8))
 	DllStructSetData($stVert, 10, BitShift(_ColorGetClr($nClr2, 2), -8))
 	DllStructSetData($stVert, 11, BitShift(_ColorGetClr($nClr2, 1), -8))
 	DllStructSetData($stVert, 12, 0)
-	
+
 	Local $stGradRect = DllStructCreate("ulong;ulong")
 	DllStructSetData($stGradRect, 1, 0)
 	DllStructSetData($stGradRect, 2, 1)
-	
+
 	If $bVert Then
 		GradientFill($hDC, DllStructGetPtr($stVert), 2, DllStructGetPtr($stGradRect), 1, 1)
 	Else
@@ -1784,7 +1784,7 @@ EndFunc
 
 
 ;********************************************************************
-; Sets 4 values to a itemrect struct 
+; Sets 4 values to a itemrect struct
 ;********************************************************************
 Func _SetItemRect(ByRef $stStruct, $p1, $p2, $p3, $p4)
 	DllStructSetData($stStruct, 1, $p1)
@@ -1817,7 +1817,7 @@ Func WM_TIMER($hWnd, $Msg, $wParam, $lParam)
 			DllStructSetData($stNID, 2, $TRAYMSGWND)
 			DllStructSetData($stNID, 3, $nID)
 			DllStructSetData($stNID, 4, $NIF_ICON)
-			
+
 			If $TRAYNOTIFYIDS[$nID][8] Then
 				DllStructSetData($stNID, 6, $hBlankIcon)
 				$TRAYNOTIFYIDS[$nID][8] = FALSE
@@ -1825,13 +1825,13 @@ Func WM_TIMER($hWnd, $Msg, $wParam, $lParam)
 				DllStructSetData($stNID, 6, $TRAYNOTIFYIDS[$nID][1])
 				$TRAYNOTIFYIDS[$nID][8] = TRUE
 			EndIf
-			
+
 			Shell_NotifyIcon($NIM_MODIFY, DllStructGetPtr($stNID))
 		EndIf
 	EndIf
 
 	KillTimer($TRAYMSGWND, $FLASHTIMERID)
-	SetTimer($TRAYMSGWND, $FLASHTIMERID, $FLASHTIMEOUT, 0)	
+	SetTimer($TRAYMSGWND, $FLASHTIMERID, $FLASHTIMEOUT, 0)
 EndFunc
 
 
@@ -1840,17 +1840,17 @@ EndFunc
 ;********************************************************************
 Func _GUICtrlCreateODMenuItem($sMenuItemText, $nParentMenu, $sIconFile = "", $nIconID = 0, $bRadio = 0)
 	Local $nMenuItem	= GUICtrlCreateMenuItem($sMenuItemText, $nParentMenu, -1, $bRadio)
-	
+
 	$nIconID = _GetIconID($nIconID, $sIconFile)
-		
+
 	If $nMenuItem > 0 Then
 		Local $nIdx = _GetNewItemIndex()
 		If $nIdx = 0 Then Return 0
 
 		$MENULASTITEM = $nMenuItem
-						
+
 		Local $hMenu		= GUICtrlGetHandle($nParentMenu)
-		
+
 		$arMenuItems[$nIdx][0] = $nMenuItem
 		$arMenuItems[$nIdx][1] = $sMenuItemText
 		$arMenuItems[$nIdx][2] = _AddMenuIcon($sIconFile, $nIconID)
@@ -1859,10 +1859,10 @@ Func _GUICtrlCreateODMenuItem($sMenuItemText, $nParentMenu, $sIconFile = "", $nI
 		$arMenuItems[$nIdx][5] = FALSE
 		$arMenuItems[$nIdx][6] = -1
 		$arMenuItems[$nIdx][7] = FALSE
-		
+
 		_SetOwnerDrawn($hMenu, $nMenuItem, $sMenuItemText)
 	EndIf
-		
+
 	Return $nMenuItem
 EndFunc
 
@@ -1877,17 +1877,17 @@ Func _GUICtrlCreateODMenu($sText, $nParentMenu = "", $sIconFile = "", $nIconID =
 	Else
 		$nMenu	= GUICtrlCreateMenu($sText, $nParentMenu)
 	EndIf
-	
+
 	$nIconID = _GetIconID($nIconID, $sIconFile)
-	
+
 	If $nMenu > 0 Then
 		Local $nIdx = _GetNewItemIndex()
 		If $nIdx = 0 Then Return 0
-		
+
 		$MENULASTITEM = $nMenu
-		
+
 		Local $hMenu	= GUICtrlGetHandle($nParentMenu)
-		
+
 		$arMenuItems[$nIdx][0] = $nMenu
 		$arMenuItems[$nIdx][1] = $sText
 		$arMenuItems[$nIdx][2] = _AddMenuIcon($sIconFile, $nIconID)
@@ -1896,21 +1896,21 @@ Func _GUICtrlCreateODMenu($sText, $nParentMenu = "", $sIconFile = "", $nIconID =
 		$arMenuItems[$nIdx][5] = FALSE
 		$arMenuItems[$nIdx][6] = -1
 		$arMenuItems[$nIdx][7] = TRUE
-		
+
 		_SetOwnerDrawn($hMenu, $nMenu, $sText)
 	EndIf
-	
+
 	Return $nMenu
 EndFunc
 
 Func _GUICtrlCreateODTopMenu($sText, $nParentGUI)
 	Local $nMenu	= GUICtrlCreateMenu($sText)
 
-	
+
 	If $nMenu > 0 Then
 		Local $nIdx = _GetNewItemIndex()
 		If $nIdx = 0 Then Return 0
-		
+
 		$MENULASTITEM = $nMenu
 		Local $hMenu = DllCall("User32.dll", "hwnd", "GetMenu", "hwnd", $nParentGUI)
 		If @error Or $hMenu[0]=0 Then Return SetError(1,0,0)
@@ -1923,11 +1923,11 @@ Func _GUICtrlCreateODTopMenu($sText, $nParentGUI)
 		$arMenuItems[$nIdx][5] = FALSE
 		$arMenuItems[$nIdx][6] = -1
 		$arMenuItems[$nIdx][7] = TRUE
-		
+
 		_SetOwnerDrawn($hMenu[0], $nMenu, $sText)
 		MenuBarBKColor($hMenu[0],$nMenuBkClr)
 	EndIf
-	
+
 	Return $nMenu
 EndFunc
 Func _GUIMenuBarSetBkColor($nParentGUI,$nMenuBkClr)
@@ -1946,9 +1946,9 @@ EndFunc
 Func _GUICtrlODMenuItemSetText($nMenuID, $sText)
 	If $nMenuID = -1 Then $nMenuID = $MENULASTITEM
 	If $nMenuID <= 0 Then Return 0
-	
+
 	Local $i
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuID Then
 			$arMenuItems[$i][1] = $sText
@@ -1969,9 +1969,9 @@ Func _GUICtrlODMenuItemSetIcon($nMenuID, $sIconFile = "", $nIconID = 0)
 	If $nMenuID <= 0 Then Return 0
 
 	$nIconID = _GetIconID($nIconID, $sIconFile)
-	
+
 	Local $i
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuID Then
 			If $sIconFile = "" Then
@@ -1983,11 +1983,11 @@ Func _GUICtrlODMenuItemSetIcon($nMenuID, $sIconFile = "", $nIconID = 0)
 					_ReplaceMenuIcon($sIconFile, $nIconID, $arMenuItems[$i][2])
 				EndIf
 			EndIf
-			
+
 			Return 1
 		EndIf
 	Next
-	
+
 	Return 0
 EndFunc
 
@@ -2000,9 +2000,9 @@ Func _GUICtrlODMenuItemSetSelIcon($nMenuID, $sIconFile = "", $nIconID = 0)
 	If $nMenuID <= 0 Then Return 0
 
 	$nIconID = _GetIconID($nIconID, $sIconFile)
-		
+
 	Local $i
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuID Then
 			If $sIconFile = "" Then
@@ -2014,11 +2014,11 @@ Func _GUICtrlODMenuItemSetSelIcon($nMenuID, $sIconFile = "", $nIconID = 0)
 					_ReplaceMenuIcon($sIconFile, $nIconID, $arMenuItems[$i][6])
 				EndIf
 			EndIf
-			
+
 			Return 1
 		EndIf
 	Next
-	
+
 	Return 0
 EndFunc
 
@@ -2028,20 +2028,20 @@ EndFunc
 ;********************************************************************
 Func _AddMenuIcon($sIconFile, $nIconID)
 	If IsHWnd($sIconFile) Or Number($sIconFile)>0 Then Return ImageList_AddIcon($hMenuImageList, $sIconFile)
-	
+
 	Local $stIcon	= DllStructCreate("hwnd")
-	
+
 	Local $nCount	= ExtractIconExW($sIconFile, $nIconID, 0, DllStructGetPtr($stIcon), 1)
-	
+
 	Local $nIndex	= -1
-	
+
 	If $nCount > 0 Then
 		$nIndex	= ImageList_AddIcon($hMenuImageList, DllStructGetData($stIcon, 1))
 		DestroyIcon(DllStructGetData($stIcon, 1))
 	EndIf
-	
+
 	$stIcon = 0
-	
+
 	Return $nIndex
 EndFunc
 
@@ -2051,20 +2051,20 @@ EndFunc
 ;********************************************************************
 Func _ReplaceMenuIcon($sIconFile, $nIconID, $nReplaceIndex)
 	If $nReplaceIndex < 0 Then Return -1
-	
+
 	If IsHWnd($sIconFile) Or Number($sIconFile)>0 Then Return ImageList_ReplaceIcon($hMenuImageList, $nReplaceIndex, $sIconFile)
-	
+
 	Local $stIcon	= DllStructCreate("hwnd")
-	
+
 	Local $nCount	= ExtractIconExW($sIconFile, $nIconID, 0, DllStructGetPtr($stIcon), 1)
-	
+
 	If $nCount > 0 Then
 		ImageList_ReplaceIcon($hMenuImageList, $nReplaceIndex, DllStructGetData($stIcon, 1))
 		DestroyIcon(DllStructGetData($stIcon, 1))
 	EndIf
-	
+
 	$stIcon = 0
-	
+
 	Return 1
 EndFunc
 
@@ -2074,14 +2074,14 @@ EndFunc
 ;********************************************************************
 Func _GetMenuHandle($nMenuItemID)
 	Local $i, $hMenu = 0
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuItemID Then
 			$hMenu = $arMenuItems[$i][3]
 			ExitLoop
 		EndIf
 	Next
-	
+
 	Return $hMenu
 EndFunc
 
@@ -2093,7 +2093,7 @@ Func _GetMenuIndex($hMenu, $nMenuItemID)
 	Local $nIndex	= -1
 	Local $nCount	= GetMenuItemCount($hMenu)
 	Local $nPos, $nID
-	
+
 	For $nPos = 0 To $nCount[0] - 1
 		$nID = GetMenuItemID($hMenu, $nPos)
 		If $nID = $nMenuItemID Then
@@ -2101,7 +2101,7 @@ Func _GetMenuIndex($hMenu, $nMenuItemID)
 			ExitLoop
 		EndIf
 	Next
-	
+
 	Return $nIndex
 EndFunc
 
@@ -2111,15 +2111,15 @@ EndFunc
 ;********************************************************************
 Func _GetMenuText($nMenuItemID)
 	Local $i, $sText = ""
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuItemID Then
 			$sText = $arMenuItems[$i][1]
 			ExitLoop
 		EndIf
 	Next
-	
-	Return $sText			
+
+	Return $sText
 EndFunc
 
 
@@ -2128,13 +2128,13 @@ EndFunc
 ;********************************************************************
 Func _CreateSideMenu($nMenuID)
 	If $nMenuID <= 0 Then Return 0
-	
+
 	Local $hMenu = GUICtrlGetHandle($nMenuID)
 	If $hMenu = 0 Then Return 0
-	
+
 	Local $i = _GetNewSideItemIndex()
 	If $i = 0 Then Return 0
-	
+
 	$arSideItems[$i][0] = $hMenu
 	$arSideItems[$i][1] = ""
 	$arSideItems[$i][2] = -1
@@ -2145,7 +2145,7 @@ Func _CreateSideMenu($nMenuID)
 	$arSideItems[$i][7] = 0
 	$arSideItems[$i][8] = 0
 	$arSideItems[$i][9] = FALSE
-	
+
 	Return $i
 EndFunc
 
@@ -2156,7 +2156,7 @@ EndFunc
 Func _IsSideMenuIdx($nIdx)
 	If $nIdx <= 0 Or $nIdx > $arSideItems[0][0] Then Return FALSE
 	If $arSideItems[$nIdx][0] = 0 Then Return FALSE
-	
+
 	Return TRUE
 EndFunc
 
@@ -2166,7 +2166,7 @@ EndFunc
 ;********************************************************************
 Func _DeleteSideMenu($nIdx)
 	If Not _IsSideMenuIdx($nIdx) Then Return FALSE
-	
+
 	$arSideItems[$nIdx][0] = 0
 	$arSideItems[$nIdx][1] = ""
 	$arSideItems[$nIdx][2] = -1
@@ -2179,9 +2179,9 @@ Func _DeleteSideMenu($nIdx)
 	$arSideItems[$nIdx][7] = 0
 	$arSideItems[$nIdx][8] = 0
 	$arSideItems[$nIdx][9] = FALSE
-	
+
 	If $nIdx = $arSideItems[0][0] Then $arSideItems[0][0] -= 1
-	
+
 	Return TRUE
 EndFunc
 
@@ -2191,15 +2191,15 @@ EndFunc
 ;********************************************************************
 Func _GetSideMenuIndex($hMenu)
 	Local $i
-	
+
 	For $i = 1 To $arSideItems[0][0]
 		If $arSideItems[$i][0] = $hMenu Then
 			Return $i
 			ExitLoop
 		EndIf
 	Next
-	
-	Return 0			
+
+	Return 0
 EndFunc
 
 
@@ -2208,8 +2208,8 @@ EndFunc
 ;********************************************************************
 Func _GetSideMenuText($nIdx)
 	If Not _IsSideMenuIdx($nIdx) Then Return ""
-	
-	Return $arSideItems[$nIdx][1]		
+
+	Return $arSideItems[$nIdx][1]
 EndFunc
 
 
@@ -2218,9 +2218,9 @@ EndFunc
 ;********************************************************************
 Func _GetSideMenuImage($nIdx)
 	If Not _IsSideMenuIdx($nIdx) Then Return 0
-	
+
 	If Not $arSideItems[$nIdx][5] Then Return 0
-	
+
 	Return $arSideItems[$nIdx][6]
 EndFunc
 
@@ -2230,13 +2230,13 @@ EndFunc
 ;********************************************************************
 Func _GetSideMenuImageSize($nIdx, ByRef $nWidth, ByRef $nHeight, ByRef $bStretch)
 	If Not _IsSideMenuIdx($nIdx) Then Return FALSE
-	
+
 	If Not $arSideItems[$nIdx][5] Then Return FALSE
-	
+
 	$nWidth		= $arSideItems[$nIdx][7]
 	$nHeight	= $arSideItems[$nIdx][8]
 	$bStretch	= $arSideItems[$nIdx][9]
-	
+
 	Return TRUE
 EndFunc
 
@@ -2254,15 +2254,15 @@ EndFunc
 ;********************************************************************
 Func _SetSideMenuText($nIdx, $sText, $sResName = "", $bIsBitmap = FALSE, $bStretch = FALSE)
 	If Not _IsSideMenuIdx($nIdx) Then Return FALSE
-	
+
 	Local $hBitmap	= 0
 	Local $nW		= 0
 	Local $nH		= 0
-		
+
 	If $bIsBitmap Then
 		Local $stFile = DllStructCreate("wchar[" & StringLen($sText) + 1 & "]")
 		DllStructSetData($stFile, 1, $sText)
-				
+
 		If $sResName = "" Then
 			$hBitmap = LoadImageW(0, DllStructGetPtr($stFile), 0, 0, 0, _
 							BitOr(0x0010, 0x0040, 0x2000, 0x0020))
@@ -2275,33 +2275,33 @@ Func _SetSideMenuText($nIdx, $sText, $sResName = "", $bIsBitmap = FALSE, $bStret
 				Else
 					Local $stRes = DllStructCreate("wchar[" & StringLen($sResName) + 1 & "]")
 					DllStructSetData($stRes, 1, $sResName)
-										
+
 					$hBitmap = LoadImageW($hLib, DllStructGetPtr($stRes), 0, 0, 0, _
 									BitOr(0x0040, 0x2000, 0x0020))
 				EndIf
-				
+
 				FreeLibrary($hLib)
 			EndIf
 		EndIf
-				
+
 		If $hBitmap = 0 Then
 			Return FALSE
 		Else
 			Local $nSize = GetObjectW($hBitmap, 0, 0)
 			Local $stBMP = DllStructCreate("long;long;long;long;ushort;ushort")
-				
+
 			If GetObjectW($hBitmap, $nSize, DllStructGetPtr($stBMP)) = 0 Then
 				DeleteObject($hBitmap)
-				Return FALSE				
+				Return FALSE
 			Else
 				$nW = DllStructGetData($stBMP, 2)
 				$nH = DllStructGetData($stBMP, 3)
 			EndIf
 		EndIf
-	EndIf		
-	
+	EndIf
+
 	$arSideItems[$nIdx][1] = $sText
-		
+
 	If $bIsBitmap Then
 		If $arSideItems[$nIdx][5] <> 0 Then DeleteObject($arSideItems[$nIdx][5])
 		$arSideItems[$nIdx][5] = TRUE
@@ -2317,7 +2317,7 @@ Func _SetSideMenuText($nIdx, $sText, $sResName = "", $bIsBitmap = FALSE, $bStret
 		$arSideItems[$nIdx][5] = FALSE
 		$arSideItems[$nIdx][6] = 0
 	EndIf
-		
+
 	Return TRUE
 EndFunc
 
@@ -2327,7 +2327,7 @@ EndFunc
 ;********************************************************************
 Func _SetSideMenuColors($nIdx, $nColor = -1, $nBkColor = -1, $nBkGrdColor = -1)
 	If Not _IsSideMenuIdx($nIdx) Then Return FALSE
-	
+
 	If $nColor <> -1 Then
 		If $nColor = -2 Then
 			$arSideItems[$nIdx][2] = $nMenuSideTxtClr
@@ -2335,7 +2335,7 @@ Func _SetSideMenuColors($nIdx, $nColor = -1, $nBkColor = -1, $nBkGrdColor = -1)
 			$arSideItems[$nIdx][2] = $nColor
 		EndIf
 	EndIf
-			
+
 	If $nBkColor <> -1 Then
 		If $nBkColor = -2 Then
 			$arSideItems[$nIdx][3] = $nMenuSideBkClr
@@ -2343,7 +2343,7 @@ Func _SetSideMenuColors($nIdx, $nColor = -1, $nBkColor = -1, $nBkGrdColor = -1)
 			$arSideItems[$nIdx][3] = $nBkColor
 		EndIf
 	EndIf
-			
+
 	If $nBkGrdColor <> -1 Then
 		If $nBkGrdColor = -2 Then
 			$arSideItems[$nIdx][4] = $nMenuSideBkClr2
@@ -2351,8 +2351,8 @@ Func _SetSideMenuColors($nIdx, $nColor = -1, $nBkColor = -1, $nBkGrdColor = -1)
 			$arSideItems[$nIdx][4] = $nBkGrdColor
 		EndIf
 	EndIf
-			
-	Return 1	
+
+	Return 1
 EndFunc
 
 
@@ -2361,11 +2361,11 @@ EndFunc
 ;********************************************************************
 Func _GetSideMenuColors($nIdx, ByRef $nColor, ByRef $nBkColor, ByRef $nBkGradColor)
 	If $nIdx = 0 Then Return 0
-	
+
 	$nColor			= $arSideItems[$nIdx][2]
 	$nBkColor		= $arSideItems[$nIdx][3]
 	$nBkGradColor	= $arSideItems[$nIdx][4]
-	
+
 	Return 1
 EndFunc
 
@@ -2378,40 +2378,40 @@ Func _GetMenuMaxTextWidth($hDC, $hMenu, ByRef $nMaxWidth, ByRef $nMaxAccWidth)
 	Local $nWidth		= 0
 	Local $nAccWidth	= 0
 	Local $arString
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][3] = $hMenu Then
 			$arString = StringSplit($arMenuItems[$i][1], @Tab)
 			If Not IsArray($arString) Then ContinueLoop
-			
+
 			If $arString[0] > 1 Then
 				$nLen	= StringLen($arString[2])
 				$stSize	= DllStructCreate("int;int")
-				
+
 				$stText = DllStructCreate("wchar[" & $nLen + 1 & "]")
 				DllStructSetData($stText, 1, $arString[2])
-				
+
 				GetTextExtentPoint32W($hDC, DllStructGetPtr($stText), $nLen, DllStructGetPtr($stSize))
-				
+
 				$nAccWidth = DllStructGetData($stSize, 1)
 				$stText	= 0
 				$stSize	= 0
-				
-				If $nAccWidth > $nMaxAccWidth Then $nMaxAccWidth = $nAccWidth			
+
+				If $nAccWidth > $nMaxAccWidth Then $nMaxAccWidth = $nAccWidth
 			EndIf
-			
+
 			$nLen	= StringLen($arString[1])
 			$stSize	= DllStructCreate("int;int")
-			
+
 			$stText = DllStructCreate("wchar[" & $nLen + 1 & "]")
 			DllStructSetData($stText, 1, $arString[1])
-			
+
 			GetTextExtentPoint32W($hDC, DllStructGetPtr($stText), $nLen, DllStructGetPtr($stSize))
-					
+
 			$nWidth = DllStructGetData($stSize, 1)
 			$stText	= 0
 			$stSize	= 0
-			
+
 			If $nWidth > $nMaxWidth Then $nMaxWidth = $nWidth
 		EndIf
 	Next
@@ -2423,14 +2423,14 @@ EndFunc
 ;********************************************************************
 Func _GetSideMenuTextWidth($hDC, $sText)
 	If $sText = "" Then Return 0
-	
+
 	Local $nLen		= StringLen($sText)
 	Local $stSize	= DllStructCreate("int;int")
 	Local $stText	= DllStructCreate("wchar[" & $nLen + 1 & "]")
 	DllStructSetData($stText, 1, $sText)
-				
+
 	GetTextExtentPoint32W($hDC, DllStructGetPtr($stText), $nLen, DllStructGetPtr($stSize))
-				
+
 	Return DllStructGetData($stSize, 2)
 EndFunc
 
@@ -2440,15 +2440,15 @@ EndFunc
 ;********************************************************************
 Func _GetMenuIsRadio($nMenuItemID)
 	Local $i, $bRadio = 0
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuItemID Then
 			$bRadio = $arMenuItems[$i][4]
 			ExitLoop
 		EndIf
 	Next
-	
-	Return $bRadio			
+
+	Return $bRadio
 EndFunc
 
 
@@ -2457,7 +2457,7 @@ EndFunc
 ;********************************************************************
 Func _GetMenuIconIndex($nMenuItemID, ByRef $nIconIndex, ByRef $nSelIconIndex)
 	Local $i
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuItemID Then
 			$nIconIndex = $arMenuItems[$i][2]
@@ -2473,15 +2473,15 @@ EndFunc
 ;********************************************************************
 Func _IsTrayItem($nMenuItemID)
 	Local $i, $bTray = FALSE
-	
+
 	For $i = 1 To $arMenuItems[0][0]
 		If $arMenuItems[$i][0] = $nMenuItemID Then
 			$bTray = $arMenuItems[$i][5]
 			ExitLoop
 		EndIf
 	Next
-	
-	Return $bTray			
+
+	Return $bTray
 EndFunc
 
 
@@ -2499,20 +2499,20 @@ EndFunc
 ;********************************************************************
 Func _SetOwnerDrawn($hMenu, $MenuItemID, $sText, $bOwnerDrawn = TRUE)
 	Local $nType = 0 ; MF_STRING
-	
+
 	If StringLen($sText) = 0 Then $nType = 0x00000800
-	
+
 	If $bOwnerDrawn Then $nType = BitOr($nType, 0x00000100)
-	
+
 	Local $stMII = DllStructCreate($sMENUITEMINFO)
 	DllStructSetData($stMII, 1, DllStructGetSize($stMII))
 	DllStructSetData($stMII, 2, 0x00000010) ; MIIM_TYPE
 	DllStructSetData($stMII, 3, $nType)
-	
+
 	Local $stTypeData = DllStructCreate("uint")
 	DllStructSetData($stTypeData, 1, $MenuItemID)
 	DllStructSetData($stMII, 10, DllStructGetPtr($stTypeData))
-	
+
 	SetMenuItemInfo($hMenu, $MenuItemID, FALSE, DllStructGetPtr($stMII))
 EndFunc
 
@@ -2523,24 +2523,24 @@ EndFunc
 Func _CreateMenuFont(ByRef $hFont, $bBold = FALSE, $bSide = FALSE)
 	Local $stNCM = DllStructCreate($sNONCLIENTMETRICS)
 	DllStructSetData($stNCM, 1, DllStructGetSize($stNCM))
-	
+
 	If SystemParametersInfo(0x0029, DllStructGetSize($stNCM), DllStructGetPtr($stNCM), 0) Then
 		Local $stMenuLogFont = DllStructCreate($sLOGFONT)
-		
-		Local $i			
+
+		Local $i
 		For $i = 1 To 14
 			DllStructSetData($stMenuLogFont, $i, DllStructGetData($stNCM, $i + 38))
 		Next
-		
+
 		If $bSide Then
 			DllStructSetData($stMenuLogFont, 3, 900)
 			DllStructSetData($stMenuLogFont, 4, 900)
 		EndIf
-		
+
 		If $bBold Then DllStructSetData($stMenuLogFont, 5, 700)
-		
+
 		If $hFont > 0 Then DeleteObject($hFont)
-				
+
 		$hFont = CreateFontIndirect(DllStructGetPtr($stMenuLogFont))
 
 		Local Const $sSegUIVar2 = @WindowsDir & "\fonts\SegUIVar.ttf"
@@ -2558,14 +2558,14 @@ EndFunc
 Func _CreateMenuFontByName($sFontName, $nHeight = 9, $nWidth = 400)
 	Local $stFontName = DllStructCreate("char[260]")
 	DllStructSetData($stFontName, 1, $sFontName)
-	
+
 	Local $hDC		= GetDC(0) ; Get the Desktops DC
 	Local $nPixel	= GetDeviceCaps($hDC, 90)
-	
+
 	$nHeight	= 0 - MulDiv($nHeight, $nPixel, 72)
-		
+
 	ReleaseDC(0, $hDC)
-	
+
 	Local $hFont = CreateFont($nHeight, _
 								0, _
 								0, _
@@ -2582,7 +2582,7 @@ Func _CreateMenuFontByName($sFontName, $nHeight = 9, $nWidth = 400)
 								DllStructGetPtr($stFontName))
 
 	$stFontName = 0
-	
+
 	Return $hFont
 EndFunc
 
@@ -2594,7 +2594,7 @@ Func _CreateBlankIcon()
 	If $hBlankIcon = 0 Then
 		If @OSVersion <> "WIN_XP" And @OSVersion <> "WIN_XPe" And @OSVersion <> "WIN_2003" Then
 			Local $stIcon = DllStructCreate("hwnd")
-			
+
 			If ExtractIconExW("shell32.dll", 50, 0, DllStructGetPtr($stIcon), 1) Then _
 				$hBlankIcon = DllStructGetData($stIcon, 1)
 		Else
@@ -2603,11 +2603,11 @@ Func _CreateBlankIcon()
 
         	Local $stXorMask = DllStructCreate("byte[64]")
 			memset(DllStructGetPtr($stXorMask), 0x0, 64)
-	
+
 			$hBlankIcon = CreateIcon(0, 16, 16, 1, 1, DllStructGetPtr($stAndMask), DllStructGetPtr($stXorMask))
 		EndIf
 	EndIf
-	
+
 	Return $hBlankIcon
 EndFunc
 
@@ -3021,7 +3021,7 @@ Func GetMenuState($hMenu, $nID, $nFlags)
 	Return $nState[0]
 EndFunc
 
-											
+
 Func FillRect($hDC, $ptrRect, $hBrush)
 	Local $bResult = DllCall($hUser32Dll, "int", "FillRect", _
 												"hwnd", $hDC, _
@@ -3091,7 +3091,7 @@ Func TrackPopupMenuEx($hMenu, $nFlags, $nX, $nY, $hWnd, $pParams)
     												"int", $nX, _
     												"int", $nY, _
     												"hwnd", $hWnd, _
-    												"ptr", $pParams)    
+    												"ptr", $pParams)
     Return $nResult[0]
 EndFunc
 
@@ -3138,7 +3138,7 @@ Func LoadImageW($hInst, $pName, $nType, $nX, $nY, $nLoad)
 													"uint", $nType, _
 													"int", $nX, _
 													"int", $nY, _
-													"uint", $nLoad)	
+													"uint", $nLoad)
 	Return $hResult[0]
 EndFunc
 
