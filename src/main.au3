@@ -541,6 +541,9 @@ Func _FilesAu3()
 EndFunc   ;==>_FilesAu3
 
 Func _MenuItemsCreate($hWnd, $bFirst = False)
+	; request the languages here to make the time with visible changes shorter => avoid flickering
+	$g_arLanguages = __Lang_GetLanguages($sLanguageConfigPath)
+
 	Local $hMenu = _GUICtrlMenu_GetMenu($hwnd)
 	; delete all but the last item (deleted later to avoid the menu to flicker in light mode)
 	While _GUICtrlMenu_GetItemCount($hMenu)>1
@@ -590,8 +593,7 @@ Func _MenuItemsCreate($hWnd, $bFirst = False)
 			If Not Assign($arSubMenus[$i][2], $idItem, 4) Then ConsoleWrite("Variable $"&$arSubMenus[$i][2]&" does not exist. Make sure it exists!"&@crlf)
 		EndIf
 	Next
-	ConsoleWrite(">>>"&$idLanguageMenu&@crlf)
-	$g_arLanguages = __Lang_GetLanguages($sLanguageConfigPath)
+
 	Local $sCurrentLang = __Lang_GetCurrentLanguage()
 	For $i=0 To UBound($g_arLanguages)-1
 		Local $idMenuItem = GUICtrlCreateMenuItem($g_arLanguages[$i][1], $idLanguageMenu, -1, 1)
