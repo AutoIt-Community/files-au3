@@ -61,8 +61,9 @@ Opt("GUICloseOnESC", 0)
 
 Global $sPathPrefix = @Compiled?"":"../" ; assuming that the compiled .exe will be put in the project root
 Global $sConfigPath = $sPathPrefix&"config/config.ini"
-Global $sAssetPath = $sPathPrefix&"assets/"
-Global $sLanguageConfigPath = $sAssetPath&"language/languages.ini"
+Global $sResourcePath = $sPathPrefix&"resources/"
+Global $sImagesPath = $sResourcePath&"images/"
+Global $sLanguageConfigPath = $sResourcePath&"language/languages.ini"
 Global $hTLESystem, $iFrame_A, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus, $idTreeView
 Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hParentFrame, $g_iIconWidth, $g_hTreeView
 Global $g_idMenuLangFirst = Default, $g_arLanguages
@@ -487,7 +488,7 @@ Func _FilesAu3()
 	_drawUAHMenuNCBottomLine($g_hGUI)
 
 	; set GUI icon
-	_WinSetIcon($g_hGUI, @ScriptDir & "\app.ico")
+	_WinSetIcon($g_hGUI, $sImagesPath & "app.ico")
 
 	_removeExStyles()
 
