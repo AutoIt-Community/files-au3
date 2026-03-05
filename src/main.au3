@@ -28,6 +28,7 @@ Global $hShell32 = DllOpen('shell32.dll')
 #include "../lib/DropSourceObject.au3"
 #include "../lib/DropTargetObject.au3"
 #include "../lib/Lang.au3"
+#include "../lib/GUIDarkMenu.au3"
 
 ; CREDITS:
 ; Kanashius     TreeListExplorer UDF
@@ -51,12 +52,6 @@ Global $sVersion = "0.4.0 - 2026-01-22"
 Global $DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = -2
 Global $iDPI = 1
 $iDPI = ApplyDPI()
-
-; DPI must be set before ownerdrawn menu
-;#include "../lib/ModernMenuRaw.au3"
-; this must be set after DPI
-#include "../lib/GUIDarkInternal.au3"
-#include "../lib/GUIDarkMenu.au3"
 
 Opt("GUIOnEventMode", 1)
 Opt("GUICloseOnESC", 0)
@@ -126,6 +121,8 @@ Func _FilesAu3()
 	; todo maybe detect system language and use that instead of Default; Functionality may be added to Lang UDF.
 	__Lang_Load(IniRead($sConfigPath, "general", "lang", Default), $sLanguageConfigPath)
 	If @error Then ConsoleWrite("Error loading language from "&$sConfigPath&" ("&@error&":"&@extended&")"&@crlf)
+
+	__GUIDarkMenu_StartUp()
 
 	_GDIPlus_Startup()
 	Local $sButtonSpacing = 20
@@ -213,8 +210,6 @@ Func _FilesAu3()
 
 	; reset GUI font
 	GUISetFont(10, $FW_NORMAL, $GUI_FONTNORMAL, "Segoe UI")
-
-	_MenuItemsCreate($g_hGUI, True)
 
 	If $isDarkMode Then
 		If $iOSBuild >= 26100 And $iRevision >= 6899 Then
@@ -326,8 +321,8 @@ Func _FilesAu3()
 	; Set resizing flag for all created frames
 	_GUIFrame_ResizeSet(0)
 
-	GUIRegisterMsg($WM_COMMAND, "WM_COMMAND2")
-	GUIRegisterMsg($WM_NOTIFY, "WM_NOTIFY2")
+	GUIRegisterMsg($WM_COMMAND, "WM_COMMAND")
+	GUIRegisterMsg($WM_NOTIFY, "WM_NOTIFY")
 
 	; get rid of the focus rectangle dots
 	GUICtrlSendMsg($idTreeView, $WM_CHANGEUISTATE, 65537, 0)
@@ -349,9 +344,7 @@ Func _FilesAu3()
 
 	GUIRegisterMsg($WM_MOVE, "WM_MOVE")
 	GUIRegisterMsg($WM_SIZE, "WM_SIZE")
-	GUIRegisterMsg($WM_DRAWITEM, "WM_DRAWITEM2")
-	;GUIRegisterMsg($WM_ACTIVATE, "WM_ACTIVATE_Handler")
-	;GUIRegisterMsg($WM_WINDOWPOSCHANGED, "WM_WINDOWPOSCHANGED_Handler")
+	GUIRegisterMsg($WM_DRAWITEM, "WM_DRAWITEM")
 
 	_GUICtrl_SetFont($g_hHeader, 16 * $iDPI, 400, 0, "Segoe UI")
 
@@ -395,13 +388,11 @@ Func _FilesAu3()
 	; get imagelist handles for treeview and listview
 	$hListImgList = _GUICtrlListView_GetImageList($idListview, 1)
 
-	; GUIDarkMenu
-    _GUITopMenuTheme($g_hGUI)
     ; redraw menus
     _GUICtrlMenu_DrawMenuBar($g_hGUI)
 
 	GUISetState(@SW_SHOW, $g_hGUI)
-	_drawUAHMenuNCBottomLine($g_hGUI)
+	__GUIDarkMode__DrawUAHMenuNCBottomLine($g_hGUI)
 
 	; set GUI icon
 	_WinSetIcon($g_hGUI, @ScriptDir & "\app.ico")
@@ -540,11 +531,11 @@ Func _FilesAu3()
 	WEnd
 EndFunc   ;==>_FilesAu3
 
-Func _MenuItemsCreate($hWnd, $bFirst = False)
+Func _MenuItemsCreate($hWnd, $iLine = @ScriptLineNumber)
 	; request the languages here to make the time with visible changes shorter => avoid flickering
 	$g_arLanguages = __Lang_GetLanguages($sLanguageConfigPath)
-
 	Local $hMenu = _GUICtrlMenu_GetMenu($hwnd)
+	Local $bFirst = _GUICtrlMenu_GetItemCount($hMenu)=0
 	; delete all but the last item (deleted later to avoid the menu to flicker in light mode)
 	While _GUICtrlMenu_GetItemCount($hMenu)>1
 		_GUICtrlMenu_DeleteMenu($hMenu, 0)
@@ -603,8 +594,7 @@ Func _MenuItemsCreate($hWnd, $bFirst = False)
 	Next
 	; delete the last item later to avoid the menu to flicker in light mode
 	If Not $bFirst Then _GUICtrlMenu_DeleteMenu($hMenu, 0)
-	_GUITopMenuTheme($hWnd)
-    _GUICtrlMenu_DrawMenuBar($g_hGUI)
+	__GUIDarkMenu_SetTheme($hWnd, $__GUIDarkMenu_iThemeDark)
 EndFunc
 
 Func _themeTooltips()
@@ -837,7 +827,7 @@ Func _historyChange($hHistory)
 	GUICtrlSetState($sForward, __History_RedoCount($hHistory) > 0 ? $GUI_ENABLE : $GUI_DISABLE)
 EndFunc   ;==>_historyChange
 
-Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
+Func WM_NOTIFY($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $hWnd, $iMsg, $wParam
 	__TreeListExplorer__WinProc($hWnd, $iMsg, $wParam, $lParam)
 
@@ -1313,7 +1303,7 @@ Func WM_NOTIFY2($hWnd, $iMsg, $wParam, $lParam)
 	EndIf
 
 	Return $GUI_RUNDEFMSG
-EndFunc   ;==>WM_NOTIFY2
+EndFunc   ;==>WM_NOTIFY
 
 Func _RenameCheckLV()
 	Local $hEdit = _GUICtrlListView_GetEditControl($g_hListview)
@@ -1445,7 +1435,7 @@ Func _GetHwndFromPID($PID)
 	Return $hWnd
 EndFunc   ;==>_GetHwndFromPID
 
-Func WM_COMMAND2($hWnd, $iMsg, $wParam, $lParam)
+Func WM_COMMAND($hWnd, $iMsg, $wParam, $lParam)
 	#forceref $hWnd, $iMsg
 
 	Local $iCode = BitShift($wParam, 16)
@@ -1458,7 +1448,7 @@ Func WM_COMMAND2($hWnd, $iMsg, $wParam, $lParam)
 			EndSwitch
 	EndSwitch
 	Return $GUI_RUNDEFMSG
-EndFunc   ;==>WM_COMMAND2
+EndFunc   ;==>WM_COMMAND
 
 Func _About()
 	Local $sMsg
@@ -1479,6 +1469,7 @@ Func _CleanExit()
 	DestroyDropTarget($pTVDropTarget)
 	GUIDelete($g_hGUI)
 	_ClearDarkSizebox()
+	__GUIDarkMenu_Shutdown()
 
 	DllClose($hKernel32)
 	DllClose($hGdi32)
@@ -1689,12 +1680,8 @@ Func _GUICtrl_SetFont($hWnd, $iHeight = 15, $iWeight = 400, $iFontAtrributes = 0
 	_SendMessage($hWnd, $WM_SETFONT, $hFont, 1)
 EndFunc   ;==>_GUICtrl_SetFont
 
-Func WM_DRAWITEM2($hWnd, $Msg, $wParam, $lParam)
+Func WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
 	#forceref $Msg, $wParam, $lParam
-
-	; GUIDarkMenu
-	WM_DRAWITEM($hWnd, $Msg, $wParam, $lParam)
-
 	Local $tDRAWITEMSTRUCT = DllStructCreate("uint CtlType;uint CtlID;uint itemID;uint itemAction;uint itemState;HWND hwndItem;HANDLE hDC;long rcItem[4];ULONG_PTR itemData", $lParam)
 
 	If DllStructGetData($tDRAWITEMSTRUCT, "hwndItem") <> $g_hStatus Then Return $GUI_RUNDEFMSG     ; Only process the statusbar
@@ -1720,7 +1707,7 @@ Func WM_DRAWITEM2($hWnd, $Msg, $wParam, $lParam)
 	_WinAPI_RedrawWindow($g_hSizebox)
 
 	Return $GUI_RUNDEFMSG
-EndFunc   ;==>WM_DRAWITEM2
+EndFunc   ;==>WM_DRAWITEM
 
 ;==============================================
 Func ScrollbarProc($hWnd, $iMsg, $wParam, $lParam) ; Andreik
@@ -1871,7 +1858,7 @@ Func _setThemeColors()
 		GUICtrlSetColor($idInputPath, $iTextColorDef)
 		GUICtrlSetBkColor($idSeparator, 0x505050)
 		$hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, $iBackColorDef)
-		_drawUAHMenuNCBottomLine($g_hGUI)
+		__GUIDarkMode__DrawUAHMenuNCBottomLine($g_hGUI)
 	Else
 		_GUISetDarkTheme($g_hGUI, False)
 		_GUISetDarkTheme(_GUIFrame_GetHandle($iFrame_A, 1), False)
@@ -1889,7 +1876,7 @@ Func _setThemeColors()
 		GUICtrlSetColor($idInputPath, $iTextColorDef)
 		GUICtrlSetBkColor($idSeparator, 0x909090)
 		$hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, $iBackColorDef)
-		_drawUAHMenuNCBottomLine($g_hGUI)
+		__GUIDarkMode__DrawUAHMenuNCBottomLine($g_hGUI)
 	EndIf
 EndFunc   ;==>_setThemeColors
 

@@ -1,28 +1,24 @@
 #include-once
-#AutoIt3Wrapper_Au3Check_Parameters=-q -d -w 1 -w 2 -w 3 -w 4 -w 5 -w 6 -w 7
 
 ; #INDEX# =======================================================================================================================
 ; Title .........: GUIDarkMenu UDF Library for AutoIt3
 ; AutoIt Version : 3.3.18.0
 ; Language ......: English
 ; Description ...: UDF library for applying dark theme to menubar
-; Author(s) .....: WildByDesign (including previous code from ahmet, argumentum, UEZ)
+; Author(s) .....: WildByDesign, Kanashius (including previous code from ahmet, argumentum, UEZ)
 ; Version .......: 0.9.2
 ; ===============================================================================================================================
 
-; Windows messages used by GUIDarkMenu:
-; $WM_DRAWITEM
-; $WM_MEASUREITEM
-; $WM_WINDOWPOSCHANGED
-; $WM_ACTIVATE
-
+#include <WinAPISysWin.au3>
 #include <GuiMenu.au3>
 #include <GUIConstantsEx.au3>
 #include <APIGdiConstants.au3>
 #include <WindowsNotifsConstants.au3>
-#include <Array.au3>
-
-#include "GUIDarkInternal.au3"
+#include <WinAPIGdiDC.au3>
+#include <StructureConstants.au3>
+#include <AutoItConstants.au3>
+#include <WinAPIGdi.au3>
+#include <WinAPIHObj.au3>
 
 ; Menu Info
 Const $ODT_MENU = 1
@@ -30,31 +26,162 @@ Const $ODS_SELECTED = 0x0001
 Const $ODS_DISABLED = 0x0004
 Const $ODS_HOTLIGHT = 0x0040
 
-; DPI
-Global $iDPIpct = 100
+Global $__GUIDarkMenu_mData[]
+Global Const $__GUIDarkMenu_iThemeLight = 1, $__GUIDarkMenu_iThemeDark = 2
+Global Const $__GUIDarkMenu_vColorBG = "iColorBG", $__GUIDarkMenu_vColor = "iColor", $__GUIDarkMenu_vColorCtrlBG = "iColorCtrlBG", $__GUIDarkMenu_vColorBorder = "iColorBorder"
+Global Const $__GUIDarkMenu_vColorMenuBG = "iColorMenuBG", $__GUIDarkMenu_vColorMenuHot = "iColorMenuHot", $__GUIDarkMenu_vColorMenuSel = "iColorMenuSel", $__GUIDarkMenu_vColorMenuText = "iColorMenuText"
 
-; Dark Mode Colors (RGB)
-Global $COLOR_BG_DARK = 0x121212
-Global $COLOR_TEXT_LIGHT = 0xE0E0E0
-Global $COLOR_CONTROL_BG = 0x202020
-Global $COLOR_BORDER = 0x3F3F3F
-Global $COLOR_MENU_BG = __WinAPI_ColorAdjustLuma($COLOR_BG_DARK, 5)
-Global $COLOR_MENU_HOT = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, 20)
-Global $COLOR_MENU_SEL = __WinAPI_ColorAdjustLuma($COLOR_MENU_BG, 10)
-Global $COLOR_MENU_TEXT = $COLOR_TEXT_LIGHT
+Func __GUIDarkMenu_StartUp()
+	$__GUIDarkMenu_mData.hDllGDI = DllOpen("gdi32.dll")
+	$__GUIDarkMenu_mData.hDllUser = DllOpen("user32.dll")
+	Local $mGuis[]
+	$__GUIDarkMenu_mData.mGuis = $mGuis
+	$__GUIDarkMenu_mData.hProc = DllCallbackRegister('__GUIDarkMenu_WinProc', 'ptr', 'hwnd;uint;wparam;lparam')
+	Local $mThemes[]
+	Local $mDarkTheme[]
+	$mDarkTheme[$__GUIDarkMenu_vColorBG] = 0x121212
+	$mDarkTheme[$__GUIDarkMenu_vColor] = 0xE0E0E0
+	$mDarkTheme[$__GUIDarkMenu_vColorCtrlBG] = 0x202020
+	$mDarkTheme[$__GUIDarkMenu_vColorBorder] = 0x3F3F3F
+	$mDarkTheme[$__GUIDarkMenu_vColorMenuBG] = _WinAPI_ColorAdjustLuma($mDarkTheme[$__GUIDarkMenu_vColorBG], 5)
+	$mDarkTheme[$__GUIDarkMenu_vColorMenuHot] = _WinAPI_ColorAdjustLuma($mDarkTheme[$__GUIDarkMenu_vColorMenuBG], 20)
+	$mDarkTheme[$__GUIDarkMenu_vColorMenuSel] = _WinAPI_ColorAdjustLuma($mDarkTheme[$__GUIDarkMenu_vColorMenuBG], 10)
+	$mDarkTheme[$__GUIDarkMenu_vColorMenuText] = $mDarkTheme[$__GUIDarkMenu_vColor]
+	$mThemes[$__GUIDarkMenu_iThemeDark] = $mDarkTheme
+	Local $mLightTheme[]
+	$mLightTheme[$__GUIDarkMenu_vColorBG] = 0xFFFFFF
+	$mLightTheme[$__GUIDarkMenu_vColor] = 0x000000
+	$mLightTheme[$__GUIDarkMenu_vColorCtrlBG] = 0xDDDDDD
+	$mLightTheme[$__GUIDarkMenu_vColorBorder] = 0xCCCCCC
+	$mLightTheme[$__GUIDarkMenu_vColorMenuBG] = _WinAPI_ColorAdjustLuma($mLightTheme[$__GUIDarkMenu_vColorBG], 95)
+	$mLightTheme[$__GUIDarkMenu_vColorMenuHot] = _WinAPI_ColorAdjustLuma($mLightTheme[$__GUIDarkMenu_vColorMenuBG], 80)
+	$mLightTheme[$__GUIDarkMenu_vColorMenuSel] = _WinAPI_ColorAdjustLuma($mLightTheme[$__GUIDarkMenu_vColorMenuBG], 70)
+	$mLightTheme[$__GUIDarkMenu_vColorMenuText] = $mLightTheme[$__GUIDarkMenu_vColor]
+	$mThemes[$__GUIDarkMenu_iThemeLight] = $mLightTheme
+	$__GUIDarkMenu_mData.mThemes = $mThemes
+EndFunc
 
-; Store handle for GUI that called menu functions
-Global $hGUI
+Func __GUIDarkMenu_Shutdown()
+	If Not __GUIDarkMenu__IsInitialized() Then Return SetError(2, 0, False)
+	For $hGui In MapKeys($__GUIDarkMenu_mData.mGuis)
+		__GUIDarkMenu_GuiRemove($hGui)
+	Next
+	DllCallbackFree($__GUIDarkMenu_mData.hProc)
+	DllClose($__GUIDarkMenu_mData.hDllGDI)
+	DllClose($__GUIDarkMenu_mData.hDllUser)
+	Local $mNewMap[]
+	$__GUIDarkMenu_mData = $mNewMap
+	Return True
+EndFunc
 
-;GUIRegisterMsg($WM_DRAWITEM, "WM_DRAWITEM")
-GUIRegisterMsg($WM_MEASUREITEM, "WM_MEASUREITEM")
+Func __GUIDarkMenu_GuiAdd($hGui)
+	If Not __GUIDarkMenu__IsInitialized() Then Return SetError(2, 0, False)
+	If MapExists($__GUIDarkMenu_mData.mGuis, $hGui) Then Return True
+	Local $mGui[]
+	Local $iDpiPct = Round(__WinAPI_GetDpiForWindow($hGUI) / 96, 2) * 100
+	$mGui.iDpi = @error?100:$iDpiPct
+	Local $hProc = _WinAPI_SetWindowLong($hGui, -4, DllCallbackGetPtr($__GUIDarkMenu_mData.hProc))
+	If @error Then Return SetError(2, 0, False)
+	$mGui.hPrevProc = $hProc
+	$mGui.iTheme = $__GUIDarkMenu_iThemeLight
+	$mGui.iTextSpaceHori = 20
+	$mGui.iTextSpaceVert = 8
+	$mGui.iFontSize = 9
+	$__GUIDarkMenu_mData["mGuis"][$hGui] = $mGui
+	Return True
+EndFunc
 
-;********************************************************************
-; WM_MEASURE procedure
-;********************************************************************
-Func WM_MEASUREITEM($hWnd, $iMsg, $wParam, $lParam)
+Func __GUIDarkMenu_GuiRemove($hGui)
+	If Not __GUIDarkMenu__IsInitialized() Then Return SetError(2, 0, False)
+	If Not MapExists($__GUIDarkMenu_mData.mGuis, $hGui) Then Return SetError(1, 1, False)
+	_WinAPI_SetWindowLong($hGui, -4, $__GUIDarkMenu_mData.mGuis[$hGui].hPrevProc)
+	MapRemove($__GUIDarkMenu_mData.mGuis, $hGui)
+	Return True
+EndFunc
+
+Func __GUIDarkMenu__IsInitialized()
+	Return UBound($__GUIDarkMenu_mData)>0
+EndFunc
+
+Func __GUIDarkMenu_WinProc($hWnd, $iMsg, $iwParam, $ilParam)
+	Local $sContinue = $GUI_RUNDEFMSG
+    Switch $iMsg
+        Case $WM_WINDOWPOSCHANGED
+            $sContinue = __GUIDarkMode__WM_WINDOWPOSCHANGED($hWnd, $iMsg, $iwParam, $ilParam)
+        Case $WM_ACTIVATE
+            $sContinue = __GUIDarkMode__WM_ACTIVATE($hWnd, $iMsg, $iwParam, $ilParam)
+        Case $WM_MEASUREITEM
+            $sContinue = __GUIDarkMode__WM_MEASUREITEM($hWnd, $iMsg, $iwParam, $ilParam)
+        Case $WM_DRAWITEM
+            $sContinue = __GUIDarkMode__WM_DRAWITEM($hWnd, $iMsg, $iwParam, $ilParam)
+	EndSwitch
+	If $sContinue=$GUI_RUNDEFMSG And MapExists($__GUIDarkMenu_mData.mGuis, $hWnd) Then Return _WinAPI_CallWindowProc($__GUIDarkMenu_mData.mGuis[$hWnd].hPrevProc, $hWnd, $iMsg, $iwParam, $ilParam)
+EndFunc
+
+Func __GUIDarkMenu_SetTheme($hGui, $iTheme)
+	If Not __GUIDarkMenu__IsInitialized() Then Return SetError(2, 0, False)
+	__GUIDarkMenu_GuiAdd($hGui)
+	If @error Then Return SetError(1, 1, False)
+	If Not MapExists($__GUIDarkMenu_mData.mThemes, $iTheme) Then Return SetError(1, 2, False)
+	$__GUIDarkMenu_mData["mGuis"][$hGui]["iTheme"] = $iTheme
+    Local $hMenu = _GUICtrlMenu_GetMenu($hGui)
+	If Not $hMenu Then Return False
+	For $i = 0 To _GUICtrlMenu_GetItemCount($hMenu) - 1
+		_GUICtrlMenu_SetItemType($hMenu, $i, $MFT_OWNERDRAW, True)
+	Next
+	__GUIDarkMenu__MenuBarSetBKColor($hMenu, __GUIDarkMenu__GetColor($hGui, $__GUIDarkMenu_vColorMenuBG))
+    _GUICtrlMenu_DrawMenuBar($hGui)
+    _WinAPI_RedrawWindow($hGui, 0, 0, BitOR($RDW_INVALIDATE, $RDW_UPDATENOW))
+	Return True
+EndFunc
+
+Func __GUIDarkMenu__GetColor($hGui, $sColor)
+	If Not __GUIDarkMenu__IsInitialized() Then Return SetError(2, 0, False)
+	If Not MapExists($__GUIDarkMenu_mData.mGuis, $hGui) Then Return SetError(1, 1, 0)
+	If Not MapExists($__GUIDarkMenu_mData.mThemes[$__GUIDarkMenu_mData.mGuis[$hGui].iTheme], $sColor) Then Return SetError(1, 2, 0)
+	Return $__GUIDarkMenu_mData.mThemes[$__GUIDarkMenu_mData.mGuis[$hGui].iTheme][$sColor]
+EndFunc
+
+Func __GUIDarkMenu__MenuBarSetBKColor($hMenu, $iColor)
+	Local $tInfo,$aResult
+	Local $hBrush = DllCall($__GUIDarkMenu_mData.hDllGDI, 'hwnd', 'CreateSolidBrush', 'int', $iColor)
+	If @error Then Return
+	;$tInfo = DllStructCreate("int Size;int Mask;int Style;int YMax;int hBack;int ContextHelpID;ptr MenuData")
+	$tInfo = DllStructCreate("int Size;int Mask;int Style;int YMax;handle hBack;int ContextHelpID;ptr MenuData")
+	DllStructSetData($tInfo, "Mask", 2)
+	DllStructSetData($tInfo, "hBack", $hBrush[0])
+	DllStructSetData($tInfo, "Size", DllStructGetSize($tInfo))
+	$aResult = DllCall($__GUIDarkMenu_mData.hDllUser, "int", "SetMenuInfo", "hwnd", $hMenu, "ptr", DllStructGetPtr($tInfo))
+	Return $aResult[0] <> 0
+EndFunc   ;==>_GUICtrlMenu_SetMenuBackground
+
+Func __WinAPI_GetDpiForWindow($hWnd)
+    Local $aResult = DllCall($__GUIDarkMenu_mData.hDllUser, "uint", "GetDpiForWindow", "hwnd", $hWnd) ;requires Win10 v1607+ / no server support
+    If Not IsArray($aResult) Or @error Then Return SetError(1, @extended, 0)
+    If Not $aResult[0] Then Return SetError(2, @extended, 0)
+    Return $aResult[0]
+EndFunc   ;==>__WinAPI_GetDpiForWindow
+
+Func __GUIDarkMenu__GetTextDimension($hWnd, $sText)
+    ; Calculate text dimensions
+    Local $hDC = _WinAPI_GetDC($hWnd)
+    Local $hFont = _SendMessage($hWnd, $WM_GETFONT, 0, 0)
+    If Not $hFont Then $hFont = _WinAPI_GetStockObject($DEFAULT_GUI_FONT)
+    Local $hOldFont = _WinAPI_SelectObject($hDC, $hFont)
+
+    Local $tSize = _WinAPI_GetTextExtentPoint32($hDC, $sText)
+    Local $iTextWidth = $tSize.X + 6
+    Local $iTextHeight = $tSize.Y
+
+    _WinAPI_SelectObject($hDC, $hOldFont)
+    _WinAPI_ReleaseDC($hWnd, $hDC)
+	Local $arSize = [$iTextWidth, $iTextHeight]
+	Return $arSize
+EndFunc
+
+Func __GUIDarkMode__WM_MEASUREITEM($hWnd, $iMsg, $wParam, $lParam)
     #forceref $iMsg, $wParam
-    Local Const $DEFAULT_GUI_FONT = 17
+	If Not MapExists($__GUIDarkMenu_mData.mGuis, $hWnd) Then Return $GUI_RUNDEFMSG
     Local $tagMEASUREITEM = "uint CtlType;uint CtlID;uint itemID;uint itemWidth;uint itemHeight;ulong_ptr itemData"
     Local $t = DllStructCreate($tagMEASUREITEM, $lParam)
     If Not IsDllStruct($t) Then Return $GUI_RUNDEFMSG
@@ -64,245 +191,111 @@ Func WM_MEASUREITEM($hWnd, $iMsg, $wParam, $lParam)
     Local $itemID = $t.itemID
 
     Local $sText = _GUICtrlMenu_GetItemText(_GUICtrlMenu_GetMenu($hWnd), $itemID, False)
-	Local $arSize = _GetTextDimension($hWnd, $sText)
+	Local $arSize = __GUIDarkMenu__GetTextDimension($hWnd, $sText)
 
     ; Set dimensions with padding (with high DPI)
-	$t.itemWidth = _CalcMenuItemWidth($iDPIpct, $arSize[0])
-    $t.itemHeight = $arSize[1] + 1
-
-    Return 1
+	$t.itemWidth = $arSize[0] + $__GUIDarkMenu_mData.mGuis[$hWnd].iTextSpaceHori/2
+    $t.itemHeight = $arSize[1] + $__GUIDarkMenu_mData.mGuis[$hWnd].iTextSpaceVert
+	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_MEASUREITEM_Handler
 
-Func _GetTextDimension($hWnd, $sText)
-    ; Calculate text dimensions
-    Local $hDC = __WinAPI_GetDC($hWnd)
-    Local $hFont = __SendMessage($hWnd, $WM_GETFONT, 0, 0)
-    If Not $hFont Then $hFont = __WinAPI_GetStockObject($DEFAULT_GUI_FONT)
-    Local $hOldFont = __WinAPI_SelectObject($hDC, $hFont)
-
-    Local $tSize = __WinAPI_GetTextExtentPoint32($hDC, $sText)
-    Local $iTextWidth = $tSize.X
-    Local $iTextHeight = $tSize.Y
-
-    __WinAPI_SelectObject($hDC, $hOldFont)
-    __WinAPI_ReleaseDC($hWnd, $hDC)
-	Local $arSize = [$iTextWidth, $iTextHeight]
-	Return $arSize
-EndFunc
-
-Func _CalcMenuItemWidth($iDPIpct, $iTextWidth)
-    If $iDPIpct < 100 Or $iDPIpct > 400 Then
-        Return $iTextWidth - 5
-    EndIf
-
-    Local Const $iSteps = Int(($iDPIpct - 100) / 25)
-    Return $iTextWidth - (4 * $iSteps)
-EndFunc   ;==>_CalcMenuItemWidth
-
-;********************************************************************
-; WM_DRAWITEM procedure
-;********************************************************************
-Func WM_DRAWITEM($hWnd, $iMsg, $wParam, $lParam)
+Func __GUIDarkMode__WM_DRAWITEM($hWnd, $iMsg, $wParam, $lParam)
     #forceref $iMsg, $wParam
-    Local Const $SM_CXDLGFRAME = 7
-    Local Const $DEFAULT_GUI_FONT = 17
     Local $tagDRAWITEM = "uint CtlType;uint CtlID;uint itemID;uint itemAction;uint itemState;ptr hwndItem;handle hDC;" & _
             "long left;long top;long right;long bottom;ulong_ptr itemData"
-    Local $t = DllStructCreate($tagDRAWITEM, $lParam)
-    If Not IsDllStruct($t) Then Return $GUI_RUNDEFMSG
+    Local $tDrawItem = DllStructCreate($tagDRAWITEM, $lParam)
+    If Not IsDllStruct($tDrawItem) Then Return $GUI_RUNDEFMSG
+    If $tDrawItem.CtlType <> $ODT_MENU Then Return $GUI_RUNDEFMSG
 
-    If $t.CtlType <> $ODT_MENU Then Return $GUI_RUNDEFMSG
-
-
-    Local $hDC = $t.hDC
-    Local $left = $t.left
-    Local $top = $t.top
-    Local $right = $t.right
-    Local $bottom = $t.bottom
-    Local $state = $t.itemState
-    Local $itemID = $t.itemID
+    Local $hDC = $tDrawItem.hDC
+    Local $iLeft = $tDrawItem.left
+    Local $iTop = $tDrawItem.top
+    Local $iRight = $tDrawItem.right
+    Local $iBottom = $tDrawItem.bottom
+    Local $iState = $tDrawItem.itemState
+    Local $iItemID = $tDrawItem.itemID
 
 	Local $hMenu = _GUICtrlMenu_GetMenu($hWnd)
     ; convert itemID to position
     Local $iPos = -1
     For $i = 0 To _GUICtrlMenu_GetItemCount($hMenu) - 1
-        If $itemID = _GUICtrlMenu_GetItemID($hMenu, $i) Then
+        If $iItemID = _GUICtrlMenu_GetItemID($hMenu, $i) Then
             $iPos = $i
             ExitLoop
         EndIf
     Next
-    If $iPos < 0 Then Return 1 ; something must have gone seriously wrong
+    If $iPos < 0 Then Return $GUI_RUNDEFMSG ; something must have gone seriously wrong
 
     Local $sText = _GUICtrlMenu_GetItemText($hMenu, $iPos)
     $sText = StringReplace($sText, "&", "")
 
-    ; Colors
-    Local $clrBG = _ColorToCOLORREF($COLOR_MENU_BG)
-    Local $clrSel = _ColorToCOLORREF($COLOR_MENU_SEL)
-    Local $clrText = _ColorToCOLORREF($COLOR_MENU_TEXT)
-
-    ;Static $iDrawCount = 0
-    ; Static $bFullBarDrawn = False
-
-    ; Count how many items were drawn in this "draw cycle"
-    ;$iDrawCount += 1
-
-    ; argumentum ; pre-declare all the "Local" in those IF-THEN that could be needed
-    Local $tClient, $iFullWidth, $tFullMenuBar, $hFullBrush
-    Local $tEmptyArea, $hEmptyBrush
-
-    ; If we are at the first item AND the bar has not yet been drawn
-    If $iPos = 0 Then ; And Not $bFullBarDrawn Then
-        ; Get the full window width
-        $tClient = __WinAPI_GetClientRect($hWnd)
-        $iFullWidth = $tClient.right
-
-        ; Fill the entire menu bar
-        $tFullMenuBar = DllStructCreate($tagRECT)
-        With $tFullMenuBar
-            .left = 0
-            .top = $top - 1
-            .right = $iFullWidth + 3
-            .bottom = $bottom
-        EndWith
-
-        $hFullBrush = __WinAPI_CreateSolidBrush($clrBG)
-        __WinAPI_FillRect($hDC, $tFullMenuBar, $hFullBrush)
-        __WinAPI_DeleteObject($hFullBrush)
-    EndIf
-
-    ; After drawing all items, mark as "drawn"
-    ;If $iDrawCount >= UBound($g_aMenuText) Then
-        ; $bFullBarDrawn = True
-        ;$iDrawCount = 0
-    ;EndIf
-
-    ; Draw background for the area AFTER the last menu item
-    If $iPos = (_GUICtrlMenu_GetItemCount($hMenu) - 1) Then ; Last menu
-        $tClient = __WinAPI_GetClientRect($hWnd)
-        $iFullWidth = $tClient.right
-
-        ; Fill only the area to the RIGHT of the last menu item
-        If $right < $iFullWidth Then
-            $tEmptyArea = DllStructCreate($tagRECT)
-            With $tEmptyArea
-                .left = $right
-                .top = $top ;        argumentum ; replace magic numbers with it's parameter name when possible
-                .right = $iFullWidth + __WinAPI_GetSystemMetrics($SM_CXDLGFRAME) ; 7 = $SM_CXDLGFRAME
-                .bottom = $bottom
-            EndWith
-
-            $hEmptyBrush = __WinAPI_CreateSolidBrush($clrBG)
-            __WinAPI_FillRect($hDC, $tEmptyArea, $hEmptyBrush)
-            __WinAPI_DeleteObject($hEmptyBrush)
-        EndIf
-    EndIf
-
     ; Draw item background (selected = lighter)
-    Local $bSelected = BitAND($state, $ODS_SELECTED)
-    Local $bHot = BitAND($state, $ODS_HOTLIGHT)
+    Local $bSelected = BitAND($iState, $ODS_SELECTED)
+    Local $bHot = BitAND($iState, $ODS_HOTLIGHT)
     Local $hBrush
 
+	; __GUIDarkMenu__ColorRGBToBGR()
     If $bSelected Then
-        $hBrush = __WinAPI_CreateSolidBrush($clrSel)
+        $hBrush = _WinAPI_CreateSolidBrush(__GUIDarkMenu__GetColor($hWnd, $__GUIDarkMenu_vColorMenuSel))
     ElseIf $bHot Then
-        $hBrush = __WinAPI_CreateSolidBrush($COLOR_MENU_HOT)
+        $hBrush = _WinAPI_CreateSolidBrush(__GUIDarkMenu__GetColor($hWnd, $__GUIDarkMenu_vColorMenuHot))
     Else
-        $hBrush = __WinAPI_CreateSolidBrush($clrBG)
+        $hBrush = _WinAPI_CreateSolidBrush(__GUIDarkMenu__GetColor($hWnd, $__GUIDarkMenu_vColorMenuBG))
     EndIf
 
     Local $tItemRect = DllStructCreate($tagRECT)
     With $tItemRect
-        .left = $left
-        .top = $top
-        .right = $right
-        .bottom = $bottom
+        .left = $iLeft
+        .top = $iTop
+        .right = $iRight
+        .bottom = $iBottom
     EndWith
 
-    __WinAPI_FillRect($hDC, $tItemRect, $hBrush)
-    __WinAPI_DeleteObject($hBrush)
+    _WinAPI_FillRect($hDC, $tItemRect, $hBrush)
+    _WinAPI_DeleteObject($hBrush)
 
     ; Setup font
-    Local $hFont = __SendMessage($hWnd, $WM_GETFONT, 0, 0)
-    If Not $hFont Then $hFont = __WinAPI_GetStockObject($DEFAULT_GUI_FONT)
-    Local $hOldFont = __WinAPI_SelectObject($hDC, $hFont)
+    Local $hFont = __GUIDarkMenu__CreateMenuFontByName("Segoe UI", $__GUIDarkMenu_mData.mGuis[$hWnd].iFontSize)
+    If Not $hFont Then $hFont = _WinAPI_GetStockObject($DEFAULT_GUI_FONT)
+    Local $hOldFont = _WinAPI_SelectObject($hDC, $hFont)
 
-    __WinAPI_SetBkMode($hDC, $TRANSPARENT)
-    __WinAPI_SetTextColor($hDC, $clrText)
+    _WinAPI_SetBkMode($hDC, $TRANSPARENT)
+    _WinAPI_SetTextColor($hDC, __GUIDarkMenu__GetColor($hWnd, $__GUIDarkMenu_vColorMenuText))
 
     ; Draw text
     Local $tTextRect = DllStructCreate($tagRECT)
     With $tTextRect
-        .left = $left + 10
-        .top = $top + 4
-        .right = $right - 10
-        .bottom = $bottom - 4
+        .left = $iLeft + $__GUIDarkMenu_mData.mGuis[$hWnd].iTextSpaceHori/2
+        .top = $iTop + $__GUIDarkMenu_mData.mGuis[$hWnd].iTextSpaceVert/2
+        .right = $iRight - $__GUIDarkMenu_mData.mGuis[$hWnd].iTextSpaceHori/2
+        .bottom = $iBottom - $__GUIDarkMenu_mData.mGuis[$hWnd].iTextSpaceVert/2
     EndWith
 
-    DllCall($hUser32Dll, "int", "DrawTextW", "handle", $hDC, "wstr", $sText, "int", -1, "ptr", _
+    DllCall($__GUIDarkMenu_mData.hDllUser, "int", "DrawTextW", "handle", $hDC, "wstr", $sText, "int", -1, "ptr", _
             DllStructGetPtr($tTextRect), "uint", BitOR($DT_SINGLELINE, $DT_VCENTER, $DT_LEFT))
 
-    If $hOldFont Then __WinAPI_SelectObject($hDC, $hOldFont)
+    If $hOldFont Then _WinAPI_SelectObject($hDC, $hOldFont)
 
-    Return 1
+    Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_DRAWITEM
 
-Func _GUITopMenuTheme($hWnd)
-	$hGUI = $hWnd
-
-    ; get top menu handle
-    Local $hMenu = _GUICtrlMenu_GetMenu($hWnd)
-    If Not $hMenu Then Return False
-	GUIRegisterMsg($WM_WINDOWPOSCHANGED, "WM_WINDOWPOSCHANGED_Handler")
-    GUIRegisterMsg($WM_ACTIVATE, "WM_ACTIVATE_Handler")
-
-	; get window DPI for measurement adjustments
-	$iDPIpct = Round(__WinAPI_GetDpiForWindow($hGUI) / 96, 2) * 100
-	If @error Then $iDPIpct = 100
-
-	For $i = 0 To _GUICtrlMenu_GetItemCount($hMenu) - 1
-		_GUICtrlMenu_SetItemType($hMenu, $i, $MFT_OWNERDRAW, True)
-	Next
-    MenuBarBKColor($hMenu, $COLOR_MENU_BG)
-EndFunc   ;==>_GUITopMenuTheme
-
-Func _SetMenuColors($hWnd, $MenuBG, $MenuHot, $MenuSel, $MenuText)
-    Local $hMenu = _GUICtrlMenu_GetMenu($hWnd)
-    $COLOR_MENU_BG = $MenuBG
-    $COLOR_MENU_HOT = $MenuHot
-    $COLOR_MENU_SEL = $MenuSel
-    $COLOR_MENU_TEXT = $MenuText
-    ; redraw menubar background area
-    MenuBarBKColor($hMenu, $COLOR_MENU_BG)
-    ; redraw menubar and force refresh
-    _GUICtrlMenu_DrawMenuBar($hWnd)
-    __WinAPI_RedrawWindow($hWnd, 0, 0, BitOR($RDW_INVALIDATE, $RDW_UPDATENOW))
-EndFunc   ;==>_SetMenuColors
-
-Func WM_WINDOWPOSCHANGED_Handler($hWnd, $iMsg, $wParam, $lParam)
+Func __GUIDarkMode__WM_WINDOWPOSCHANGED($hWnd, $iMsg, $wParam, $lParam)
     #forceref $iMsg, $wParam, $lParam
-	If $hWnd <> $hGUI Then Return $GUI_RUNDEFMSG
-	_drawUAHMenuNCBottomLine($hWnd)
+	If Not MapExists($__GUIDarkMenu_mData.mGuis, $hWnd) Then Return $GUI_RUNDEFMSG
+	__GUIDarkMode__DrawUAHMenuNCBottomLine($hWnd)
 	Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_WINDOWPOSCHANGED_Handler
 
-Func _drawUAHMenuNCBottomLine($hWnd)
-    Local $rcClient = __WinAPI_GetClientRect($hWnd)
-
-    DllCall($hUser32Dll, "int", "MapWindowPoints", _
+Func __GUIDarkMode__DrawUAHMenuNCBottomLine($hWnd)
+    Local $rcClient = _WinAPI_GetClientRect($hWnd)
+    DllCall($__GUIDarkMenu_mData.hDllUser, "int", "MapWindowPoints", _
         "hwnd", $hWnd, _ ; hWndFrom
         "hwnd", 0, _     ; hWndTo
         "ptr", DllStructGetPtr($rcClient), _
         "uint", 2)       ;number of points - 2 for RECT structure
 
-    If @error Then
-        ;MsgBox($MB_ICONERROR, "Error", @error)
-        Exit
-    EndIf
-
-    Local $rcWindow = __WinAPI_GetWindowRect($hWnd)
-
-    __WinAPI_OffsetRect($rcClient, -$rcWindow.left, -$rcWindow.top)
+    Local $rcWindow = _WinAPI_GetWindowRect($hWnd)
+    _WinAPI_OffsetRect($rcClient, -$rcWindow.left, -$rcWindow.top)
 
     Local $rcAnnoyingLine = DllStructCreate($tagRECT)
     $rcAnnoyingLine.left = $rcClient.left
@@ -313,40 +306,58 @@ Func _drawUAHMenuNCBottomLine($hWnd)
     $rcAnnoyingLine.bottom = $rcAnnoyingLine.top
     $rcAnnoyingLine.top = $rcAnnoyingLine.top - 1
 
-    Local $hRgn = __WinAPI_CreateRectRgn(0,0,8000,8000)
+    Local $hRgn = _WinAPI_CreateRectRgn(0,0,8000,8000)
 
-    Local $hDC = __WinAPI_GetDCEx($hWnd,$hRgn, BitOR($DCX_WINDOW,$DCX_INTERSECTRGN))
-    Local $hFullBrush = __WinAPI_CreateSolidBrush($COLOR_MENU_BG)
-    __WinAPI_FillRect($hDC, $rcAnnoyingLine, $hFullBrush)
-    __WinAPI_ReleaseDC($hWnd, $hDC)
-    __WinAPI_DeleteObject($hFullBrush)
+    Local $hDC = _WinAPI_GetDCEx($hWnd,$hRgn, BitOR($DCX_WINDOW,$DCX_INTERSECTRGN))
+    Local $hFullBrush = _WinAPI_CreateSolidBrush(__GUIDarkMenu__GetColor($hWnd, $__GUIDarkMenu_vColorMenuBG))
+    _WinAPI_FillRect($hDC, $rcAnnoyingLine, $hFullBrush)
+    _WinAPI_ReleaseDC($hWnd, $hDC)
+    _WinAPI_DeleteObject($hFullBrush)
 
-EndFunc   ;==>_drawUAHMenuNCBottomLine
+EndFunc   ;==>__GUIDarkMode__DrawUAHMenuNCBottomLine
 
-Func WM_ACTIVATE_Handler($hWnd, $MsgID, $wParam, $lParam)
+Func __GUIDarkMode__WM_ACTIVATE($hWnd, $MsgID, $wParam, $lParam)
     #forceref $MsgID, $wParam, $lParam
-    If $hWnd <> $hGUI Then Return $GUI_RUNDEFMSG
-    _drawUAHMenuNCBottomLine($hWnd)
+    If Not MapExists($__GUIDarkMenu_mData.mGuis, $hWnd) Then Return $GUI_RUNDEFMSG
+    __GUIDarkMode__DrawUAHMenuNCBottomLine($hWnd)
 
     Return $GUI_RUNDEFMSG
 EndFunc   ;==>WM_ACTIVATE_Handler
 
-Func MenuBarBKColor($hMenu, $nColor)
-	Local $tInfo,$aResult
-	Local $hBrush = DllCall($hGdi32Dll, 'hwnd', 'CreateSolidBrush', 'int', $nColor)
-	If @error Then Return
-	;$tInfo = DllStructCreate("int Size;int Mask;int Style;int YMax;int hBack;int ContextHelpID;ptr MenuData")
-	$tInfo = DllStructCreate("int Size;int Mask;int Style;int YMax;handle hBack;int ContextHelpID;ptr MenuData")
-	DllStructSetData($tInfo, "Mask", 2)
-	DllStructSetData($tInfo, "hBack", $hBrush[0])
-	DllStructSetData($tInfo, "Size", DllStructGetSize($tInfo))
-	$aResult = DllCall($hUser32Dll, "int", "SetMenuInfo", "hwnd", $hMenu, "ptr", DllStructGetPtr($tInfo))
-	Return $aResult[0] <> 0
-EndFunc   ;==>_GUICtrlMenu_SetMenuBackground
-
-Func _ColorToCOLORREF($iColor) ;RGB to BGR
+Func __GUIDarkMenu__ColorRGBToBGR($iColor) ;RGB to BGR
     Local $iR = BitAND(BitShift($iColor, 16), 0xFF)
     Local $iG = BitAND(BitShift($iColor, 8), 0xFF)
     Local $iB = BitAND($iColor, 0xFF)
     Return BitOR(BitShift($iB, -16), BitShift($iG, -8), $iR)
-EndFunc   ;==>_ColorToCOLORREF
+EndFunc   ;==>__GUIDarkMenu__ColorRGBToBGR
+
+Func __GUIDarkMenu__CreateFont($nHeight, $nWidth, $nEscape, $nOrientn, $fnWeight, $bItalic, $bUnderline, $bStrikeout, $nCharset, $nOutputPrec, $nClipPrec, $nQuality, $nPitch, $ptrFontName)
+	Local $hFont = DllCall($__GUIDarkMenu_mData.hDllGDI , "hwnd", "CreateFont", _
+												"int", $nHeight, _
+												"int", $nWidth, _
+												"int", $nEscape, _
+												"int", $nOrientn, _
+												"int", $fnWeight, _
+												"long", $bItalic, _
+												"long", $bUnderline, _
+												"long", $bStrikeout, _
+												"long", $nCharset, _
+												"long", $nOutputPrec, _
+												"long", $nClipPrec, _
+												"long", $nQuality, _
+												"long", $nPitch, _
+												"ptr", $ptrFontName)
+	Return $hFont[0]
+EndFunc
+
+Func __GUIDarkMenu__CreateMenuFontByName($sFontName, $nHeight = 9, $nWidth = 400)
+	Local $stFontName = DllStructCreate("char[260]")
+	DllStructSetData($stFontName, 1, $sFontName)
+    Local $hDC		= _WinAPI_GetDC(0)
+    Local $nPixel	= _WinAPI_GetDeviceCaps($hDC, 90)
+    $nHeight	= 0 - _WinAPI_MulDiv($nHeight, $nPixel, 72)
+    _WinAPI_ReleaseDC(0, $hDC)
+	Local $hFont = __GUIDarkMenu__CreateFont($nHeight, 0, 0, 0, $nWidth, 0, 0, 0, 0, 0, 0, 0, 0, DllStructGetPtr($stFontName))
+	$stFontName = 0
+	Return $hFont
+EndFunc
