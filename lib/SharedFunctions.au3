@@ -200,10 +200,6 @@ Func TreeItemToPath($hTree, $hItem, $bArray = False)
 	Local $sPath = StringReplace(_GUICtrlTreeView_GetTree($hTree, $hItem), "|", "\")
 	$sPath = StringTrimLeft($sPath, StringInStr($sPath, "\"))     ; remove this pc at the beginning
 
-	If StringInStr(FileGetAttrib($sPath), "D") Then
-		$sPath &= "\"   ; let folders end with \
-	EndIf
-
 	If Not $bArray Then
 		Return $sPath
 	EndIf
