@@ -87,6 +87,9 @@ Global $bCopy = False, $pCopyObj
 ; force light mode
 ;$isDarkMode = False
 
+Global Const $TVM_SETEXTENDEDSTYLE = 0x112C
+Global Const $TVS_EX_DOUBLEBUFFER = 0x0004
+
 ; get Windows build
 Global $iOSBuild = @OSBuild
 Global $iRevision = RegRead("HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion", "UBR")
@@ -333,6 +336,7 @@ Func _FilesAu3()
 	GUICtrlSetState(-1, $GUI_DROPACCEPTED)
 	GUICtrlSetResizing(-1, $GUI_DOCKLEFT + $GUI_DOCKRIGHT + $GUI_DOCKTOP + $GUI_DOCKBOTTOM)
 	$g_hTreeView = GUICtrlGetHandle($idTreeView)
+	_GUICtrlTreeView_SetExtendedStyle($g_hTreeView, $TVS_EX_DOUBLEBUFFER)
 
 	; Create TLE system
 	$hTLESystem = __TreeListExplorer_CreateSystem($g_hGUI, "", "_folderCallback")
@@ -494,10 +498,6 @@ Func _FilesAu3()
 
 	; apply theme to tooltips
 	_themeTooltips()
-
-	; add composited to treeview frame
-	Local $i_ExStyle_Old = _WinAPI_GetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 1), $GWL_EXSTYLE)
-	_WinAPI_SetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 1), $GWL_EXSTYLE, BitOR($i_ExStyle_Old, $WS_EX_COMPOSITED))
 
 	; add drop files support to treeview frame and listview frame
 	$i_ExStyle_Old = _WinAPI_GetWindowLong_mod(_GUIFrame_GetHandle($iFrame_A, 1), $GWL_EXSTYLE)
@@ -2655,4 +2655,9 @@ EndFunc
 Func _langCallbackOther($bRTL)
 	_selectionChangedLV()
 	_PathInputChanged()
+EndFunc
+
+Func _GUICtrlTreeView_SetExtendedStyle($hTreeView, $iExStyle)
+    Local $iResult = _SendMessage($hTreeView, $TVM_SETEXTENDEDSTYLE, 0x07FD, $iExStyle)
+    Return SetError(@error, @extended, $iResult)
 EndFunc
