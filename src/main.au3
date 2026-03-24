@@ -83,7 +83,7 @@ Global $hSolidBrush = _WinAPI_CreateBrushIndirect($BS_SOLID, 0x000000)
 Global $iTopSpacer = Round(12 * $iDPI)
 Global $aPosTip, $iOldaPos0, $iOldaPos1
 Global $sRenameFrom, $sControlFocus, $bFocusChanged = False, $bSelectChanged = False, $bSaveEdit = False
-Global $bCopy = False, $pCopyObj
+Global $bCopy = False
 ; force light mode
 ;$isDarkMode = False
 
@@ -419,6 +419,10 @@ Func _FilesAu3()
 
 	GUIRegisterMsg($WM_COMMAND, "WM_COMMAND2")
 	GUIRegisterMsg($WM_NOTIFY, "WM_NOTIFY2")
+	GUIRegisterMsg($WM_CLIPBOARDUPDATE, 'WM_CLIPBOARDUPDATE')
+
+	_WinAPI_AddClipboardFormatListener($g_hGUI)
+	_SendMessage($g_hGUI, $WM_CLIPBOARDUPDATE)
 
 	; get rid of the focus rectangle dots
 	GUICtrlSendMsg($idTreeView, $WM_CHANGEUISTATE, 65537, 0)
@@ -1497,6 +1501,7 @@ Func _About()
 EndFunc   ;==>_About
 
 Func _CleanExit()
+	_WinAPI_RemoveClipboardFormatListener($g_hGUI)
 	__TreeListExplorer_Shutdown()
 	_GUICtrlHeader_Destroy($g_hHeader)
 	_GUIToolTip_Destroy($hToolTip1)
@@ -2191,7 +2196,17 @@ Func _AllowUndo()
 EndFunc
 
 Func _PasteItems()
-	Local $sFullPath
+	Local $sFullPath, $pCopyObj
+	If _ClipBoard_IsFormatAvailable($CF_HDROP) Then
+        If _ClipBoard_Open($g_hGUI) Then
+            Local $hHDROP = _ClipBoard_GetDataEx($CF_HDROP)
+            Local $aFileList = _WinAPI_DragQueryFileEx($hHDROP)
+            _ArrayDelete($aFileList, 0)
+			; create data object
+			$pCopyObj = GetDataObject($aFileList)
+            _ClipBoard_Close()
+        EndIf
+    EndIf
 	Select
 		Case $sControlFocus = 'List'
 			Local $aSelectedLV = _GUICtrlListView_GetSelectedIndices($idListview, True)
@@ -2210,54 +2225,40 @@ Func _PasteItems()
 					Return
 				EndIf
 			EndIf
-			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-			$sAction = "CopyItems"
-			_IFileOperationFile($pCopyObj, $sFullPath, $sAction, $iFlags)
-			__TreeListExplorer_Reload($hTLESystem)
 		Case $sControlFocus = 'Tree'
 			Local $hTreeItem = _GUICtrlTreeView_GetSelection($g_hTreeView)
 			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItem)
 			$sFullPath = $sItemText
-			$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
-			$sAction = "CopyItems"
-			_IFileOperationFile($pCopyObj, $sFullPath, $sAction, $iFlags)
-			__TreeListExplorer_Reload($hTLESystem)
 	EndSelect
+
+	; file operations
+	$iFlags = BitOR($FOFX_ADDUNDORECORD, $FOFX_RECYCLEONDELETE, $FOFX_NOCOPYHOOKS)
+	$sAction = "CopyItems"
+	_IFileOperationFile($pCopyObj, $sFullPath, $sAction, $iFlags)
+	__TreeListExplorer_Reload($hTLESystem)
+
+	; release data object
+	_Release($pCopyObj)
 EndFunc
 
 Func _CopyItems()
 	Select
 		Case $sControlFocus = 'List'
-			; if previous copy object exists and user initiates new copy, release previous object
-			If $bCopy Then _Release($pCopyObj)
-
 			; create array with list of selected listview items
 			Local $aItems = _GUICtrlListView_GetSelectedIndices($g_hListView, True)
 			For $i = 1 To $aItems[0]
 				$aItems[$i] = __TreeListExplorer_GetPath($hTLESystem) & _GUICtrlListView_GetItemText($g_hListView, $aItems[$i])
 			Next
-
 			_ArrayDelete($aItems, 0)
-			$pCopyObj = GetDataObject($aItems)
-
-			; we don't want to release this until after Paste
-			;_Release($pCopyObj)
-
+			; copy selected files and folders to Windows clipboard
+			_ClipPutFile($aItems)
 			; keep track of copy status for menu
 			$bCopy = True
 		Case $sControlFocus = 'Tree'
-			; if previous copy object exists and user initiates new copy, release previous object
-			If $bCopy Then _Release($pCopyObj)
-
 			Local $hTreeItem = _GUICtrlTreeView_GetSelection($g_hTreeView)
 			Local $sItemText = TreeItemToPath($g_hTreeView, $hTreeItem)
-
-			;Get an IDataObject representing the file to copy
-			$pCopyObj = GetDataObjectOfFile(_GUIFrame_GetHandle($iFrame_A, 1), $sItemText)
-
-			; we don't want to release this until after Paste
-			;_Release($pCopyObj)
-
+			; copy selected files and folders to Windows clipboard
+			_ClipPutFile($sItemText)
 			; keep track of copy status for menu
 			$bCopy = True
 	EndSelect
@@ -2656,6 +2657,55 @@ Func _langCallbackOther($bRTL)
 	_selectionChangedLV()
 	_PathInputChanged()
 EndFunc
+
+Func _ClipPutFile(ByRef $vFile, $sDelim = "|") ; From Nine
+    If $sDelim = Default Then $sDelim = "|"
+    Local $aFile = IsArray($vFile) ? $vFile : StringSplit($vFile, $sDelim, $STR_NOCOUNT)
+    If Not UBound($aFile) Then Return SetError(1)
+    Local $iLen = 1
+    For $sText In $aFile
+        $iLen += StringLen($sText) + 1
+    Next
+    Local $hGlobal = _MemGlobalAlloc($iLen * 2 + 20, $GHND)
+    Local $pLock = _MemGlobalLock($hGlobal)
+    Local $tDROPFILES = DllStructCreate("dword pFiles;" & $tagPOINT & ";bool fNC;bool fWide;wchar File[" & $iLen & "]", $pLock)
+    With $tDROPFILES
+        .pFiles = 20
+        .x = 0
+        .y = 0
+        .fNC = 0
+        .fWide = 1
+    EndWith
+
+    Local $pStr = DllStructGetPtr($tDROPFILES, "File"), $tStr
+    For $sText In $aFile
+        $iLen = StringLen($sText) + 1
+        $tStr = DllStructCreate("wchar str[" & $iLen & "]", $pStr)
+        $tStr.str = $sText
+        $pStr += $iLen * 2
+    Next
+
+    _ClipBoard_Open(0)
+    _ClipBoard_Empty()
+    _ClipBoard_SetDataEx($hGlobal, $CF_HDROP)
+    _MemGlobalUnlock($hGlobal)
+    _ClipBoard_Close()
+    _MemGlobalFree($hGlobal)
+EndFunc   ;==>_ClipPutFile
+
+Func WM_CLIPBOARDUPDATE($hWnd, $iMsg, $wParam, $lParam)
+    #forceref $hWnd, $iMsg, $wParam, $lParam
+
+    If _ClipBoard_IsFormatAvailable($CF_HDROP) Then
+		; enable Paste menu item here
+		$bCopy = True
+    Else
+        ; disable Paste menu item here
+		$bCopy = False
+    EndIf
+
+    Return 0
+EndFunc   ;==>WM_CLIPBOARDUPDATE
 
 Func _GUICtrlTreeView_SetExtendedStyle($hTreeView, $iExStyle)
     Local $iResult = _SendMessage($hTreeView, $TVM_SETEXTENDEDSTYLE, 0x07FD, $iExStyle)
