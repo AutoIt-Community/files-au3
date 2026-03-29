@@ -27,6 +27,7 @@ Global $hShell32 = DllOpen('shell32.dll')
 #include "../lib/ProjectConstants.au3"
 #include "../lib/DropSourceObject.au3"
 #include "../lib/DropTargetObject.au3"
+#include "../lib/MsgBoxEx.au3"
 #include "../lib/Lang.au3"
 
 ; CREDITS:
@@ -513,7 +514,7 @@ Func _FilesAu3()
 	$sMsg &= "At the moment, Files Au3 allows you to Undo the most recent drag and drop, copy, move, delete, rename, etc. "
 	$sMsg &= "by pressing Ctrl+Z or Undo from the Edit menu. Future versions will expand to allow more than just the most "
 	$sMsg &= "recent Undo operation."
-	MsgBox($MB_ICONWARNING, __Lang_Get("applicationTitle"), __Lang_Get("fileOperationNewCodeWarning"))
+	MsgBoxEx(BitOR($MB_ICONWARNING, $MB_TOPMOST, $MB_OK), __Lang_Get("applicationTitle"), __Lang_Get("fileOperationNewCodeWarning"))
 
 	; TreeView has initial focus
 	$sControlFocus = 'Tree'
@@ -1493,7 +1494,7 @@ Func _About()
 	$sMsg = __Lang_Get("applicationVersion", $sVersion) & @CRLF & @CRLF
 	$sMsg &= __Lang_Get("treeListExplorer", _VersionToString(_UDFGetVersion("../lib/TreeListExplorer.au3"))) & @CRLF & @CRLF
 	$sMsg &= __Lang_Get("madeByAutoItCommunity")
-	MsgBox(0, __Lang_Get("applicationTitle"), $sMsg)
+	MsgBoxEx(BitOR($MB_TOPMOST, $MB_OK), __Lang_Get("applicationTitle"), $sMsg)
 EndFunc   ;==>_About
 
 Func _CleanExit()
@@ -1922,30 +1923,6 @@ Func _setThemeColors()
 EndFunc   ;==>_setThemeColors
 
 ; #FUNCTION# ====================================================================================================================
-; Name ..........: _WinAPI_ShouldAppsUseDarkMode
-; Description ...: Checks if apps should use the dark mode.
-; Syntax ........: _WinAPI_ShouldAppsUseDarkMode()
-; Parameters ....: None
-; Return values .: Success: Returns True if apps should use dark mode.
-;                  Failure: Returns False and sets @error:
-;                           -1: Operating system version is earlier than Windows 10 (version 1809, build 17763).
-;                           Other values: DllCall error, check @error @extended for more information.
-; Author ........: NoNameCode
-; Modified ......:
-; Remarks .......: Requires Windows 10 (version 1809, build 17763) or later.
-; Related .......:
-; Link ..........: http://www.opengate.at/blog/2021/08/dark-mode-win32/
-; Example .......: No
-; ===============================================================================================================================
-Func _WinAPI_ShouldAppsUseDarkMode()
-	If @OSBuild < 17763 Then Return SetError(-1, 0, False)
-	Local $fnShouldAppsUseDarkMode = 132
-	Local $aResult = DllCall('uxtheme.dll', 'bool', $fnShouldAppsUseDarkMode)
-	If @error Then Return SetError(@error, @extended, False)
-	Return $aResult[0]
-EndFunc   ;==>_WinAPI_ShouldAppsUseDarkMode
-
-; #FUNCTION# ====================================================================================================================
 ; Name ..........: _WinAPI_DwmSetWindowAttribute_unr
 ; Description ...: Dose the same as _WinAPI_DwmSetWindowAttribute; But has no Restrictions
 ; Syntax ........: _WinAPI_DwmSetWindowAttribute_unr($hWnd, $iAttribute, $iData)
@@ -1993,35 +1970,6 @@ Func _GUISetDarkTheme($hWnd, $bEnableDarkTheme = True)
 	GUISetBkColor($iGUI_BkColor, $hWnd)
 	_WinAPI_DwmSetWindowAttribute_unr($hWnd, $DWMWA_USE_IMMERSIVE_DARK_MODE, $bEnableDarkTheme)
 EndFunc   ;==>_GUISetDarkTheme
-
-; #FUNCTION# ====================================================================================================================
-; Name ..........: _WinAPI_SetPreferredAppMode
-; Description ...: Sets the preferred application mode for Windows 10 (version 1903, build 18362) and later.
-; Syntax ........: _WinAPI_SetPreferredAppMode($PREFERREDAPPMODE)
-; Parameters ....: $PREFERREDAPPMODE - The preferred application mode. See enum PreferredAppMode for possible values.
-;                    $APPMODE_DEFAULT (0)
-;                    $APPMODE_ALLOWDARK (1)
-;                    $APPMODE_FORCEDARK (2)
-;                    $APPMODE_FORCELIGHT (3)
-;                    $APPMODE_MAX (4)
-; Return values .: Success: The PreferredAppMode retuned by the DllCall
-;                  Failure: '' and sets the @error flag:
-;                           -1: Operating system version is earlier than Windows 10 (version 18362)
-;                           Other values: DllCall error, check @error @extended for more information.
-; Author ........: NoNameCode
-; Modified ......:
-; Remarks .......: This function is applicable for Windows 10 (version 18362) and later.
-; Related .......: _WinAPI_AllowDarkModeForApp
-; Link ..........: http://www.opengate.at/blog/2021/08/dark-mode-win32/
-; Example .......: No
-; ===============================================================================================================================
-Func _WinAPI_SetPreferredAppMode($PREFERREDAPPMODE)
-	If @OSBuild < 18362 Then Return SetError(-1, 0, False)
-	Local $fnSetPreferredAppMode = 135
-	Local $aResult = DllCall('uxtheme.dll', 'int', $fnSetPreferredAppMode, 'int', $PREFERREDAPPMODE)
-	If @error Or Not IsArray($aResult) Then Return SetError(@error, @extended, '')
-	Return $aResult[0]
-EndFunc   ;==>_WinAPI_SetPreferredAppMode
 
 ; #FUNCTION# ====================================================================================================================
 ; Name ..........: _WinAPI_RefreshImmersiveColorPolicyState
