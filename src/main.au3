@@ -31,22 +31,23 @@ Global $hShell32 = DllOpen('shell32.dll')
 #include "../lib/Lang.au3"
 
 ; CREDITS:
-; Kanashius     TreeListExplorer UDF
-; SOLVE-SMART	Code review, organization and refactoring
-; pixelsearch   Detached Header and ListView synchronization
-; ioa747        Detached Header subclassing for dark mode
-; Nine          Custom Draw for Buttons
-; argumentum    Dark Mode functions
-; NoNameCode    Dark Mode functions
-; Melba23       GUIFrame UDF
+; WildByDesign	Initiator, Contributor, Coordination
+; DonChunior    Contributor, Code review, bug fixes and refactoring
+; Kanashius     Contributor, TreeListExplorer/History/Lang/IPC UDF
+; SOLVE-SMART	Contributor, Code review, organization and refactoring
 ; ahmet         Non-client painting of white menubar line in dark mode
-; UEZ           Lots and lots and lots
-; DonChunior    Code review, bug fixes and refactoring
-; MattyD		Drag and drop code
+; argumentum    Dark Mode functions
+; ioa747        Detached Header subclassing for dark mode
 ; jugador		ListView multiple item drag and drop
+; MattyD		Drag and drop code
+; Melba23       GUIFrame UDF
+; Nine          Custom Draw for Buttons
+; NoNameCode    Dark Mode functions
+; pixelsearch   Detached Header and ListView synchronization
+; UEZ           Lots and lots and lots
 ; Danyfirex		IFileOperation code
 
-Global $sVersion = "0.4.0 - 2026-01-22"
+Global $sVersion = "0.4.1 - 2026-03-04"
 
 ; set base DPI scale value and apply DPI
 Global $DPI_AWARENESS_CONTEXT_SYSTEM_AWARE = -2
@@ -61,8 +62,9 @@ Opt("GUICloseOnESC", 0)
 
 Global $sPathPrefix = @Compiled?"":"../" ; assuming that the compiled .exe will be put in the project root
 Global $sConfigPath = $sPathPrefix&"config/config.ini"
-Global $sAssetPath = $sPathPrefix&"assets/"
-Global $sLanguageConfigPath = $sAssetPath&"language/languages.ini"
+Global $sResourcePath = $sPathPrefix&"resources/"
+Global $sImagesPath = $sResourcePath&"images/"
+Global $sLanguageConfigPath = $sResourcePath&"language/languages.ini"
 Global $hTLESystem, $iFrame_A, $hSeparatorFrame, $aWinSize2, $idInputPath, $g_hInputPath, $g_hStatus, $idTreeView
 Global $g_hGUI, $g_hChild, $g_hHeader, $g_hListview, $idListview, $iHeaderHeight, $hParentFrame, $g_iIconWidth, $g_hTreeView
 Global $g_idMenuLangFirst = Default, $g_arLanguages
@@ -495,7 +497,7 @@ Func _FilesAu3()
 	_drawUAHMenuNCBottomLine($g_hGUI)
 
 	; set GUI icon
-	_WinSetIcon($g_hGUI, @ScriptDir & "\app.ico")
+	_WinSetIcon($g_hGUI, $sImagesPath & "app.ico")
 
 	_removeExStyles()
 
